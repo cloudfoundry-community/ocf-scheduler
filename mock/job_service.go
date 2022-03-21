@@ -13,6 +13,39 @@ type JobService struct {
 	storage []*core.Job
 }
 
+func (service *JobService) Get(guid string) (*core.Job, error) {
+	candidates := make([]*core.Job, 0)
+
+	for _, job := range service.storage {
+		if job.GUID == guid {
+			candidates = append(candidates, job)
+		}
+	}
+
+	if len(candidates) > 1 {
+		return nil, fmt.Errorf("too many results")
+	}
+
+	if len(candidates) < 1 {
+		return nil, fmt.Errorf("too few results")
+	}
+
+	return candidates[0], nil
+}
+
+func (service *JobService) Delete(job *core.Job) error {
+	keep := make([]*core.Job, 0)
+	for _, item := range service.storage {
+		if item.GUID != job.GUID {
+			keep = append(keep, item)
+		}
+	}
+
+	service.storage = keep
+
+	return nil
+}
+
 func (service *JobService) Named(name string) (*core.Job, error) {
 	candidates := make([]*core.Job, 0)
 
@@ -62,6 +95,18 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 	service.storage = append(service.storage, candidate)
 
 	return candidate, nil
+}
+
+func (service *JobService) InSpace(guid string) []*core.Job {
+	spaced := make([]*core.Job, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.SpaceGUID == guid {
+			spaced = append(spaced, candidate)
+		}
+	}
+
+	return spaced
 }
 
 func NewJobService() *JobService {

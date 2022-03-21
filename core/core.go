@@ -29,10 +29,18 @@ type Schedule struct {
 }
 
 type JobService interface {
+	Get(string) (*Job, error)
+	Delete(*Job) error
 	Named(string) (*Job, error)
 	Persist(*Job) (*Job, error)
+	InSpace(string) []*Job
+}
+
+type EnvironmentInfoService interface {
+	SpaceGUID() string
 }
 
 type Services struct {
-	Jobs JobService
+	Jobs        JobService
+	Environment EnvironmentInfoService
 }
