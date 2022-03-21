@@ -30,6 +30,8 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
+		input.SpaceGUID = services.Environment.SpaceGUID()
+
 		if len(input.Name) == 0 {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}

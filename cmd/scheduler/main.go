@@ -14,7 +14,13 @@ import (
 
 func main() {
 	jobs := mock.NewJobService()
-	services := &core.Services{Jobs: jobs}
+	environment := mock.NewEnvironmentInfoService()
+
+	services := &core.Services{
+		Jobs:        jobs,
+		Environment: environment,
+	}
+
 	server := http.Server("0.0.0.0:8000", services)
 
 	go func() {

@@ -97,6 +97,18 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 	return candidate, nil
 }
 
+func (service *JobService) InSpace(guid string) []*core.Job {
+	spaced := make([]*core.Job, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.SpaceGUID == guid {
+			spaced = append(spaced, candidate)
+		}
+	}
+
+	return spaced
+}
+
 func NewJobService() *JobService {
 	return &JobService{
 		storage: make([]*core.Job, 0),
