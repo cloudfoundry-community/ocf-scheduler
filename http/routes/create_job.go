@@ -47,7 +47,7 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 		fmt.Println("job:", job)
 
 		return c.JSON(
-			http.StatusOK,
+			http.StatusCreated,
 			job,
 		)
 	})
