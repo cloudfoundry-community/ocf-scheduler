@@ -33,6 +33,19 @@ func (service *JobService) Get(guid string) (*core.Job, error) {
 	return candidates[0], nil
 }
 
+func (service *JobService) Delete(job *core.Job) error {
+	keep := make([]*core.Job, 0)
+	for _, item := range service.storage {
+		if item.GUID != job.GUID {
+			keep = append(keep, item)
+		}
+	}
+
+	service.storage = keep
+
+	return nil
+}
+
 func (service *JobService) Named(name string) (*core.Job, error) {
 	candidates := make([]*core.Job, 0)
 

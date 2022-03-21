@@ -11,7 +11,7 @@ func Jobs(e *echo.Echo, services *core.Services) {
 	//AllJobs(e, services)
 	CreateJob(e, services)
 	GetJob(e, services)
-	//DeleteJob(e, services)
+	DeleteJob(e, services)
 
 	//// Execution-centric subroutes
 	//ExecuteJob(e, services)
