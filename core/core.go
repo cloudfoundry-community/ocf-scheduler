@@ -15,19 +15,6 @@ type Job struct {
 	SpaceGUID string `json:"space_guid"`
 }
 
-type Call struct {
-	GUID       string `json:"guid"`
-	Name       string `json:"name"`
-	AuthHeader string `json:"auth_header"`
-	URL        string `json:"url"`
-
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-
-	AppGUID   string `json:"app_guid"`
-	SpaceGUID string `json:"space_guid"`
-}
-
 type Schedule struct {
 	GUID          string `json:"guid"`
 	Enabled       bool   `json:"enabled"`
@@ -41,4 +28,11 @@ type Schedule struct {
 	RefType string `json:"-"`
 }
 
-type Services struct{}
+type JobService interface {
+	Named(string) (*Job, error)
+	Persist(*Job) (*Job, error)
+}
+
+type Services struct {
+	Jobs JobService
+}

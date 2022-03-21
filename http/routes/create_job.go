@@ -2,7 +2,6 @@ package routes
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -18,19 +17,35 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
-		now := time.Now().UTC()
+		appGUID := c.QueryParam("app_guid")
 
-		input := struct {
-			Text string `json:"text"`
-		}{}
+		input := &core.Job{}
 
 		if err := c.Bind(&input); err != nil {
-			return c.JSON(http.StatusUnprocessableEntity, &input)
+			return c.JSON(http.StatusUnprocessableEntity, "")
+		}
+
+		input.AppGUID = appGUID
+		if len(appGUID) == 0 {
+			return c.JSON(http.StatusUnprocessableEntity, "")
+		}
+
+		if len(input.Name) == 0 {
+			return c.JSON(http.StatusUnprocessableEntity, "")
+		}
+
+		if len(input.Command) == 0 {
+			return c.JSON(http.StatusUnprocessableEntity, "")
+		}
+
+		job, err := services.Jobs.Persist(input)
+		if err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
 		return c.JSON(
-			http.StatusOK,
-			"POST RESULT",
+			http.StatusCreated,
+			job,
 		)
 	})
 }

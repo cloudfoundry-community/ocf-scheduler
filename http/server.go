@@ -1,19 +1,13 @@
 package http
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/http/routes"
 )
-
-func verifyAuth(c echo.Context) error {
-	auth := c.Request().Header.Get(echo.HeaderAuthorization)
-
-	return fmt.Errorf("unimplemented")
-}
 
 func Server(bind string, services *core.Services) *http.Server {
 	e := echo.New()
@@ -26,9 +20,7 @@ func Server(bind string, services *core.Services) *http.Server {
 		)
 	})
 
-	// CALL ROUTES
-
-	// JOB ROUTES
+	routes.Apply(e, services)
 
 	server := e.Server
 	server.Addr = bind
