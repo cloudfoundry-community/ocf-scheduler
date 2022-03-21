@@ -13,6 +13,26 @@ type JobService struct {
 	storage []*core.Job
 }
 
+func (service *JobService) Get(guid string) (*core.Job, error) {
+	candidates := make([]*core.Job, 0)
+
+	for _, job := range service.storage {
+		if job.GUID == guid {
+			candidates = append(candidates, job)
+		}
+	}
+
+	if len(candidates) > 1 {
+		return nil, fmt.Errorf("too many results")
+	}
+
+	if len(candidates) < 1 {
+		return nil, fmt.Errorf("too few results")
+	}
+
+	return candidates[0], nil
+}
+
 func (service *JobService) Named(name string) (*core.Job, error) {
 	candidates := make([]*core.Job, 0)
 

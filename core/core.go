@@ -29,6 +29,7 @@ type Schedule struct {
 }
 
 type JobService interface {
+	Get(string) (*Job, error)
 	Named(string) (*Job, error)
 	Persist(*Job) (*Job, error)
 }
