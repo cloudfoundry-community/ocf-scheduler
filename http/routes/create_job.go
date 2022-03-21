@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -43,8 +42,6 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 		if err != nil {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
-
-		fmt.Println("job:", job)
 
 		return c.JSON(
 			http.StatusCreated,

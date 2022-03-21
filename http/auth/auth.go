@@ -8,7 +8,6 @@ import (
 
 func Verify(c echo.Context) error {
 	auth := c.Request().Header.Get(echo.HeaderAuthorization)
-	fmt.Println("(DEBUG) auth:", auth)
 	if len(auth) == 0 {
 		return fmt.Errorf("no auth provided")
 	}
@@ -17,6 +16,5 @@ func Verify(c echo.Context) error {
 		return fmt.Errorf("you're not jeremy!")
 	}
 
-	//return fmt.Errorf("unimplemented")
 	return nil
 }
