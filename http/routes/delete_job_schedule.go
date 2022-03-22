@@ -19,7 +19,7 @@ func DeleteJobSchedule(e *echo.Echo, services *core.Services) {
 
 		guid := c.Param("guid")
 
-		_, err := services.Jobs.Get(guid)
+		job, err := services.Jobs.Get(guid)
 		if err != nil {
 			return c.JSON(http.StatusNotFound, "")
 		}
@@ -28,6 +28,12 @@ func DeleteJobSchedule(e *echo.Echo, services *core.Services) {
 		schedule, err := services.Schedules.Get(scheduleGUID)
 		if err != nil {
 			return c.JSON(http.StatusNotFound, "")
+		}
+
+		run := &core.Run{Job: job, Schedule: schedule, Services: services}
+
+		if services.Cron.Delete(run) != nil {
+			return c.JSON(http.StatusInternalServerError, "")
 		}
 
 		if services.Schedules.Delete(schedule) != nil {

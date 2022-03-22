@@ -10,10 +10,10 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/http/presenters"
 )
 
-func CreateJobSchedule(e *echo.Echo, services *core.Services) {
-	// Schedule a Job to run later
-	// POST /jobs/{jobGuid}/schedules
-	e.POST("/jobs/:guid/schedules", func(c echo.Context) error {
+func ExecuteJob(e *echo.Echo, services *core.Services) {
+	// Execute a Job as soon as possible
+	// POST /jobs/{jobGuid}/execute
+	e.POST("/jobs/:guid/execute", func(c echo.Context) error {
 		if auth.Verify(c) != nil {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
@@ -28,7 +28,7 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 			)
 		}
 
-		input := &core.Schedule{}
+		input := &core.Execution{}
 
 		if err = c.Bind(&input); err != nil {
 			return c.JSON(http.StatusUnprocessableEntity, "")
@@ -37,16 +37,16 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 		input.RefGUID = guid
 		input.RefType = "job"
 
-		schedule, err := services.Schedules.Persist(input)
+		execution, err := services.Executions.Persist(input)
 		if err != nil {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		services.Cron.Add(&core.Run{Job: job, Schedule: schedule, Services: services})
+		services.Runner.Execute(services, execution, job)
 
 		return c.JSON(
 			http.StatusCreated,
-			presenters.AsJobSchedule(schedule),
+			presenters.AsJobExecution(execution),
 		)
 	})
 }
