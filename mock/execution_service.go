@@ -72,3 +72,15 @@ func (service *ExecutionService) Fail(execution *core.Execution) (*core.Executio
 
 //return candidate, nil
 //}
+
+func (service *ExecutionService) ByJob(job *core.Job) []*core.Execution {
+	found := make([]*core.Execution, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.RefType == "job" && candidate.RefGUID == job.GUID {
+			found = append(found, candidate)
+		}
+	}
+
+	return found
+}

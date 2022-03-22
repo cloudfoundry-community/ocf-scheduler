@@ -20,4 +20,5 @@ type ExecutionService interface {
 	Success(*Execution) (*Execution, error)
 	Fail(*Execution) (*Execution, error)
 	UpdateMessage(*Execution, string) (*Execution, error)
+	ByJob(*Job) []*Execution
 }
