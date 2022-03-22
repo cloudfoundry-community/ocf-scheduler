@@ -16,10 +16,10 @@ type Job struct {
 }
 
 type Schedule struct {
-	GUID          string `json:"guid"`
-	Enabled       bool   `json:"enabled"`
-	Expression    string `json:"expession"`
-	ExpessionType string `json:"expression_type"`
+	GUID           string `json:"guid"`
+	Enabled        bool   `json:"enabled"`
+	Expression     string `json:"expression"`
+	ExpressionType string `json:"expression_type"`
 
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
@@ -40,7 +40,15 @@ type EnvironmentInfoService interface {
 	SpaceGUID() string
 }
 
+type ScheduleService interface {
+	Persist(*Schedule) (*Schedule, error)
+	ByJob(*Job) []*Schedule
+	Get(string) (*Schedule, error)
+	Delete(*Schedule) error
+}
+
 type Services struct {
-	Jobs        JobService
 	Environment EnvironmentInfoService
+	Jobs        JobService
+	Schedules   ScheduleService
 }
