@@ -20,7 +20,7 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 
 		guid := c.Param("guid")
 
-		_, err := services.Jobs.Get(guid)
+		job, err := services.Jobs.Get(guid)
 		if err != nil {
 			return c.JSON(
 				http.StatusNotFound,
@@ -41,6 +41,8 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 		if err != nil {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
+
+		services.Cron.Add(&core.Run{Job: job, Schedule: schedule, Services: services})
 
 		return c.JSON(
 			http.StatusCreated,

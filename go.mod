@@ -6,6 +6,7 @@ require (
 	github.com/gammazero/workerpool v1.1.2
 	github.com/google/uuid v1.3.0
 	github.com/labstack/echo/v4 v4.7.2
+	github.com/robfig/cron/v3 v3.0.1
 )
 
 require (

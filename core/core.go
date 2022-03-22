@@ -1,5 +1,15 @@
 package core
 
+import "context"
+
+type CronService interface {
+	Start()
+	Stop() context.Context
+	Add(*Run) error
+	Delete(*Run) error
+	Count() int
+}
+
 type Services struct {
 	Environment EnvironmentInfoService
 	Jobs        JobService
@@ -7,4 +17,5 @@ type Services struct {
 	Workers     WorkerService
 	Runner      RunService
 	Executions  ExecutionService
+	Cron        CronService
 }

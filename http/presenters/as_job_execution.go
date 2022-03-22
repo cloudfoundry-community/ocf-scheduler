@@ -4,9 +4,11 @@ import "github.com/starkandwayne/scheduler-for-ocf/core"
 
 func AsJobExecution(execution *core.Execution) *JobExecution {
 	output := &JobExecution{
-		GUID:     execution.GUID,
-		JobGUID:  execution.RefGUID,
-		TaskGUID: execution.TaskGUID,
+		GUID:          execution.GUID,
+		JobGUID:       execution.RefGUID,
+		TaskGUID:      execution.TaskGUID,
+		ScheduleGUID:  execution.ScheduleGUID,
+		ScheduledTime: execution.ScheduledTime,
 
 		Message: execution.Message,
 		State:   execution.State,
@@ -29,9 +31,11 @@ func AsJobExecutionCollection(executions []*core.Execution) []*JobExecution {
 }
 
 type JobExecution struct {
-	GUID     string `json:"guid"`
-	JobGUID  string `json:"job_guid"`
-	TaskGUID string `json:"task_guid"`
+	GUID          string `json:"guid"`
+	JobGUID       string `json:"job_guid"`
+	TaskGUID      string `json:"task_guid"`
+	ScheduleGUID  string `json:"schedule_guid,omitempty"`
+	ScheduledTime string `json:"scheduled_time,omitempty"`
 
 	Message string `json:"message"`
 	State   string `json:"state"`

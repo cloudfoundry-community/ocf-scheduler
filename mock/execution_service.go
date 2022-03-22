@@ -44,7 +44,21 @@ func (service *ExecutionService) UpdateMessage(execution *core.Execution, messag
 }
 
 func (service *ExecutionService) Start(execution *core.Execution) (*core.Execution, error) {
-	execution.ExecutionStartTime = time.Now().UTC().String()
+	now := time.Now().UTC()
+
+	execution.ExecutionStartTime = now.String()
+	if len(execution.ScheduleGUID) > 0 {
+		execution.ScheduledTime = time.Date(
+			now.Year(),
+			now.Month(),
+			now.Day(),
+			now.Hour(),
+			now.Minute(),
+			0,
+			0,
+			time.UTC,
+		).String()
+	}
 
 	return service.update(execution)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/gammazero/workerpool"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/cron"
 	"github.com/starkandwayne/scheduler-for-ocf/http"
 	"github.com/starkandwayne/scheduler-for-ocf/mock"
 )
@@ -20,9 +21,13 @@ func main() {
 	schedules := mock.NewScheduleService()
 	executions := mock.NewExecutionService()
 	runner := mock.NewRunService()
-	workers := workerpool.New(10)
 
+	workers := workerpool.New(10)
 	defer workers.StopWait()
+
+	cronService := cron.NewCronService()
+	cronService.Start()
+	defer cronService.Stop()
 
 	services := &core.Services{
 		Jobs:        jobs,
@@ -31,6 +36,7 @@ func main() {
 		Workers:     workers,
 		Runner:      runner,
 		Executions:  executions,
+		Cron:        cronService,
 	}
 
 	server := http.Server("0.0.0.0:8000", services)
