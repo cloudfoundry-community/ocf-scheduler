@@ -48,3 +48,36 @@ func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
 
 	return found
 }
+
+func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
+	candidates := make([]*core.Schedule, 0)
+
+	for _, schedule := range service.storage {
+		if schedule.GUID == guid {
+			candidates = append(candidates, schedule)
+		}
+	}
+
+	if len(candidates) > 1 {
+		return nil, fmt.Errorf("too many results")
+	}
+
+	if len(candidates) < 1 {
+		return nil, fmt.Errorf("too few results")
+	}
+
+	return candidates[0], nil
+}
+
+func (service *ScheduleService) Delete(schedule *core.Schedule) error {
+	keep := make([]*core.Schedule, 0)
+	for _, item := range service.storage {
+		if item.GUID != schedule.GUID {
+			keep = append(keep, item)
+		}
+	}
+
+	service.storage = keep
+
+	return nil
+}
