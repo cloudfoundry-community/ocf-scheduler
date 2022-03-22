@@ -2,8 +2,8 @@ package presenters
 
 import "github.com/starkandwayne/scheduler-for-ocf/core"
 
-func AsJobSchedule(schedule *core.Schedule) *jobSchedule {
-	output := &jobSchedule{
+func AsJobSchedule(schedule *core.Schedule) *JobSchedule {
+	output := &JobSchedule{
 		GUID:           schedule.GUID,
 		Enabled:        schedule.Enabled,
 		Expression:     schedule.Expression,
@@ -16,7 +16,17 @@ func AsJobSchedule(schedule *core.Schedule) *jobSchedule {
 	return output
 }
 
-type jobSchedule struct {
+func AsJobScheduleCollection(schedules []*core.Schedule) []*JobSchedule {
+	output := make([]*JobSchedule, 0)
+
+	for _, schedule := range schedules {
+		output = append(output, AsJobSchedule(schedule))
+	}
+
+	return output
+}
+
+type JobSchedule struct {
 	GUID           string `json:"guid"`
 	Enabled        bool   `json:"enabled"`
 	Expression     string `json:"expression"`

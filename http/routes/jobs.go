@@ -19,7 +19,7 @@ func Jobs(e *echo.Echo, services *core.Services) {
 	//AllJobScheduleExecutions(e, services)
 
 	// Schedule-centric subroutes
-	//AllJobSchedules(e, services)
+	AllJobSchedules(e, services)
 	CreateJobSchedule(e, services)
 	//DeleteJobSchedule(e, services)
 }

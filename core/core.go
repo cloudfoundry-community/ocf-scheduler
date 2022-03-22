@@ -42,6 +42,7 @@ type EnvironmentInfoService interface {
 
 type ScheduleService interface {
 	Persist(*Schedule) (*Schedule, error)
+	ByJob(*Job) []*Schedule
 }
 
 type Services struct {
