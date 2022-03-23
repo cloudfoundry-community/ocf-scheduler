@@ -99,6 +99,18 @@ func (service *ExecutionService) ByJob(job *core.Job) []*core.Execution {
 	return found
 }
 
+func (service *ExecutionService) ByCall(call *core.Call) []*core.Execution {
+	found := make([]*core.Execution, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.RefType == "call" && candidate.RefGUID == call.GUID {
+			found = append(found, candidate)
+		}
+	}
+
+	return found
+}
+
 func (service *ExecutionService) BySchedule(schedule *core.Schedule) []*core.Execution {
 	found := make([]*core.Execution, 0)
 

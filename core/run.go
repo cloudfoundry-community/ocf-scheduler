@@ -1,28 +1,14 @@
 package core
 
-type Run struct {
-	Job      *Job
-	Schedule *Schedule
-	Services *Services
-}
-
-func (run *Run) Run() {
-	execution := &Execution{
-		RefGUID:      run.Job.GUID,
-		RefType:      "job",
-		ScheduleGUID: run.Schedule.GUID,
-	}
-
-	execution, _ = run.Services.Executions.Persist(execution)
-
-	run.Services.Runner.Execute(
-		run.Services,
-		execution,
-		run.Job,
-	)
-
+type Runnable interface {
+	Run()
+	Services() *Services
+	Job() *Job
+	Call() *Call
+	Schedule() *Schedule
 }
 
 type RunService interface {
-	Execute(*Services, *Execution, *Job)
+	ExecuteJob(*Services, *Execution, *Job)
+	ExecuteCall(*Services, *Execution, *Call)
 }

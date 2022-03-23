@@ -42,7 +42,7 @@ func ExecuteJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		services.Runner.Execute(services, execution, job)
+		services.Runner.ExecuteJob(services, execution, job)
 
 		return c.JSON(
 			http.StatusCreated,

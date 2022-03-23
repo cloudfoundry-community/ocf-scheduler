@@ -13,7 +13,16 @@ func NewRunService() *RunService {
 	return &RunService{}
 }
 
-func (service *RunService) Execute(services *core.Services, execution *core.Execution, job *core.Job) {
+func (service *RunService) ExecuteJob(services *core.Services, execution *core.Execution, job *core.Job) {
+	services.Workers.Submit(func() {
+		services.Executions.Start(execution)
+		time.Sleep(time.Second)
+		services.Executions.UpdateMessage(execution, "ran by the mock runnner")
+		services.Executions.Success(execution)
+	})
+}
+
+func (service *RunService) ExecuteCall(services *core.Services, execution *core.Execution, call *core.Call) {
 	services.Workers.Submit(func() {
 		services.Executions.Start(execution)
 		time.Sleep(time.Second)

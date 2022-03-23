@@ -5,14 +5,15 @@ import "context"
 type CronService interface {
 	Start()
 	Stop() context.Context
-	Add(*Run) error
-	Delete(*Run) error
+	Add(Runnable) error
+	Delete(Runnable) error
 	Count() int
 }
 
 type Services struct {
 	Environment EnvironmentInfoService
 	Jobs        JobService
+	Calls       CallService
 	Schedules   ScheduleService
 	Workers     WorkerService
 	Runner      RunService

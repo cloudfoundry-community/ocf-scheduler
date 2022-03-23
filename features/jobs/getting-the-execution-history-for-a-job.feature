@@ -30,6 +30,6 @@ Feature: Getting the execution history for a Job
 
   @failure
   Scenario: No such Job
-    When I GET with authentication from /jobs/1-bohj/history
+    When I GET with authentication from /jobs/1-boj/history
     Then the response code is 404
     And the response body is empty

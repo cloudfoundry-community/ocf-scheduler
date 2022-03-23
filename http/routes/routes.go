@@ -8,4 +8,5 @@ import (
 
 func Apply(e *echo.Echo, services *core.Services) {
 	Jobs(e, services)
+	Calls(e, services)
 }

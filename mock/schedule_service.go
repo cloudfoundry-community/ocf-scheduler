@@ -37,6 +37,18 @@ func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedul
 	return candidate, nil
 }
 
+func (service *ScheduleService) ByCall(call *core.Call) []*core.Schedule {
+	found := make([]*core.Schedule, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.RefType == "call" && candidate.RefGUID == call.GUID {
+			found = append(found, candidate)
+		}
+	}
+
+	return found
+}
+
 func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
 	found := make([]*core.Schedule, 0)
 

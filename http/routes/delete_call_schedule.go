@@ -9,17 +9,17 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/http/auth"
 )
 
-func DeleteJobSchedule(e *echo.Echo, services *core.Services) {
-	// Delete the given schedule for the given Job
-	// DELETE /jobs/{jobGuid}/schedules/{scheduleGuid}
-	e.DELETE("/jobs/:guid/schedules/:schedule_guid", func(c echo.Context) error {
+func DeleteCallSchedule(e *echo.Echo, services *core.Services) {
+	// Delete the given schedule for the given Call
+	// DELETE /calls/{callGuid}/schedules/{scheduleGuid}
+	e.DELETE("/calls/:guid/schedules/:schedule_guid", func(c echo.Context) error {
 		if auth.Verify(c) != nil {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
 		guid := c.Param("guid")
 
-		job, err := services.Jobs.Get(guid)
+		call, err := services.Calls.Get(guid)
 		if err != nil {
 			return c.JSON(http.StatusNotFound, "")
 		}
@@ -30,7 +30,7 @@ func DeleteJobSchedule(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusNotFound, "")
 		}
 
-		run := core.NewJobRun(job, schedule, services)
+		run := core.NewCallRun(call, schedule, services)
 
 		if services.Cron.Delete(run) != nil {
 			return c.JSON(http.StatusInternalServerError, "")
