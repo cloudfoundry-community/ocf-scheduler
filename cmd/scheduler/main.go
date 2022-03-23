@@ -17,6 +17,7 @@ import (
 
 func main() {
 	jobs := mock.NewJobService()
+	calls := mock.NewCallService()
 	environment := mock.NewEnvironmentInfoService()
 	schedules := mock.NewScheduleService()
 	executions := mock.NewExecutionService()
@@ -31,6 +32,7 @@ func main() {
 
 	services := &core.Services{
 		Jobs:        jobs,
+		Calls:       calls,
 		Environment: environment,
 		Schedules:   schedules,
 		Workers:     workers,
