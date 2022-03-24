@@ -8,7 +8,7 @@ type Execution struct {
 	Message            string `json:"message"`
 	State              string `json:"state"`
 	ExecutionStartTime string `json:"execution_start_time"`
-	ExecutionEndTime   string `json:" execution_end_time"`
+	ExecutionEndTime   string `json:"execution_end_time"`
 
 	RefGUID string `json:"-"`
 	RefType string `json:"-"`
