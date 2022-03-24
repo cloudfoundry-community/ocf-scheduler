@@ -6,7 +6,6 @@ func AsCallExecution(execution *core.Execution) *CallExecution {
 	output := &CallExecution{
 		GUID:          execution.GUID,
 		CallGUID:      execution.RefGUID,
-		TaskGUID:      execution.TaskGUID,
 		ScheduleGUID:  execution.ScheduleGUID,
 		ScheduledTime: execution.ScheduledTime,
 
@@ -33,7 +32,6 @@ func AsCallExecutionCollection(executions []*core.Execution) []*CallExecution {
 type CallExecution struct {
 	GUID          string `json:"guid"`
 	CallGUID      string `json:"call_guid"`
-	TaskGUID      string `json:"task_guid"`
 	ScheduleGUID  string `json:"schedule_guid,omitempty"`
 	ScheduledTime string `json:"scheduled_time,omitempty"`
 

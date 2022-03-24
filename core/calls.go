@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 type Call struct {
 	GUID       string `json:"guid"`
 	Name       string `json:"name"`
@@ -11,6 +13,18 @@ type Call struct {
 
 	AppGUID   string `json:"app_guid"`
 	SpaceGUID string `json:"space_guid"`
+}
+
+func (entity *Call) Type() string {
+	return "call"
+}
+
+func (entity *Call) ToJob() (*Job, error) {
+	return nil, fmt.Errorf("cannot convert to Job")
+}
+
+func (entity *Call) ToCall() (*Call, error) {
+	return entity, nil
 }
 
 type CallService interface {

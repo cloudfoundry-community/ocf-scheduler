@@ -42,7 +42,7 @@ func ExecuteCall(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		services.Runner.ExecuteCall(services, execution, call)
+		services.Runner.Execute(services, execution, call)
 
 		return c.JSON(
 			http.StatusCreated,

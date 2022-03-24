@@ -23,7 +23,7 @@ func (run *CallRun) Run() {
 
 	execution, _ = run.services.Executions.Persist(execution)
 
-	run.services.Runner.ExecuteCall(
+	run.services.Runner.Execute(
 		run.services,
 		execution,
 		run.call,

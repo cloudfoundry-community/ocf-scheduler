@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: /app/scheduler
+    volumes:
+      - .:/src/scheduler-for-pcf
+    expose:
+      - 8000
+    ports:
+      - 8000:8000
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres/controller?sslmode=disable
+    links:
+      - postgres
+
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=controller
+      - POSTGRES_PASSWORD=postgres

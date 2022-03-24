@@ -71,11 +71,11 @@ func (service *ExecutionService) finish(execution *core.Execution, state string)
 }
 
 func (service *ExecutionService) Success(execution *core.Execution) (*core.Execution, error) {
-	return service.finish(execution, "SUCCESS")
+	return service.finish(execution, "SUCCEEDED")
 }
 
 func (service *ExecutionService) Fail(execution *core.Execution) (*core.Execution, error) {
-	return service.finish(execution, "FAILURE")
+	return service.finish(execution, "FAILED")
 }
 
 //func (service *ExecutionService) Get(guid string) (*core.Execution, error) {

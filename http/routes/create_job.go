@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -13,7 +14,10 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 	// Create Job
 	// POST /jobs?app_guid=string
 	e.POST("/jobs", func(c echo.Context) error {
+		tag := "create-job"
+
 		if auth.Verify(c) != nil {
+			services.Logger.Error(tag, "authentication to this endpoint failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
@@ -33,18 +37,28 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 		input.SpaceGUID = services.Environment.SpaceGUID()
 
 		if len(input.Name) == 0 {
+			services.Logger.Error(tag, "got a blank job name")
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
 		if len(input.Command) == 0 {
+			services.Logger.Error(tag, "got a blank job command")
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
 		job, err := services.Jobs.Persist(input)
 		if err != nil {
+			services.Logger.Error(tag, "could not persist the job")
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
+		success := fmt.Sprintf(
+			"successfully created job %s for app %s",
+			job.Name,
+			appGUID,
+		)
+
+		services.Logger.Info(tag, success)
 		return c.JSON(
 			http.StatusCreated,
 			job,

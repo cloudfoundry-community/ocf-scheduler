@@ -10,38 +10,45 @@ import (
 
 type CronService struct {
 	*cron.Cron
+	log     core.LogService
 	mapping map[string]cron.EntryID
 }
 
-func NewCronService() *CronService {
-	return &CronService{cron.New(), make(map[string]cron.EntryID)}
+func NewCronService(log core.LogService) *CronService {
+	return &CronService{
+		cron.New(),
+		log,
+		make(map[string]cron.EntryID)}
 }
 
 func (service *CronService) Add(runnable core.Runnable) error {
 	schedule := runnable.Schedule()
 
 	process := func() {
+		tag := "cron-service"
+
 		if runnable.Job() != nil {
 			job := runnable.Job()
 
-			fmt.Printf(
-				"\nRunning job %s (%s)\n\tScheduled with %s (%s)\n",
+			message := fmt.Sprintf(
+				"running job %s (%s) [%s]",
 				job.Name,
 				job.Command,
 				schedule.Expression,
-				schedule.GUID,
 			)
+
+			service.log.Info(tag, message)
 		} else {
 			call := runnable.Call()
 
-			fmt.Printf(
-				"\nPerforming call %s (%s) [%s]\n\tScheduled with %s (%s)\n",
+			message := fmt.Sprintf(
+				"performing call %s (%s) [%s]",
 				call.Name,
-				call.GUID,
 				call.URL,
 				schedule.Expression,
-				schedule.GUID,
 			)
+
+			service.log.Info(tag, message)
 		}
 
 		runnable.Run()

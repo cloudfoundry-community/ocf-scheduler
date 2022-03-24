@@ -10,6 +10,12 @@ type CronService interface {
 	Count() int
 }
 
+type Executable interface {
+	Type() string
+	ToCall() (*Call, error)
+	ToJob() (*Job, error)
+}
+
 type Services struct {
 	Environment EnvironmentInfoService
 	Jobs        JobService
@@ -19,4 +25,5 @@ type Services struct {
 	Runner      RunService
 	Executions  ExecutionService
 	Cron        CronService
+	Logger      LogService
 }

@@ -2,6 +2,7 @@ package mock
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,9 +12,17 @@ import (
 
 type JobService struct {
 	storage []*core.Job
+	locker  sync.Mutex
 }
 
 func (service *JobService) Get(guid string) (*core.Job, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	return service.get(guid)
+}
+
+func (service *JobService) get(guid string) (*core.Job, error) {
 	candidates := make([]*core.Job, 0)
 
 	for _, job := range service.storage {
@@ -34,6 +43,13 @@ func (service *JobService) Get(guid string) (*core.Job, error) {
 }
 
 func (service *JobService) Delete(job *core.Job) error {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	return service.delete(job)
+}
+
+func (service *JobService) delete(job *core.Job) error {
 	keep := make([]*core.Job, 0)
 	for _, item := range service.storage {
 		if item.GUID != job.GUID {
@@ -47,6 +63,13 @@ func (service *JobService) Delete(job *core.Job) error {
 }
 
 func (service *JobService) Named(name string) (*core.Job, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	return service.named(name)
+}
+
+func (service *JobService) named(name string) (*core.Job, error) {
 	candidates := make([]*core.Job, 0)
 
 	for _, job := range service.storage {
@@ -67,7 +90,10 @@ func (service *JobService) Named(name string) (*core.Job, error) {
 }
 
 func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
-	if _, err := service.Named(candidate.Name); err == nil {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	if _, err := service.named(candidate.Name); err == nil {
 		return nil, fmt.Errorf("hold up, jack, that name is already taken")
 	}
 
@@ -98,6 +124,9 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 }
 
 func (service *JobService) InSpace(guid string) []*core.Job {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	spaced := make([]*core.Job, 0)
 
 	for _, candidate := range service.storage {

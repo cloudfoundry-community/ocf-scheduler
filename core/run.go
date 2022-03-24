@@ -9,6 +9,7 @@ type Runnable interface {
 }
 
 type RunService interface {
-	ExecuteJob(*Services, *Execution, *Job)
-	ExecuteCall(*Services, *Execution, *Call)
+	//ExecuteJob(*Services, *Execution, *Job)
+	//ExecuteCall(*Services, *Execution, *Call)
+	Execute(*Services, *Execution, Executable)
 }

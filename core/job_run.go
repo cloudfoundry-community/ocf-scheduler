@@ -23,7 +23,7 @@ func (run *JobRun) Run() {
 
 	execution, _ = run.services.Executions.Persist(execution)
 
-	run.services.Runner.ExecuteJob(
+	run.services.Runner.Execute(
 		run.services,
 		execution,
 		run.job,

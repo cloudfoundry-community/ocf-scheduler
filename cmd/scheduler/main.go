@@ -9,11 +9,16 @@ import (
 
 	"github.com/gammazero/workerpool"
 
+	"github.com/starkandwayne/scheduler-for-ocf/combined"
 	"github.com/starkandwayne/scheduler-for-ocf/core"
 	"github.com/starkandwayne/scheduler-for-ocf/cron"
 	"github.com/starkandwayne/scheduler-for-ocf/http"
+	"github.com/starkandwayne/scheduler-for-ocf/logger"
 	"github.com/starkandwayne/scheduler-for-ocf/mock"
 )
+
+var callRunner = http.NewRunService()
+var jobRunner = mock.NewRunService()
 
 func main() {
 	jobs := mock.NewJobService()
@@ -21,12 +26,18 @@ func main() {
 	environment := mock.NewEnvironmentInfoService()
 	schedules := mock.NewScheduleService()
 	executions := mock.NewExecutionService()
-	runner := mock.NewRunService()
+	log := logger.New()
+	runner := combined.NewRunService(
+		map[string]core.RunService{
+			"job":  jobRunner,
+			"call": callRunner,
+		},
+	)
 
 	workers := workerpool.New(10)
 	defer workers.StopWait()
 
-	cronService := cron.NewCronService()
+	cronService := cron.NewCronService(log)
 	cronService.Start()
 	defer cronService.Stop()
 
@@ -39,17 +50,20 @@ func main() {
 		Runner:      runner,
 		Executions:  executions,
 		Cron:        cronService,
+		Logger:      log,
 	}
 
 	server := http.Server("0.0.0.0:8000", services)
 
+	tag := "scheduler-for-ocf"
+
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
-			fmt.Println("stopping the server")
+			log.Info(tag, "stopping the server")
 		}
 	}()
 
-	fmt.Println("Listening for connections on", server.Addr)
+	log.Info(tag, fmt.Sprintf("listening for connections on %s", server.Addr))
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit, os.Interrupt)
@@ -61,7 +75,7 @@ func main() {
 
 	if err := server.Shutdown(ctx); err != nil {
 		server.Close()
-		fmt.Println(err)
+		log.Error(tag, err.Error())
 		os.Exit(2)
 	}
 }

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -13,7 +14,10 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 	// Create Call
 	// POST /calls?app_guid=string
 	e.POST("/calls", func(c echo.Context) error {
+		tag := "create-call"
+
 		if auth.Verify(c) != nil {
+			services.Logger.Error(tag, "authentication to this endpoint failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
@@ -33,22 +37,33 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 		input.SpaceGUID = services.Environment.SpaceGUID()
 
 		if len(input.Name) == 0 {
+			services.Logger.Error(tag, "got a blank call name")
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
 		if len(input.URL) == 0 {
+			services.Logger.Error(tag, "got a blank call URL")
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
 		if len(input.AuthHeader) == 0 {
+			services.Logger.Error(tag, "got a blank call auth header")
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
 		call, err := services.Calls.Persist(input)
 		if err != nil {
+			services.Logger.Error(tag, "could not persist the call")
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
+		success := fmt.Sprintf(
+			"successfully created call %s for app %s",
+			call.Name,
+			appGUID,
+		)
+
+		services.Logger.Info(tag, success)
 		return c.JSON(
 			http.StatusCreated,
 			call,

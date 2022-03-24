@@ -2,6 +2,7 @@ package mock
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 
 type ScheduleService struct {
 	storage []*core.Schedule
+	locker  sync.Mutex
 }
 
 func NewScheduleService() *ScheduleService {
@@ -20,6 +22,9 @@ func NewScheduleService() *ScheduleService {
 }
 
 func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedule, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	now := time.Now().UTC()
 
 	id, err := uuid.NewRandom()
@@ -38,6 +43,9 @@ func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedul
 }
 
 func (service *ScheduleService) ByCall(call *core.Call) []*core.Schedule {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	found := make([]*core.Schedule, 0)
 
 	for _, candidate := range service.storage {
@@ -50,6 +58,9 @@ func (service *ScheduleService) ByCall(call *core.Call) []*core.Schedule {
 }
 
 func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	found := make([]*core.Schedule, 0)
 
 	for _, candidate := range service.storage {
@@ -62,6 +73,9 @@ func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
 }
 
 func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	candidates := make([]*core.Schedule, 0)
 
 	for _, schedule := range service.storage {
@@ -82,6 +96,9 @@ func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
 }
 
 func (service *ScheduleService) Delete(schedule *core.Schedule) error {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	keep := make([]*core.Schedule, 0)
 	for _, item := range service.storage {
 		if item.GUID != schedule.GUID {
