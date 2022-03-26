@@ -12,8 +12,8 @@ func init() {
 				name TEXT NOT NULL,
 				url TEXT NOT NULL,
 				auth_header TEXT NOT NULL,
-				app_guid TEXT NOT NULL,
-				space_guid TEXT NOT NULL,
+				app_guid CHAR(36) NOT NULL,
+				space_guid CHAR(36) NOT NULL,
 				created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 				updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 			);`,

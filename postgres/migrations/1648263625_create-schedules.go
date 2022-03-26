@@ -12,7 +12,7 @@ func init() {
 				enabled BOOL,
 				expression TEXT NOT NULL,
 				expression_type TEXT NOT NULL,
-				ref_guid TEXT NOT NULL,
+				ref_guid CHAR(36) NOT NULL,
 				ref_type TEXT NOT NULL,
 				created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 				updated_at TIMESTAMP WITH TIME ZONE NOT NULL
