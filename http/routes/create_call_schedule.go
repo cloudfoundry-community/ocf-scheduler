@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -14,6 +15,8 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 	// Schedule a Call to run later
 	// POST /calls/{callGuid}/schedules
 	e.POST("/calls/:guid/schedules", func(c echo.Context) error {
+		tag := "create-call-schedule"
+
 		if auth.Verify(c) != nil {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
@@ -36,6 +39,8 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 
 		input.RefGUID = guid
 		input.RefType = "call"
+
+		services.Logger.Info(tag, fmt.Sprintf("expression == '%s', expression_type == '%s'", input.Expression, input.ExpressionType))
 
 		schedule, err := services.Schedules.Persist(input)
 		if err != nil {

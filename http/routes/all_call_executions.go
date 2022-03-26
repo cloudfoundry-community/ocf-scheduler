@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -14,6 +15,8 @@ func AllCallExecutions(e *echo.Echo, services *core.Services) {
 	// Get all execution histories for a Call
 	// GET /calls/{callGuid}/history
 	e.GET("/calls/:guid/history", func(c echo.Context) error {
+		tag := "all-call-executions"
+
 		if auth.Verify(c) != nil {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
@@ -26,6 +29,8 @@ func AllCallExecutions(e *echo.Echo, services *core.Services) {
 		}
 
 		executions := services.Executions.ByCall(call)
+
+		services.Logger.Info(tag, fmt.Sprintf("got %d executions", len(executions)))
 
 		output := &callExecutionCollection{
 			Resources: presenters.AsCallExecutionCollection(executions),

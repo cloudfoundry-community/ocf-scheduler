@@ -1,14 +1,16 @@
 package core
 
+import "time"
+
 type Execution struct {
-	GUID               string `json:"guid"`
-	TaskGUID           string `json:"task_guid"`
-	ScheduleGUID       string `json:"schedule_guid,omitempty"`
-	ScheduledTime      string `json:"scheduled_time"`
-	Message            string `json:"message"`
-	State              string `json:"state"`
-	ExecutionStartTime string `json:"execution_start_time"`
-	ExecutionEndTime   string `json:"execution_end_time"`
+	GUID               string    `json:"guid"`
+	TaskGUID           string    `json:"task_guid"`
+	ScheduleGUID       string    `json:"schedule_guid,omitempty"`
+	ScheduledTime      time.Time `json:"scheduled_time"`
+	Message            string    `json:"message"`
+	State              string    `json:"state"`
+	ExecutionStartTime time.Time `json:"execution_start_time"`
+	ExecutionEndTime   time.Time `json:"execution_end_time"`
 
 	RefGUID string `json:"-"`
 	RefType string `json:"-"`

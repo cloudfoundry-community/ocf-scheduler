@@ -34,8 +34,8 @@ func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedul
 	}
 
 	candidate.GUID = id.String()
-	candidate.CreatedAt = now.String()
-	candidate.UpdatedAt = now.String()
+	candidate.CreatedAt = now
+	candidate.UpdatedAt = now
 
 	service.storage = append(service.storage, candidate)
 
@@ -109,4 +109,19 @@ func (service *ScheduleService) Delete(schedule *core.Schedule) error {
 	service.storage = keep
 
 	return nil
+}
+
+func (service *ScheduleService) Enabled() []*core.Schedule {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	enabled := make([]*core.Schedule, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.Enabled {
+			enabled = append(enabled, candidate)
+		}
+	}
+
+	return enabled
 }

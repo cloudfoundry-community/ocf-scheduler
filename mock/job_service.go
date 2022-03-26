@@ -106,8 +106,8 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 	}
 
 	candidate.GUID = id.String()
-	candidate.CreatedAt = now.String()
-	candidate.UpdatedAt = now.String()
+	candidate.CreatedAt = now
+	candidate.UpdatedAt = now
 	candidate.State = "Indiana"
 
 	if candidate.DiskInMb == 0 {

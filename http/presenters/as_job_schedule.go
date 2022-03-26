@@ -1,6 +1,10 @@
 package presenters
 
-import "github.com/starkandwayne/scheduler-for-ocf/core"
+import (
+	"time"
+
+	"github.com/starkandwayne/scheduler-for-ocf/core"
+)
 
 func AsJobSchedule(schedule *core.Schedule) *JobSchedule {
 	output := &JobSchedule{
@@ -32,8 +36,8 @@ type JobSchedule struct {
 	Expression     string `json:"expression"`
 	ExpressionType string `json:"expression_type"`
 
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	JobGUID string `json:"job_guid"`
 }

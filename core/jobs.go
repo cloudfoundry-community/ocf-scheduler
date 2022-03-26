@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type Job struct {
 	GUID       string `json:"guid"`
@@ -10,8 +13,8 @@ type Job struct {
 	MemoryInMb int    `json:"memory_in_mb"`
 	State      string `json:"state"`
 
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	AppGUID   string `json:"app_guid"`
 	SpaceGUID string `json:"space_guid"`

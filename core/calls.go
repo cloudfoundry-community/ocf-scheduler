@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type Call struct {
 	GUID       string `json:"guid"`
@@ -8,8 +11,8 @@ type Call struct {
 	URL        string `json:"url"`
 	AuthHeader string `json:"auth_header"`
 
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	AppGUID   string `json:"app_guid"`
 	SpaceGUID string `json:"space_guid"`

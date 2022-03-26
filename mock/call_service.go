@@ -102,8 +102,8 @@ func (service *CallService) Persist(candidate *core.Call) (*core.Call, error) {
 	}
 
 	candidate.GUID = id.String()
-	candidate.CreatedAt = now.String()
-	candidate.UpdatedAt = now.String()
+	candidate.CreatedAt = now
+	candidate.UpdatedAt = now
 
 	service.storage = append(service.storage, candidate)
 

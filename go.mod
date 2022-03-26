@@ -7,13 +7,16 @@ require (
 	github.com/gammazero/workerpool v1.1.2
 	github.com/google/uuid v1.3.0
 	github.com/labstack/echo/v4 v4.7.2
+	github.com/lib/pq v1.10.4
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/rubenv/sql-migrate v1.1.1
 	github.com/sirupsen/logrus v1.8.1
 )
 
 require (
 	github.com/ess/debuggable v1.0.0 // indirect
 	github.com/gammazero/deque v0.1.0 // indirect
+	github.com/go-gorp/gorp/v3 v3.0.2 // indirect
 	github.com/labstack/gommon v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect

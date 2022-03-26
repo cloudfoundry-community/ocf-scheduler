@@ -1,6 +1,10 @@
 package presenters
 
-import "github.com/starkandwayne/scheduler-for-ocf/core"
+import (
+	"time"
+
+	"github.com/starkandwayne/scheduler-for-ocf/core"
+)
 
 func AsJobExecution(execution *core.Execution) *JobExecution {
 	output := &JobExecution{
@@ -31,15 +35,15 @@ func AsJobExecutionCollection(executions []*core.Execution) []*JobExecution {
 }
 
 type JobExecution struct {
-	GUID          string `json:"guid"`
-	JobGUID       string `json:"job_guid"`
-	TaskGUID      string `json:"task_guid"`
-	ScheduleGUID  string `json:"schedule_guid,omitempty"`
-	ScheduledTime string `json:"scheduled_time,omitempty"`
+	GUID          string    `json:"guid"`
+	JobGUID       string    `json:"job_guid"`
+	TaskGUID      string    `json:"task_guid"`
+	ScheduleGUID  string    `json:"schedule_guid,omitempty"`
+	ScheduledTime time.Time `json:"scheduled_time,omitempty"`
 
 	Message string `json:"message"`
 	State   string `json:"state"`
 
-	ExecutionStartTime string `json:"execution_start_time"`
-	ExecutionEndTime   string `json:"execution_end_time"`
+	ExecutionStartTime time.Time `json:"execution_start_time"`
+	ExecutionEndTime   time.Time `json:"execution_end_time"`
 }
