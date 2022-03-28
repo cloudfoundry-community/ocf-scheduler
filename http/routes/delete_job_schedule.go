@@ -7,6 +7,7 @@ import (
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
 	"github.com/starkandwayne/scheduler-for-ocf/http/auth"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 func DeleteJobSchedule(e *echo.Echo, services *core.Services) {
@@ -30,13 +31,8 @@ func DeleteJobSchedule(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusNotFound, "")
 		}
 
-		run := core.NewJobRun(job, schedule, services)
-
-		if services.Cron.Delete(run) != nil {
-			return c.JSON(http.StatusInternalServerError, "")
-		}
-
-		if services.Schedules.Delete(schedule) != nil {
+		err = workflows.DeletingASchedule(services, schedule, job)
+		if err != nil {
 			return c.JSON(http.StatusInternalServerError, "")
 		}
 

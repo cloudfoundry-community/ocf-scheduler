@@ -7,6 +7,7 @@ import (
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
 	"github.com/starkandwayne/scheduler-for-ocf/http/auth"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 func DeleteCall(e *echo.Echo, services *core.Services) {
@@ -25,6 +26,14 @@ func DeleteCall(e *echo.Echo, services *core.Services) {
 				http.StatusNotFound,
 				"",
 			)
+		}
+
+		// delete things associated with the call
+		for _, schedule := range services.Schedules.ByCall(call) {
+			err = workflows.DeletingASchedule(services, schedule, call)
+			if err != nil {
+				return c.JSON(http.StatusInternalServerError, "")
+			}
 		}
 
 		err = services.Calls.Delete(call)
