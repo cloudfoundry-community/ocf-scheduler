@@ -106,6 +106,41 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 	return candidate, nil
 }
 
+func (service *JobService) Success(candidate *core.Job) (*core.Job, error) {
+	candidate.State = "SUCCEEDED"
+
+	return service.update(candidate)
+}
+
+func (service *JobService) Fail(candidate *core.Job) (*core.Job, error) {
+	candidate.State = "FAILED"
+
+	return service.update(candidate)
+}
+
+func (service *JobService) update(candidate *core.Job) (*core.Job, error) {
+	now := time.Now().UTC()
+
+	candidate.UpdatedAt = now
+
+	err := WithTransaction(service.db, func(tx Transaction) error {
+		_, aErr := tx.Exec(
+			"update jobs set updated_at = $3, state = $2 where guid = $1",
+			candidate.GUID,
+			candidate.State,
+			candidate.UpdatedAt,
+		)
+
+		return aErr
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return candidate, nil
+}
+
 func (service *JobService) InSpace(guid string) []*core.Job {
 	return service.getCollection(
 		"select * from jobs where space_guid = $1 ORDER BY name ASC",
