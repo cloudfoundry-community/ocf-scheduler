@@ -2,12 +2,12 @@ package mock
 
 var SpaceGUID = "abcdef-1"
 
-type EnvironmentInfoService struct{}
+type InfoService struct{}
 
-func (service *EnvironmentInfoService) SpaceGUID() string {
-	return SpaceGUID
+func (service *InfoService) GetSpaceGUIDForApp(guid string) (string, error) {
+	return SpaceGUID, nil
 }
 
-func NewEnvironmentInfoService() *EnvironmentInfoService {
-	return &EnvironmentInfoService{}
+func NewInfoService() *InfoService {
+	return &InfoService{}
 }

@@ -22,13 +22,16 @@ Feature: Creating a Job
     And the Job has a GUID
     And the Job is named "sausages"
     And the Job's command is "gold"
-    And the Job can use up to 1024MB of memory
-    And the Job can use up to 1024MB of disk space
+    And the Job's disk quota is 0
+    And the Job's memory quota is 0
+    #And the Job can use up to 1024MB of memory
+    #And the Job can use up to 1024MB of disk space
     And the Job has an app GUID
     And the Job has a space GUID
     And the Job has a state
     And the Job is timestamped
 
+  # Note: if we don't get a disk quota, we don't pass one to cfapi
   Scenario: Specifying job disk quota
     Given my payload has a disk_in_mb int of 12
     When I POST my payload with authentication to /jobs?app_guid=123
@@ -36,6 +39,7 @@ Feature: Creating a Job
     And I receive a Job object in the response body
     And the Job can use up to 12MB of disk space
 
+  # Note: if we don't get a memory quota, we don't pass one to cfapi
   Scenario: Specifying job memory quota
     Given my payload has a memory_in_mb int of 13
     When I POST my payload with authentication to /jobs?app_guid=123

@@ -1,13 +1,17 @@
-package auth
+package mock
 
 import (
 	"fmt"
-
-	"github.com/labstack/echo/v4"
 )
 
-func Verify(c echo.Context) error {
-	auth := c.Request().Header.Get(echo.HeaderAuthorization)
+type AuthService struct {
+}
+
+func NewAuthService() *AuthService {
+	return &AuthService{}
+}
+
+func (service *AuthService) Verify(auth string) error {
 	if len(auth) == 0 {
 		return fmt.Errorf("no auth provided")
 	}

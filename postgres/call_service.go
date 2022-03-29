@@ -16,6 +16,7 @@ func NewCallService(db *sql.DB) *CallService {
 	return &CallService{db}
 }
 
+// toasted
 func (service *CallService) Get(guid string) (*core.Call, error) {
 	candidates := service.getCollection(
 		"select * from calls where guid = $1",
@@ -47,6 +48,7 @@ func (service *CallService) Delete(call *core.Call) error {
 	return err
 }
 
+// toasted
 func (service *CallService) Named(name string) (*core.Call, error) {
 	candidates := service.getCollection(
 		"select * from calls where name = $1",
@@ -95,6 +97,7 @@ func (service *CallService) Persist(candidate *core.Call) (*core.Call, error) {
 	return candidate, nil
 }
 
+// toasted
 func (service *CallService) InSpace(guid string) []*core.Call {
 	return service.getCollection(
 		"select * from calls where space_guid = $1 ORDER BY name ASC",

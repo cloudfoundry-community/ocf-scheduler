@@ -7,7 +7,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
-	"github.com/starkandwayne/scheduler-for-ocf/http/auth"
 )
 
 func CreateJob(e *echo.Echo, services *core.Services) {
@@ -16,7 +15,9 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 	e.POST("/jobs", func(c echo.Context) error {
 		tag := "create-job"
 
-		if auth.Verify(c) != nil {
+		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+
+		if services.Auth.Verify(auth) != nil {
 			services.Logger.Error(tag, "authentication to this endpoint failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}
@@ -34,7 +35,13 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		input.SpaceGUID = services.Environment.SpaceGUID()
+		spaceGUID, err := services.Info.GetSpaceGUIDForApp(appGUID)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("could not get space GUID for app %s", appGUID))
+			return c.JSON(http.StatusUnprocessableEntity, "")
+		}
+
+		input.SpaceGUID = spaceGUID
 
 		if len(input.Name) == 0 {
 			services.Logger.Error(tag, "got a blank job name")

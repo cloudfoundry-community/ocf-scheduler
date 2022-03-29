@@ -7,19 +7,38 @@ services:
       dockerfile: Dockerfile.dev
     command: /app/scheduler
     volumes:
-      - .:/src/scheduler-for-pcf
+      - .:/src/scheduler-for-ocf
     expose:
       - 8000
     ports:
       - 8000:8000
     environment:
-      - DATABASE_URL=postgres://postgres:postgres@postgres/controller?sslmode=disable
+      - DATABASE_URL=postgres://postgres:postgres@postgres-dev/dev?sslmode=disable
     links:
-      - postgres
+      - postgres-dev
 
-  postgres:
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    command: make test
+    volumes:
+      - .:/src/scheduler-for-ocf
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres-test/test?sslmode=disable
+    links:
+      - postgres-test
+
+  postgres-dev:
     image: postgres
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_DB=controller
+      - POSTGRES_DB=dev
+      - POSTGRES_PASSWORD=postgres
+
+  postgres-test:
+    image: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=test
       - POSTGRES_PASSWORD=postgres

@@ -7,7 +7,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
-	"github.com/starkandwayne/scheduler-for-ocf/http/auth"
 	"github.com/starkandwayne/scheduler-for-ocf/http/presenters"
 )
 
@@ -17,7 +16,9 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 	e.POST("/calls/:guid/schedules", func(c echo.Context) error {
 		tag := "create-call-schedule"
 
-		if auth.Verify(c) != nil {
+		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+
+		if services.Auth.Verify(auth) != nil {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
