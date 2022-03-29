@@ -3,6 +3,7 @@ module github.com/starkandwayne/scheduler-for-ocf
 go 1.17
 
 require (
+	github.com/DATA-DOG/godog v0.7.13
 	github.com/ess/hype v1.1.4
 	github.com/ess/testscope v1.0.0
 	github.com/gammazero/workerpool v1.1.2

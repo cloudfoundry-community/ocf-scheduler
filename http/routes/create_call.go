@@ -35,7 +35,13 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		input.SpaceGUID = services.Environment.SpaceGUID()
+		spaceGUID, err := services.Info.GetSpaceGUIDForApp(appGUID)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("could not get space GUID for app %s", appGUID))
+			return c.JSON(http.StatusUnprocessableEntity, "")
+		}
+
+		input.SpaceGUID = spaceGUID
 
 		if len(input.Name) == 0 {
 			services.Logger.Error(tag, "got a blank call name")

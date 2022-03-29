@@ -51,7 +51,7 @@ func main() {
 	auth := mock.NewAuthService()
 	jobs := postgres.NewJobService(db)
 	calls := postgres.NewCallService(db)
-	environment := mock.NewEnvironmentInfoService()
+	info := mock.NewInfoService()
 	schedules := postgres.NewScheduleService(db)
 	executions := postgres.NewExecutionService(db)
 	runner := combined.NewRunService(
@@ -69,16 +69,16 @@ func main() {
 	defer cronService.Stop()
 
 	services := &core.Services{
-		Jobs:        jobs,
-		Calls:       calls,
-		Environment: environment,
-		Schedules:   schedules,
-		Workers:     workers,
-		Runner:      runner,
-		Executions:  executions,
-		Cron:        cronService,
-		Logger:      log,
-		Auth:        auth,
+		Jobs:       jobs,
+		Calls:      calls,
+		Info:       info,
+		Schedules:  schedules,
+		Workers:    workers,
+		Runner:     runner,
+		Executions: executions,
+		Cron:       cronService,
+		Logger:     log,
+		Auth:       auth,
 	}
 
 	// Load up all existing schedules
