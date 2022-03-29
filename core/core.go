@@ -31,4 +31,5 @@ type Services struct {
 	Executions  ExecutionService
 	Cron        CronService
 	Logger      LogService
+	Auth        AuthService
 }
