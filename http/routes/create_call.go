@@ -7,7 +7,6 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
-	"github.com/starkandwayne/scheduler-for-ocf/http/auth"
 )
 
 func CreateCall(e *echo.Echo, services *core.Services) {
@@ -16,7 +15,9 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 	e.POST("/calls", func(c echo.Context) error {
 		tag := "create-call"
 
-		if auth.Verify(c) != nil {
+		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+
+		if services.Auth.Verify(auth) != nil {
 			services.Logger.Error(tag, "authentication to this endpoint failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}

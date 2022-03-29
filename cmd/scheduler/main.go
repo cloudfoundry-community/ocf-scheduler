@@ -48,6 +48,7 @@ func main() {
 		os.Exit(255)
 	}
 
+	auth := mock.NewAuthService()
 	jobs := postgres.NewJobService(db)
 	calls := postgres.NewCallService(db)
 	environment := mock.NewEnvironmentInfoService()
@@ -77,6 +78,7 @@ func main() {
 		Executions:  executions,
 		Cron:        cronService,
 		Logger:      log,
+		Auth:        auth,
 	}
 
 	// Load up all existing schedules
