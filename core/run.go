@@ -1,5 +1,6 @@
 package core
 
+// Runnable is an interface that describes a process that can be ran.
 type Runnable interface {
 	Run()
 	Services() *Services
@@ -8,8 +9,8 @@ type Runnable interface {
 	Schedule() *Schedule
 }
 
+// RunService is an interface that describes the entrypoint for executing
+// an Executable.
 type RunService interface {
-	//ExecuteJob(*Services, *Execution, *Job)
-	//ExecuteCall(*Services, *Execution, *Call)
 	Execute(*Services, *Execution, Executable)
 }

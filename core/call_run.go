@@ -1,5 +1,6 @@
 package core
 
+// CallRun is a struct that wraps a Call and makes it Runnable.
 type CallRun struct {
 	call     *Call
 	schedule *Schedule

@@ -1,5 +1,6 @@
 package core
 
+// JobRun is a struct that wraps a Job and makes it Runnable.
 type JobRun struct {
 	job      *Job
 	schedule *Schedule

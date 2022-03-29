@@ -18,7 +18,7 @@ append() {
 coverpkg() {
   local output=""
 
-  for package in cf cmd core http mock os
+  for package in cf cmd combined core cron http logger mock postgres workflows
   do
     if [ -d "./${package}" ]
     then
