@@ -9,15 +9,15 @@ func init() {
 		Up: []string{
 			`CREATE TABLE executions (
 			  guid CHAR(36) PRIMARY KEY,
-				ref_guid CHAR(36),
-				ref_type TEXT,
-				task_guid CHAR(36),
-				schedule_guid CHAR(36),
-				scheduled_time TIMESTAMP WITH TIME ZONE,
+				ref_guid CHAR(36) NOT NULL,
+				ref_type TEXT NOT NULL,
+				task_guid CHAR(36) DEFAULT NULL,
+				schedule_guid CHAR(36) DEFAULT NULL,
+				scheduled_time TIMESTAMP WITH TIME ZONE DEFAULT NULL,
 				message TEXT,
 				state TEXT,
-				execution_start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-				execution_end_time TIMESTAMP WITH TIME ZONE NOT NULL
+				execution_start_time TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+				execution_end_time TIMESTAMP WITH TIME ZONE DEFAULT NULL
 			);`,
 		},
 

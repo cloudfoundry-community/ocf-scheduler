@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/lib/pq"
 
+	"github.com/starkandwayne/scheduler-for-ocf/cf"
 	"github.com/starkandwayne/scheduler-for-ocf/combined"
 	"github.com/starkandwayne/scheduler-for-ocf/core"
 	"github.com/starkandwayne/scheduler-for-ocf/cron"
@@ -24,7 +25,6 @@ import (
 )
 
 var callRunner = http.NewRunService()
-var jobRunner = mock.NewRunService()
 
 func main() {
 	log := logger.New()
@@ -48,10 +48,17 @@ func main() {
 		os.Exit(255)
 	}
 
+	client, err := mock.NewClient()
+	if err != nil {
+		log.Error(tag, "could not instantiate cf client")
+		os.Exit(255)
+	}
+
 	auth := mock.NewAuthService()
 	jobs := postgres.NewJobService(db)
 	calls := postgres.NewCallService(db)
-	info := mock.NewInfoService()
+	info := cf.NewInfoService(client)
+	jobRunner := cf.NewRunService(client)
 	schedules := postgres.NewScheduleService(db)
 	executions := postgres.NewExecutionService(db)
 	runner := combined.NewRunService(

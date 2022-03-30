@@ -59,6 +59,7 @@ func (service *ExecutionService) Persist(candidate *core.Execution) (*core.Execu
 	}
 
 	candidate.GUID = guid
+	candidate.State = "PENDING"
 
 	return service.insert(candidate)
 }
@@ -69,6 +70,12 @@ func (service *ExecutionService) Fail(execution *core.Execution) (*core.Executio
 
 func (service *ExecutionService) Success(execution *core.Execution) (*core.Execution, error) {
 	return service.finish(execution, "SUCCEEDED")
+}
+
+func (service *ExecutionService) UpdateTaskGUID(execution *core.Execution, guid string) (*core.Execution, error) {
+	execution.TaskGUID = guid
+
+	return service.update(execution)
 }
 
 func (service *ExecutionService) UpdateMessage(execution *core.Execution, message string) (*core.Execution, error) {
