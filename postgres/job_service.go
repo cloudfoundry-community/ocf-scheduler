@@ -168,7 +168,7 @@ func (service *JobService) getCollection(query string, args ...interface{}) []*c
 		var createdAt time.Time
 		var updatedAt time.Time
 
-		err := rows.Scan(&guid, &name, &command, &diskInMb, &memoryInMb, &state, &spaceGUID, &appGUID, &createdAt, &updatedAt)
+		err := rows.Scan(&guid, &name, &command, &diskInMb, &memoryInMb, &state, &appGUID, &spaceGUID, &createdAt, &updatedAt)
 		if err != nil {
 			continue
 		}
