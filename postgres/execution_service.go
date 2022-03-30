@@ -71,6 +71,12 @@ func (service *ExecutionService) Success(execution *core.Execution) (*core.Execu
 	return service.finish(execution, "SUCCEEDED")
 }
 
+func (service *ExecutionService) UpdateTaskGUID(execution *core.Execution, guid string) (*core.Execution, error) {
+	execution.TaskGUID = guid
+
+	return service.update(execution)
+}
+
 func (service *ExecutionService) UpdateMessage(execution *core.Execution, message string) (*core.Execution, error) {
 	execution.Message = message
 
