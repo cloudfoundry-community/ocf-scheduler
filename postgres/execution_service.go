@@ -59,6 +59,7 @@ func (service *ExecutionService) Persist(candidate *core.Execution) (*core.Execu
 	}
 
 	candidate.GUID = guid
+	candidate.State = "PENDING"
 
 	return service.insert(candidate)
 }
