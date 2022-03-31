@@ -5,6 +5,7 @@ import (
 
 	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/all"
 	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/create"
+	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/del"
 	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/execute"
 )
 
@@ -21,4 +22,5 @@ func init() {
 	Command.AddCommand(all.Command)
 	Command.AddCommand(create.Command)
 	Command.AddCommand(execute.Command)
+	Command.AddCommand(del.Command)
 }

@@ -6,7 +6,9 @@ import (
 
 	"github.com/ess/hype"
 	"github.com/spf13/cobra"
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	scheduler "github.com/starkandwayne/scheduler-for-ocf/core"
+
+	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/core"
 )
 
 var Command = &cobra.Command{
@@ -26,29 +28,17 @@ var Command = &cobra.Command{
 		jobName := args[1]
 		jobCommand := args[2]
 
-		driver, err := hype.New("http://localhost:8000")
-		if err != nil {
-			return fmt.Errorf("couldn't hype it up: %s", err.Error())
-		}
-
 		params := hype.Params{}
 		params.Set("app_guid", appGUID)
 
-		payload := &core.Job{
+		payload := &scheduler.Job{
 			Name:    jobName,
 			Command: jobCommand,
 		}
 
 		data, err := json.Marshal(payload)
 
-		response := driver.
-			Post("jobs", params, data).
-			WithHeaderSet(
-				hype.NewHeader("Authorization", "jeremy"),
-				hype.NewHeader("Accept", "application/json"),
-				hype.NewHeader("Content-Type", "application/json"),
-			).
-			Response()
+		response := core.Client.Post("jobs", params, data)
 
 		if !response.Okay() {
 			return response.Error()

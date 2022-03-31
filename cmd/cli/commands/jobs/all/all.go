@@ -6,7 +6,9 @@ import (
 
 	"github.com/ess/hype"
 	"github.com/spf13/cobra"
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	scheduler "github.com/starkandwayne/scheduler-for-ocf/core"
+
+	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/core"
 )
 
 var Command = &cobra.Command{
@@ -22,32 +24,20 @@ var Command = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		driver, err := hype.New("http://localhost:8000")
-		if err != nil {
-			return fmt.Errorf("couldn't hype it up: %s", err.Error())
-		}
-
 		params := hype.Params{}
 		params.Set("space_guid", args[0])
 
-		response := driver.
-			Get("jobs", params).
-			WithHeaderSet(
-				hype.NewHeader("Authorization", "jeremy"),
-				hype.NewHeader("Accept", "application/json"),
-				hype.NewHeader("Content-Type", "application/json"),
-			).
-			Response()
+		response := core.Client.Get("jobs", params)
 
 		if !response.Okay() {
 			return response.Error()
 		}
 
 		data := struct {
-			Resources []*core.Job `json:"resources"`
+			Resources []*scheduler.Job `json:"resources"`
 		}{}
 
-		err = json.Unmarshal(response.Data(), &data)
+		err := json.Unmarshal(response.Data(), &data)
 		if err != nil {
 			return err
 		}
