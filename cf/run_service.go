@@ -141,7 +141,7 @@ func (service *RunService) finalizeTask(services *core.Services, execution *core
 		services.Logger.Error(
 			tag,
 			fmt.Sprintf(
-				"task faile for job %s (%s)",
+				"task failed for job %s (%s)",
 				job.Name,
 				job.GUID,
 			),
