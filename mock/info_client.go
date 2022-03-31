@@ -68,6 +68,16 @@ func (client *Client) succeed(task cf.Task) cf.Task {
 	}
 }
 
+func (client *Client) fail(task cf.Task) cf.Task {
+	return cf.Task{
+		GUID:       task.GUID,
+		Command:    task.Command,
+		MemoryInMb: task.MemoryInMb,
+		DiskInMb:   task.DiskInMb,
+		State:      "FAILED",
+	}
+}
+
 func (client *Client) GetTaskByGuid(guid string) (cf.Task, error) {
 	client.locker.Lock()
 	defer client.locker.Unlock()
@@ -89,10 +99,11 @@ func (client *Client) GetTaskByGuid(guid string) (cf.Task, error) {
 	if retry >= max {
 		delete(client.retries, guid)
 		delete(client.maxretries, guid)
+		delete(client.tasks, guid)
 
-		task := client.succeed(original)
-		client.tasks[guid] = task
-		return task, nil
+		client.tasks[guid] = client.succeed(original)
+
+		return client.tasks[guid], nil
 	}
 
 	client.retries[guid] = client.retries[guid] + 1

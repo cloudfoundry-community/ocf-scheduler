@@ -59,57 +59,20 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 				),
 			)
 		} else {
-			// NOTE: this probably isn't necessary, but I need to double-check the
-			// postgres.ExecutionService implementation to be sure
-			execution, _ = services.Executions.UpdateTaskGUID(execution, task.GUID)
-
-			for task.State == "RUNNING" {
-				// oh hey, the task is running, so let's wait a bit and see how it's
-				// going
-
-				time.Sleep(5 * time.Second)
-
-				task, err = service.client.GetTaskByGuid(task.GUID)
-				if err != nil {
-					// Even though the task was created, the API now says that we don't
-					// get to know about it, so let's cry about it
-					service.qq(
-						services,
-						execution,
-						tag,
-						fmt.Sprintf(
-							"cannot get task for the job %s (%s)",
-							job.Name,
-							job.GUID,
-						),
-					)
-				} else {
-					if task.State == "FAILED" {
-						// Uh-oh, the task ran, but it failed ... let's cry about it, but
-						// not the same way that we cry about everything else
-						message := fmt.Sprintf(
-							"task failed for the job %s (%s)",
-							job.Name,
-							job.GUID,
-						)
-
-						services.Logger.Error(tag, message)
-						services.Executions.UpdateMessage(execution, task.Result.FailureReason)
-						services.Executions.Fail(execution)
-					} else {
-						// WE HAVE ACHIEVED A SUCCESSFUL TASK
-						message := fmt.Sprintf(
-							"task successfully completed for the job %s (%s)",
-							job.Name,
-							job.GUID,
-						)
-
-						services.Logger.Info(tag, message)
-						services.Executions.Success(execution)
-						break
-					}
-				}
+			execution, err = services.Executions.UpdateTaskGUID(execution, task.GUID)
+			for err != nil {
+				// We literally can't continue until the execution has a task GUID
+				execution, err = services.Executions.UpdateTaskGUID(execution, task.GUID)
 			}
+
+			task, err = service.waitForTask(services, task)
+			if err != nil {
+				service.handleTaskFailure(services, execution, job, task, err)
+			}
+
+			services.Logger.Info(tag, fmt.Sprintf("task state before finalization: %s", task.State))
+
+			service.finalizeTask(services, execution, job, task)
 		}
 
 		finishmsg := fmt.Sprintf("Finishing job %s (%s)", job.Name, job.GUID)
@@ -121,4 +84,82 @@ func (service *RunService) qq(services *core.Services, execution *core.Execution
 	services.Logger.Error(tag, message)
 	services.Executions.UpdateMessage(execution, message)
 	services.Executions.Fail(execution)
+}
+
+func (service *RunService) waitForTask(services *core.Services, task cf.Task) (cf.Task, error) {
+	count := 0
+
+	for task.State == "RUNNING" {
+		// oh hey, the task is running, so let's wait a bit and see how it's
+		// going
+
+		services.Logger.Info("wait-for-task", fmt.Sprintf("waiting for task %s, iteration %d", task.GUID, count))
+		time.Sleep(5 * time.Second)
+
+		updatedTask, err := service.client.GetTaskByGuid(task.GUID)
+		if err != nil {
+			// Even though the task was created, the API now says that we don't
+			// get to know about it, so let's cry about it
+			return updatedTask, fmt.Errorf("api failure")
+		}
+
+		services.Logger.Info("wait-for-task", fmt.Sprintf("got a task with state %s on iteration %d", updatedTask.State, count))
+
+		task = updatedTask
+		count = count + 1
+	}
+
+	return task, nil
+}
+
+func (service *RunService) handleTaskFailure(services *core.Services, execution *core.Execution, job *core.Job, task cf.Task, err error) error {
+	tag := "cf-run-service"
+
+	if err == nil {
+		return nil
+	}
+
+	service.qq(
+		services,
+		execution,
+		tag,
+		fmt.Sprintf(
+			"cannot get task for the job %s (%s)",
+			job.Name,
+			job.GUID,
+		),
+	)
+
+	return err
+
+}
+
+func (service *RunService) finalizeTask(services *core.Services, execution *core.Execution, job *core.Job, task cf.Task) {
+	tag := "cf-run-service"
+
+	if task.State == "FAILED" {
+		services.Logger.Error(
+			tag,
+			fmt.Sprintf(
+				"task faile for job %s (%s)",
+				job.Name,
+				job.GUID,
+			),
+		)
+
+		services.Executions.UpdateMessage(execution, task.Result.FailureReason)
+		services.Executions.Fail(execution)
+
+		return
+	}
+
+	// WE HAVE ACHIEVED A SUCCESSFUL TASK
+	message := fmt.Sprintf(
+		"task successfully completed for the job %s (%s)",
+		job.Name,
+		job.GUID,
+	)
+
+	services.Logger.Info(tag, message)
+	services.Executions.Success(execution)
 }
