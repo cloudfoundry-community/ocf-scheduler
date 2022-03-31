@@ -59,7 +59,14 @@ var Command = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Created job %s (%s) [App GUID: %s]\n", payload.Name, payload.GUID, appGUID)
+		fmt.Printf(
+			"Created job %s\n\tGUID: %s\n\tApp GUID: %s\n\tSpace GUID: %s\n\tCommand: %s\n",
+			payload.Name,
+			payload.GUID,
+			payload.AppGUID,
+			payload.SpaceGUID,
+			payload.Command,
+		)
 
 		return nil
 	},
