@@ -7,6 +7,7 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/create"
 	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/del"
 	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/execute"
+	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/history"
 )
 
 var Command = &cobra.Command{
@@ -23,4 +24,5 @@ func init() {
 	Command.AddCommand(create.Command)
 	Command.AddCommand(execute.Command)
 	Command.AddCommand(del.Command)
+	Command.AddCommand(history.Command)
 }

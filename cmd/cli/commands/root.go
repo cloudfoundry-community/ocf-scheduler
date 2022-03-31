@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/calls"
 	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs"
 )
 
@@ -31,6 +32,7 @@ func Execute() error {
 }
 
 func init() {
+	RootCmd.AddCommand(calls.Command)
 	RootCmd.AddCommand(jobs.Command)
 	cobra.OnInitialize(initConfig)
 }
