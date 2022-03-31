@@ -27,6 +27,10 @@ release: distclean distbuild linux darwin
 build:
 	go build ${LDFLAGS} -o ${BINARY} ${PACKAGE}
 
+cli:
+	go build ${LDFLAGS} -o sch github.com/starkandwayne/scheduler-for-ocf/cmd/cli
+
+
 # Builds the project for all possible platforms
 distbuild:
 	mkdir -p ${TARGET}
