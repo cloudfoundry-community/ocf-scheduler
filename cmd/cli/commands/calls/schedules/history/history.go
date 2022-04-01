@@ -45,7 +45,7 @@ var Command = &cobra.Command{
 		fmt.Fprintln(writer, "=====\t==============\t==========\t========")
 
 		for _, exec := range executions {
-			fmt.Fprintln(
+			fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\t%s\n",
 				exec.State,
