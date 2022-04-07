@@ -1,0 +1,18 @@
+FROM golang:1.17-alpine
+
+ENV GOBIN /go/bin
+
+RUN mkdir -p /app /src/scheduler-for-ocf
+ADD . /src/scheduler-for-ocf
+WORKDIR /src/scheduler-for-ocf
+
+RUN apk add git bash vim gcc g++ make curl && \
+  rm -rf /var/cache/apk/*
+
+RUN go get ./...
+
+RUN go build -o /app/uaa github.com/starkandwayne/scheduler-for-ocf/cmd/jeuaa
+
+EXPOSE 8001
+
+CMD ["/app/uaa", "8001"]

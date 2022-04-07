@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/DATA-DOG/godog v0.7.13
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20220218061834-a7f54630885c
+	github.com/cloudfoundry-community/go-uaa v0.3.1
 	github.com/ess/hype v1.1.4
 	github.com/ess/testscope v1.0.0
 	github.com/gammazero/workerpool v1.1.2

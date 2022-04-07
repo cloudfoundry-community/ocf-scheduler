@@ -14,8 +14,10 @@ services:
       - 8000:8000
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres-dev/dev?sslmode=disable
+      - UAA_ENDPOINT=http://uaa:8001
     links:
       - postgres-dev
+      - uaa
 
   test:
     build:
@@ -42,3 +44,13 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=test
       - POSTGRES_PASSWORD=postgres
+
+  uaa:
+    build:
+      context: .
+      dockerfile: Dockerfile.uaa
+    command: /app/uaa
+    expose:
+      - 8001
+    ports:
+      - 8001:8001
