@@ -1,6 +1,8 @@
 package cf
 
 import (
+	"net/url"
+
 	cf "github.com/cloudfoundry-community/go-cfclient"
 )
 
@@ -10,4 +12,6 @@ type Client interface {
 	AppByGuid(string) (cf.App, error)
 	CreateTask(cf.TaskRequest) (cf.Task, error)
 	GetTaskByGuid(string) (cf.Task, error)
+	ListUsersByQuery(url.Values) (cf.Users, error)
+	ListV3RolesByQuery(url.Values) ([]cf.V3Role, error)
 }

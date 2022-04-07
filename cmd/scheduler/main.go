@@ -48,17 +48,17 @@ func main() {
 		os.Exit(255)
 	}
 
-	client, err := mock.NewClient()
+	cfclient, err := mock.NewCFClient()
 	if err != nil {
 		log.Error(tag, "could not instantiate cf client")
 		os.Exit(255)
 	}
 
-	auth := mock.NewAuthService()
+	auth := cf.NewAuthService(cfclient)
 	jobs := postgres.NewJobService(db)
 	calls := postgres.NewCallService(db)
-	info := cf.NewInfoService(client)
-	jobRunner := cf.NewRunService(client)
+	info := cf.NewInfoService(cfclient)
+	jobRunner := cf.NewRunService(cfclient)
 	schedules := postgres.NewScheduleService(db)
 	executions := postgres.NewExecutionService(db)
 	runner := combined.NewRunService(
