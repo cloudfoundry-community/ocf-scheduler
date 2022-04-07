@@ -17,7 +17,7 @@ const (
 	spaceGUID = "sector-42-a-19"
 )
 
-var MaxGetTaskRetries = 30
+var MaxGetTaskRetries = 10
 
 var spaceManager = cf.V3Role{
 	GUID: "j4m3s-t-k1rk",
