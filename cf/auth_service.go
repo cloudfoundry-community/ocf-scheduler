@@ -12,12 +12,12 @@ import (
 )
 
 type AuthService struct {
-	cf Client
+	client *cf.Client
 }
 
-func NewAuthService(cf Client) *AuthService {
+func NewAuthService(client *cf.Client) *AuthService {
 	return &AuthService{
-		cf: cf,
+		client: client,
 	}
 }
 
@@ -53,9 +53,14 @@ func (service *AuthService) getUser(username string) (cf.User, error) {
 	query := url.Values{}
 	query.Add("username", username)
 
-	users, err := service.cf.ListUsersByQuery(query)
+	users, err := service.client.ListUsersByQuery(query)
 	if err != nil {
 		return cf.User{}, err
+	}
+
+	fmt.Println("got", len(users), "users:", users)
+	for i, u := range users {
+		fmt.Println("user", i, "guid:", u.Guid)
 	}
 
 	user := users.GetUserByUsername(username)
@@ -69,7 +74,7 @@ func (service *AuthService) getUser(username string) (cf.User, error) {
 func (service *AuthService) getUserRoles(user cf.User) ([]cf.V3Role, error) {
 	roleQuery := url.Values{}
 	roleQuery.Add("user_guids", user.Guid)
-	roles, err := service.cf.ListV3RolesByQuery(roleQuery)
+	roles, err := service.client.ListV3RolesByQuery(roleQuery)
 	if err != nil {
 		return nil, err
 	}

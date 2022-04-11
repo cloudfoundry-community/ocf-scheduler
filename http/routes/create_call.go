@@ -17,8 +17,11 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if services.Auth.Verify(auth) != nil {
-			services.Logger.Error(tag, "authentication to this endpoint failed")
+		if authErr := services.Auth.Verify(auth); authErr != nil {
+			services.Logger.Error(
+				tag,
+				fmt.Sprintf("authentication to this endpoint failed: %s", authErr.Error()),
+			)
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
@@ -42,6 +45,7 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 		}
 
 		input.SpaceGUID = spaceGUID
+		services.Logger.Info(tag, fmt.Sprintf("Space GUID is '%s'", spaceGUID))
 
 		if len(input.Name) == 0 {
 			services.Logger.Error(tag, "got a blank call name")

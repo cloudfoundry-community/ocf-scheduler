@@ -15,9 +15,13 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:postgres@postgres-dev/dev?sslmode=disable
       - UAA_ENDPOINT=http://uaa:8001
+      - CF_ENDPOINT=http://cf-api:8002
+      - CLIENT_ID=scheduler
+      - CLIENT_SECRET=lolsekrat
     links:
       - postgres-dev
       - uaa
+      - cf-api
 
   test:
     build:
@@ -54,3 +58,18 @@ services:
       - 8001
     ports:
       - 8001:8001
+
+  cf-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.cfapi
+    command: /app/cf-api
+    environment:
+      - UAA_ENDPOINT=http://uaa:8001
+      - CF_ENDPOINT=http://cf-api:8002
+    links:
+      - uaa
+    expose:
+      - 8002
+    ports:
+      - 8002:8002
