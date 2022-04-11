@@ -5,10 +5,10 @@ import (
 )
 
 type InfoService struct {
-	client cf.Client
+	client *cf.Client
 }
 
-func NewInfoService(client cf.Client) *InfoService {
+func NewInfoService(client *cf.Client) *InfoService {
 	return &InfoService{client: client}
 }
 

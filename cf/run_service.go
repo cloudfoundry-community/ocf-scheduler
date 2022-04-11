@@ -9,10 +9,10 @@ import (
 )
 
 type RunService struct {
-	client cf.Client
+	client *cf.Client
 }
 
-func NewRunService(client cf.Client) *RunService {
+func NewRunService(client *cf.Client) *RunService {
 	return &RunService{client}
 }
 
