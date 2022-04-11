@@ -1,10 +1,14 @@
 package cf
 
+import (
+	cf "github.com/cloudfoundry-community/go-cfclient"
+)
+
 type InfoService struct {
-	client Client
+	client cf.Client
 }
 
-func NewInfoService(client Client) *InfoService {
+func NewInfoService(client cf.Client) *InfoService {
 	return &InfoService{client: client}
 }
 

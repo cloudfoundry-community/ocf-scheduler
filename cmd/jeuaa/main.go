@@ -55,6 +55,29 @@ func Server(bind string) *http.Server {
 		)
 	})
 
+	e.POST("/oauth/token", func(c echo.Context) error {
+		return c.JSON(
+			http.StatusOK,
+			map[string]interface{}{
+				"token_type":    "bearer",
+				"access_token":  "jeremy",
+				"refresh_token": "bearamy",
+			},
+		)
+	})
+
+	e.GET("*", func(c echo.Context) error {
+		fmt.Println("Got a GET request I didn't recognize:", c.Request().URL)
+
+		return c.JSON(http.StatusInternalServerError, "")
+	})
+
+	e.POST("*", func(c echo.Context) error {
+		fmt.Println("Got a POST request I didn't recognize:", c.Request().URL)
+
+		return c.JSON(http.StatusInternalServerError, "")
+	})
+
 	server := e.Server
 	server.Addr = bind
 

@@ -9,6 +9,7 @@ type CronService interface {
 	Add(Runnable) error
 	Delete(Runnable) error
 	Count() int
+	Validate(string) error
 }
 
 // Executable is an intermediary interface to allow all things that can be

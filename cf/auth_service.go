@@ -58,6 +58,11 @@ func (service *AuthService) getUser(username string) (cf.User, error) {
 		return cf.User{}, err
 	}
 
+	fmt.Println("got", len(users), "users:", users)
+	for i, u := range users {
+		fmt.Println("user", i, "guid:", u.Guid)
+	}
+
 	user := users.GetUserByUsername(username)
 	if len(user.Guid) == 0 {
 		return cf.User{}, fmt.Errorf("no such user")

@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"time"
 
+	realcf "github.com/cloudfoundry-community/go-cfclient"
 	"github.com/gammazero/workerpool"
 	migrate "github.com/rubenv/sql-migrate"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/cron"
 	"github.com/starkandwayne/scheduler-for-ocf/http"
 	"github.com/starkandwayne/scheduler-for-ocf/logger"
-	"github.com/starkandwayne/scheduler-for-ocf/mock"
 	"github.com/starkandwayne/scheduler-for-ocf/postgres"
 	"github.com/starkandwayne/scheduler-for-ocf/postgres/migrations"
 )
@@ -30,9 +30,33 @@ func main() {
 	log := logger.New()
 	tag := "scheduler-for-ocf"
 
+	clientID := os.Getenv("CLIENT_ID")
+	if len(clientID) == 0 {
+		log.Error(tag, "CLIENT_ID not set")
+		os.Exit(255)
+	}
+
+	clientSecret := os.Getenv("CLIENT_SECRET")
+	if len(clientSecret) == 0 {
+		log.Error(tag, "CLIENT_SECRET not set")
+		os.Exit(255)
+	}
+
 	dbURL := os.Getenv("DATABASE_URL")
 	if len(dbURL) == 0 {
 		log.Error(tag, "DATABASE_URL not set")
+		os.Exit(255)
+	}
+
+	cfEndpoint := os.Getenv("CF_ENDPOINT")
+	if len(cfEndpoint) == 0 {
+		log.Error(tag, "CF_ENDPOINT not set")
+		os.Exit(255)
+	}
+
+	uaaEndpoint := os.Getenv("UAA_ENDPOINT")
+	if len(uaaEndpoint) == 0 {
+		log.Error(tag, "UAA_ENDPOINT not set")
 		os.Exit(255)
 	}
 
@@ -48,7 +72,14 @@ func main() {
 		os.Exit(255)
 	}
 
-	cfclient, err := mock.NewCFClient()
+	//cfclient, err := mock.NewCFClient()
+	cfg := &realcf.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		ApiAddress:   cfEndpoint,
+	}
+
+	cfclient, err := realcf.NewClient(cfg)
 	if err != nil {
 		log.Error(tag, "could not instantiate cf client")
 		os.Exit(255)

@@ -78,3 +78,9 @@ func (service *CronService) Delete(runnable core.Runnable) error {
 func (service *CronService) Count() int {
 	return len(service.Entries())
 }
+
+func (service *CronService) Validate(expression string) error {
+	_, err := cron.ParseStandard(expression)
+
+	return err
+}

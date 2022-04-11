@@ -9,10 +9,10 @@ import (
 )
 
 type RunService struct {
-	client Client
+	client cf.Client
 }
 
-func NewRunService(client Client) *RunService {
+func NewRunService(client cf.Client) *RunService {
 	return &RunService{client}
 }
 
@@ -56,6 +56,13 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 					"cannot create task for the job %s (%s)",
 					job.Name,
 					job.GUID,
+				),
+			)
+			services.Logger.Error(
+				"cf-run-service",
+				fmt.Sprintf(
+					"specific error: %s",
+					err.Error(),
 				),
 			)
 		} else {
