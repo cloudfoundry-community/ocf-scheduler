@@ -1,0 +1,97 @@
+#!/bin/bash
+
+append() {
+  local original="${1}"
+  local addition="${2}"
+  local output=""
+
+  if [ -n "${original}" ]
+  then
+    output="${original},${addition}"
+  else
+    output="${addition}"
+  fi
+
+  echo -n "${output}"
+}
+
+coverpkg() {
+  local output=""
+
+  for package in cf cmd combined core cron http logger postgres workflows
+  do
+    if [ -d "./${package}" ]
+    then
+      output=$(append "${output}" "./${package}"...)
+    fi
+  done
+
+  if [ -z "${output}" ]
+  then
+    output="./..."
+  fi
+
+  echo -n "${output}"
+}
+
+generate() {
+  local scope="${1}"
+  local unit=""
+  local integration=""
+
+  case "${scope}" in
+    "integration" | "features" | "outside" )
+      echo "INTEGRATION TESTS ONLY"
+      integration="1"
+    ;;
+
+    "unit" | "inside" )
+      echo "UNIT TESTS ONLY"
+      unit="1"
+    ;;
+
+    * )
+      echo "ALL TESTS"
+      unit="1"
+      integration="1"
+    ;;
+
+  esac
+
+  INTEGRATION="${integration}" UNIT="${unit}" go test -coverprofile=coverage.out -count=1 -v -coverpkg=$(coverpkg) $(go list ./... | grep -v /vendor/)
+}
+
+total() {
+  echo
+  echo -n "TOTAL TEST COVERAGE: "
+  go tool cover -func=coverage.out | grep 'total:' | awk '{print $NF}'
+}
+
+display() {
+  local via="${1}"
+
+  go tool cover -${via}=coverage.out
+}
+
+view() {
+  local via="${1}"
+  local base="go tool cover"
+  local target="=coverage.out"
+
+  case "${via}" in
+    "browser" | "html" )
+      display html
+      ;;
+
+    "terminal" | "func" )
+      echo
+      display func
+      ;;
+
+    * )
+      return 0
+      ;;
+  esac
+}
+
+generate ${2} && view ${1} && total

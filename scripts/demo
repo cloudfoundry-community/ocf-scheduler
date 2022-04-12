@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+services() {
+  docker compose up postgres-dev &
+  sleep 5
+  docker compose build uaa
+  docker compose up uaa &
+  docker compose build cf-api
+  docker compose up cf-api &
+}
+
+up() {
+  services
+  docker compose build dev
+  docker compose up dev
+}
+
+down() {
+  docker compose down
+}
+
+case "$1" in
+  (down)
+    down
+    ;;
+  (services)
+    services
+    ;;
+  (*)
+    up
+    ;;
+esac

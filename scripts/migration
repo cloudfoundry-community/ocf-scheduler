@@ -1,0 +1,29 @@
+#!/bin/bash
+
+stamp=$(date '+%s')
+
+mkdir -p postgres/migrations
+
+cat << MIGRATION >postgres/migrations/${stamp}_${1}.go
+package migrations
+
+import (
+	"github.com/rubenv/sql-migrate"
+)
+
+func init() {
+	m := &migrate.Migration{
+		Id: "${stamp}",
+
+		Up: []string{
+			\`CREATE TABLE table_name (
+			  id CHAR(36) PRIMARY KEY,
+			);\`,
+		},
+
+		Down: []string{\`DROP TABLE IF EXISTS table_name;\`},
+	}
+
+	Collection.Migrations = append(Collection.Migrations, m)
+}
+MIGRATION

@@ -1,0 +1,75 @@
+version: '3'
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: /app/scheduler
+    volumes:
+      - .:/src/scheduler-for-ocf
+    expose:
+      - 8000
+    ports:
+      - 8000:8000
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres-dev/dev?sslmode=disable
+      - UAA_ENDPOINT=http://uaa:8001
+      - CF_ENDPOINT=http://cf-api:8002
+      - CLIENT_ID=scheduler
+      - CLIENT_SECRET=lolsekrat
+    links:
+      - postgres-dev
+      - uaa
+      - cf-api
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    command: make test
+    volumes:
+      - .:/src/scheduler-for-ocf
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres-test/test?sslmode=disable
+    links:
+      - postgres-test
+
+  postgres-dev:
+    image: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=dev
+      - POSTGRES_PASSWORD=postgres
+
+  postgres-test:
+    image: postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=test
+      - POSTGRES_PASSWORD=postgres
+
+  uaa:
+    build:
+      context: .
+      dockerfile: Dockerfile.uaa
+    command: /app/uaa
+    expose:
+      - 8001
+    ports:
+      - 8001:8001
+
+  cf-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.cfapi
+    command: /app/cf-api
+    environment:
+      - UAA_ENDPOINT=http://uaa:8001
+      - CF_ENDPOINT=http://cf-api:8002
+    links:
+      - uaa
+    expose:
+      - 8002
+    ports:
+      - 8002:8002

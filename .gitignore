@@ -1,0 +1,7 @@
+*~
+*.swp
+/scheduler
+/scheduler-for-ocf
+/coverage.out
+/ignoremelol
+/demo
