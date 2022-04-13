@@ -94,6 +94,7 @@ func getUsername(auth string) (string, error) {
 	}
 
 	opts := make([]uaa.Option, 0)
+	opts = append(opts, uaa.WithSkipSSLValidation(true))
 
 	client, err := uaa.New(endpoint, uaa.WithToken(&oauth2.Token{AccessToken: bearer}), opts...)
 	if err != nil {
@@ -102,7 +103,7 @@ func getUsername(auth string) (string, error) {
 
 	me, err := client.GetMe()
 	if err != nil {
-		return "", fmt.Errorf("couldn't get user info")
+		return "", fmt.Errorf("couldn't get user info: %s", err.Error())
 	}
 
 	return me.Username, nil

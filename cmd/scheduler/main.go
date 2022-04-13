@@ -68,22 +68,27 @@ func main() {
 
 	_, err = migrate.Exec(db, "postgres", migrations.Collection, migrate.Up)
 	if err != nil {
-		log.Error(tag, "could not update database schema")
+		log.Error(tag, fmt.Sprintf("could not update database schema: %s", err.Error()))
 		os.Exit(255)
 	}
 
 	//cfclient, err := mock.NewCFClient()
 	cfg := &realcf.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		ApiAddress:   cfEndpoint,
+		ClientID:          clientID,
+		ClientSecret:      clientSecret,
+		ApiAddress:        cfEndpoint,
+		SkipSslValidation: true,
 	}
+
+	log.Info(tag, "trying to instantiate a cf client")
 
 	cfclient, err := realcf.NewClient(cfg)
 	if err != nil {
-		log.Error(tag, "could not instantiate cf client")
+		log.Error(tag, fmt.Sprintf("could not instantiate cf client: %s", err.Error()))
 		os.Exit(255)
 	}
+
+	log.Info(tag, "got the cf client set up")
 
 	auth := cf.NewAuthService(cfclient)
 	jobs := postgres.NewJobService(db)
