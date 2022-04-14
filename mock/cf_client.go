@@ -170,10 +170,6 @@ func (client *CFClient) ListUsersByQuery(query url.Values) (cf.Users, error) {
 		},
 	}
 
-	for i, u := range users {
-		fmt.Println("FAKE CLIENT user", i, "guid:", u.Guid)
-	}
-
 	return users, nil
 }
 
