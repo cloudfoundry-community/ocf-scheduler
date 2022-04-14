@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
 	realcf "github.com/cloudfoundry-community/go-cfclient"
@@ -29,6 +30,14 @@ var callRunner = http.NewRunService()
 func main() {
 	log := logger.New()
 	tag := "scheduler-for-ocf"
+
+	port := 8000
+	portEnv := os.Getenv("SCHEDULER_PORT")
+	if len(portEnv) > 0 {
+		if t, err := strconv.Atoi(portEnv); err == nil {
+			port = t
+		}
+	}
 
 	clientID := os.Getenv("CLIENT_ID")
 	if len(clientID) == 0 {
@@ -156,7 +165,7 @@ func main() {
 		}
 	}
 
-	server := http.Server("0.0.0.0:8000", services)
+	server := http.Server(fmt.Sprintf("0.0.0.0:%d", port), services)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
