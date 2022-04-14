@@ -42,6 +42,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 			Command:          job.Command,
 			MemoryInMegabyte: job.MemoryInMb,
 			DiskInMegabyte:   job.DiskInMb,
+			DropletGUID:      job.AppGUID,
 		}
 
 		task, err := service.client.CreateTask(request)
