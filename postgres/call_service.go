@@ -123,7 +123,7 @@ func (service *CallService) getCollection(query string, args ...interface{}) []*
 		var createdAt time.Time
 		var updatedAt time.Time
 
-		err := rows.Scan(&guid, &name, &url, &authHeader, &spaceGUID, &appGUID, &createdAt, &updatedAt)
+		err := rows.Scan(&guid, &name, &url, &authHeader, &appGUID, &spaceGUID, &createdAt, &updatedAt)
 		if err != nil {
 			continue
 		}
@@ -133,8 +133,8 @@ func (service *CallService) getCollection(query string, args ...interface{}) []*
 			Name:       name,
 			URL:        url,
 			AuthHeader: authHeader,
-			SpaceGUID:  spaceGUID,
 			AppGUID:    appGUID,
+			SpaceGUID:  spaceGUID,
 			CreatedAt:  createdAt,
 			UpdatedAt:  updatedAt,
 		}
