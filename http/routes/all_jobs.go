@@ -30,9 +30,13 @@ func AllJobs(e *echo.Echo, services *core.Services) {
 	// Get all Jobs within space
 	// GET /jobs?space_guid=string
 	e.GET("/jobs", func(c echo.Context) error {
+		tag := "all-jobs"
+		services.Logger.Info(tag, "trying to get all jobs")
+
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
 		if services.Auth.Verify(auth) != nil {
+			services.Logger.Error(tag, "authentication to this endpoint failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
