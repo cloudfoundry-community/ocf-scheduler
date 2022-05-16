@@ -13,38 +13,21 @@ func DeleteJob(e *echo.Echo, services *core.Services) {
 	// Delete a Job
 	// DELETE /jobs/{jobGuid}
 	e.DELETE("/jobs/:guid", func(c echo.Context) error {
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+		result := workflows.
+			DeletingAJob.
+			Call(core.NewInput(c, services))
 
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
-		}
+		if result.Failure() {
+			cause := result.Error().(string)
 
-		guid := c.Param("guid")
-
-		// look up the job
-		job, err := services.Jobs.Get(guid)
-		if err != nil {
-			return c.JSON(
-				http.StatusNotFound,
-				"",
-			)
-		}
-
-		// delete things associated with the job
-		for _, schedule := range services.Schedules.ByJob(job) {
-			err = workflows.DeletingASchedule(services, schedule, job)
-			if err != nil {
+			switch cause {
+			case "auth-failure":
+				return c.JSON(http.StatusUnauthorized, "")
+			case "no-such-job":
+				return c.JSON(http.StatusNotFound, "")
+			default:
 				return c.JSON(http.StatusInternalServerError, "")
 			}
-		}
-
-		// actually delete the job
-		err = services.Jobs.Delete(job)
-		if err != nil {
-			return c.JSON(
-				http.StatusInternalServerError,
-				"",
-			)
 		}
 
 		return c.JSON(
