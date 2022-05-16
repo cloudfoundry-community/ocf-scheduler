@@ -43,12 +43,12 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 		} else {
 
 			response := driver.
-				Get("", nil).
+				Post("", nil, nil).
 				WithHeaderSet(hype.NewHeader("Authorization", call.AuthHeader)).
 				Response()
 
 			if response.Okay() {
-				services.Executions.UpdateMessage(execution, "GET success")
+				services.Executions.UpdateMessage(execution, "POST success")
 				services.Executions.Success(execution)
 			} else {
 				services.Executions.UpdateMessage(execution, response.Error().Error())
