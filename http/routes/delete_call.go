@@ -13,36 +13,21 @@ func DeleteCall(e *echo.Echo, services *core.Services) {
 	// Delete a Call
 	// DELETE /calls/{callGuid}
 	e.DELETE("/calls/:guid", func(c echo.Context) error {
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+		result := workflows.
+			DeletingACall.
+			Call(core.NewInput(c, services))
 
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
-		}
+		if result.Failure() {
+			cause := result.Error().(string)
 
-		guid := c.Param("guid")
-
-		call, err := services.Calls.Get(guid)
-		if err != nil {
-			return c.JSON(
-				http.StatusNotFound,
-				"",
-			)
-		}
-
-		// delete things associated with the call
-		for _, schedule := range services.Schedules.ByCall(call) {
-			err = workflows.DeletingASchedule(services, schedule, call)
-			if err != nil {
+			switch cause {
+			case "auth-failure":
+				return c.JSON(http.StatusUnauthorized, "")
+			case "no-such-call":
+				return c.JSON(http.StatusNotFound, "")
+			default:
 				return c.JSON(http.StatusInternalServerError, "")
 			}
-		}
-
-		err = services.Calls.Delete(call)
-		if err != nil {
-			return c.JSON(
-				http.StatusInternalServerError,
-				"",
-			)
 		}
 
 		return c.JSON(
