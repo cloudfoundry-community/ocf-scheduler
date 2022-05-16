@@ -19,7 +19,7 @@ LDFLAGS=-ldflags "-w -s \
 all: clean build
 
 # Build a new release
-release: distclean distbuild linux
+release: distclean distbuild linux package
 
 # Builds the project
 build:
@@ -43,7 +43,7 @@ clean:
 
 # Cleans release files
 distclean:
-	rm -rf ${TARGET}
+	rm -rf ${TARGET} ${TARGET}.tar.gz
 
 test:
 	./scripts/blanket
@@ -51,3 +51,6 @@ test:
 linux:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -o ${TARGET}/${BINARY}-linux-amd64 ${PACKAGE}
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm go build ${LDFLAGS} -o ${TARGET}/${BINARY}-linux-arm ${PACKAGE}
+
+package:
+	tar -C builds -z -c -v -f ${TARGET}.tar.gz ${BINARY}-${VERSION}
