@@ -6,19 +6,30 @@ import (
 )
 
 type Input struct {
-	Context    echo.Context
-	Services   *Services
+	// Helpers
+	Context  echo.Context
+	Services *Services
+
+	// Single records
 	Executable Executable
-	Executions []*Execution
-	Schedules  []*Schedule
+	Execution  *Execution
+	Schedule   *Schedule
+
+	// Collections
+	JobCollection       []*Job
+	CallCollection      []*Call
+	ExecutionCollection []*Execution
+	ScheduleCollection  []*Schedule
 }
 
 func NewInput(context echo.Context, services *Services) *Input {
 	return &Input{
-		Context:    context,
-		Services:   services,
-		Executions: make([]*Execution, 0),
-		Schedules:  make([]*Schedule, 0),
+		Context:             context,
+		Services:            services,
+		JobCollection:       make([]*Job, 0),
+		CallCollection:      make([]*Call, 0),
+		ExecutionCollection: make([]*Execution, 0),
+		ScheduleCollection:  make([]*Schedule, 0),
 	}
 }
 

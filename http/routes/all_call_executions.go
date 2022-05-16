@@ -29,7 +29,7 @@ func AllCallExecutions(e *echo.Echo, services *core.Services) {
 			}
 		}
 
-		executions := core.Inputify(result.Value()).Executions
+		executions := core.Inputify(result.Value()).ExecutionCollection
 
 		output := &callExecutionCollection{
 			Resources: presenters.AsCallExecutionCollection(executions),

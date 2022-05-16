@@ -10,7 +10,7 @@ func LoadExecutions(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
 	executable := input.Executable
 
-	input.Executions = input.Services.Executions.ByRef(
+	input.ExecutionCollection = input.Services.Executions.ByRef(
 		executable.RefType(),
 		executable.RefGUID(),
 	)

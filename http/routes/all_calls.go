@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 type callCollection struct {
@@ -17,15 +18,15 @@ func AllCalls(e *echo.Echo, services *core.Services) {
 	// Get all Calls within space
 	// GET /calls?space_guid=string
 	e.GET("/calls", func(c echo.Context) error {
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+		result := workflows.
+			GettingAllCalls.
+			Call(core.NewInput(c, services))
 
-		if services.Auth.Verify(auth) != nil {
+		if result.Failure() {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
-		spaceGUID := c.QueryParam("space_guid")
-
-		calls := services.Calls.InSpace(spaceGUID)
+		calls := core.Inputify(result.Value()).CallCollection
 
 		output := &callCollection{
 			Resources: calls,

@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 type pageref struct {
@@ -30,19 +31,15 @@ func AllJobs(e *echo.Echo, services *core.Services) {
 	// Get all Jobs within space
 	// GET /jobs?space_guid=string
 	e.GET("/jobs", func(c echo.Context) error {
-		tag := "all-jobs"
-		services.Logger.Info(tag, "trying to get all jobs")
+		result := workflows.
+			GettingAllJobs.
+			Call(core.NewInput(c, services))
 
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
-
-		if services.Auth.Verify(auth) != nil {
-			services.Logger.Error(tag, "authentication to this endpoint failed")
+		if result.Failure() {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
-		spaceGUID := c.QueryParam("space_guid")
-
-		jobs := services.Jobs.InSpace(spaceGUID)
+		jobs := core.Inputify(result.Value()).JobCollection
 
 		output := &jobCollection{
 			Resources: jobs,

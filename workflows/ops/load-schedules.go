@@ -10,7 +10,7 @@ func LoadSchedules(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
 	executable := input.Executable
 
-	input.Schedules = input.Services.Schedules.ByRef(
+	input.ScheduleCollection = input.Services.Schedules.ByRef(
 		executable.RefType(),
 		executable.RefGUID(),
 	)

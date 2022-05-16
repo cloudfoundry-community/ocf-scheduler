@@ -11,15 +11,9 @@ import (
 func DeleteSchedule(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
 	executable := input.Executable
+	schedule := input.Schedule
 	tag := "ops.delete-schedule"
 	var run core.Runnable
-
-	if len(input.Schedules) != 1 {
-		input.Services.Logger.Error(tag, "expected exactly one schedule")
-		return dry.Failure("schedule-count-mismatch")
-	}
-
-	schedule := input.Schedules[0]
 
 	switch executable.RefType() {
 	case "call":

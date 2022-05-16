@@ -13,6 +13,11 @@ func VerifyAuth(raw dry.Value) dry.Result {
 	auth := input.Context.Request().Header.Get(echo.HeaderAuthorization)
 
 	if input.Services.Auth.Verify(auth) != nil {
+		input.Services.Logger.Error(
+			"ops.verify-auth",
+			"authentication to this endpoint failed",
+		)
+
 		return dry.Failure("auth-failure")
 	}
 

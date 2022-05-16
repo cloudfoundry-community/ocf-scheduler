@@ -26,7 +26,7 @@ func AllJobSchedules(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusNotFound, "")
 		}
 
-		schedules := services.Schedules.ByJob(job)
+		schedules := services.Schedules.ByRef("job", job.GUID)
 
 		output := &jobScheduleCollection{
 			Resources: presenters.AsJobScheduleCollection(schedules),
