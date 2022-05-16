@@ -1,37 +1,35 @@
 package routes
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
 	"github.com/starkandwayne/scheduler-for-ocf/http/presenters"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 func AllCallExecutions(e *echo.Echo, services *core.Services) {
 	// Get all execution histories for a Call
 	// GET /calls/{callGuid}/history
 	e.GET("/calls/:guid/history", func(c echo.Context) error {
-		tag := "all-call-executions"
+		result := workflows.
+			GettingScheduledCallExecutions.
+			Call(core.NewInput(c, services))
 
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+		if result.Failure() {
+			cause := result.Error().(string)
 
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
+			switch cause {
+			case "auth-failure":
+				return c.JSON(http.StatusUnauthorized, "")
+			default:
+				return c.JSON(http.StatusNotFound, "")
+			}
 		}
 
-		guid := c.Param("guid")
-
-		call, err := services.Calls.Get(guid)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, "")
-		}
-
-		executions := services.Executions.ByCall(call)
-
-		services.Logger.Info(tag, fmt.Sprintf("got %d executions", len(executions)))
+		executions := core.Inputify(result.Value()).Executions
 
 		output := &callExecutionCollection{
 			Resources: presenters.AsCallExecutionCollection(executions),
