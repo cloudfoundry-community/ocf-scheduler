@@ -18,9 +18,7 @@ func DeleteJob(e *echo.Echo, services *core.Services) {
 			Call(core.NewInput(c, services))
 
 		if result.Failure() {
-			cause := result.Error().(string)
-
-			switch cause {
+			switch core.Causify(result.Error()) {
 			case "auth-failure":
 				return c.JSON(http.StatusUnauthorized, "")
 			case "no-such-job":

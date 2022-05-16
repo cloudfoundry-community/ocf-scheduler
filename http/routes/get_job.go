@@ -6,27 +6,27 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 func GetJob(e *echo.Echo, services *core.Services) {
 	// Get a Job (sha-na-na-na, sha-na-na-na-na, ahh-do)
 	// GET /jobs/{jobGuid}
 	e.GET("/jobs/:guid", func(c echo.Context) error {
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+		result := workflows.
+			GettingAJob.
+			Call(core.NewInput(c, services))
 
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
+		if result.Failure() {
+			switch core.Causify(result.Error()) {
+			case "auth-failure":
+				return c.JSON(http.StatusUnauthorized, "")
+			default:
+				return c.JSON(http.StatusNotFound, "")
+			}
 		}
 
-		guid := c.Param("guid")
-
-		job, err := services.Jobs.Get(guid)
-		if err != nil {
-			return c.JSON(
-				http.StatusNotFound,
-				"",
-			)
-		}
+		job, _ := core.Inputify(result.Value()).Executable.ToJob()
 
 		return c.JSON(
 			http.StatusOK,
