@@ -27,7 +27,7 @@ import (
 
 var callRunner = http.NewRunService()
 
-func main() {
+func meat() int {
 	log := logger.New()
 	tag := "scheduler-for-ocf"
 
@@ -42,31 +42,31 @@ func main() {
 	clientID := os.Getenv("CLIENT_ID")
 	if len(clientID) == 0 {
 		log.Error(tag, "CLIENT_ID not set")
-		os.Exit(255)
+		return 255
 	}
 
 	clientSecret := os.Getenv("CLIENT_SECRET")
 	if len(clientSecret) == 0 {
 		log.Error(tag, "CLIENT_SECRET not set")
-		os.Exit(255)
+		return 255
 	}
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if len(dbURL) == 0 {
 		log.Error(tag, "DATABASE_URL not set")
-		os.Exit(255)
+		return 255
 	}
 
 	cfEndpoint := os.Getenv("CF_ENDPOINT")
 	if len(cfEndpoint) == 0 {
 		log.Error(tag, "CF_ENDPOINT not set")
-		os.Exit(255)
+		return 255
 	}
 
 	uaaEndpoint := os.Getenv("UAA_ENDPOINT")
 	if len(uaaEndpoint) == 0 {
 		log.Error(tag, "UAA_ENDPOINT not set")
-		os.Exit(255)
+		return 255
 	}
 
 	db, err := sql.Open("postgres", dbURL)
@@ -78,10 +78,9 @@ func main() {
 	_, err = migrate.Exec(db, "postgres", migrations.Collection, migrate.Up)
 	if err != nil {
 		log.Error(tag, fmt.Sprintf("could not update database schema: %s", err.Error()))
-		os.Exit(255)
+		return 255
 	}
 
-	//cfclient, err := mock.NewCFClient()
 	cfg := &realcf.Config{
 		ClientID:          clientID,
 		ClientSecret:      clientSecret,
@@ -94,7 +93,7 @@ func main() {
 	cfclient, err := realcf.NewClient(cfg)
 	if err != nil {
 		log.Error(tag, fmt.Sprintf("could not instantiate cf client: %s", err.Error()))
-		os.Exit(255)
+		return 255
 	}
 
 	log.Info(tag, "got the cf client set up")
@@ -186,6 +185,12 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		server.Close()
 		log.Error(tag, err.Error())
-		os.Exit(2)
+		return 2
 	}
+
+	return 0
+}
+
+func main() {
+	os.Exit(meat())
 }

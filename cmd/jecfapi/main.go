@@ -240,17 +240,17 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 	return server
 }
 
-func main() {
+func meat() int {
 	cfURL := os.Getenv("CF_ENDPOINT")
 	if len(cfURL) == 0 {
 		fmt.Println("CF_ENDPOINT not set")
-		os.Exit(1)
+		return 1
 	}
 
 	uaaURL := os.Getenv("UAA_ENDPOINT")
 	if len(uaaURL) == 0 {
 		fmt.Println("UAA_ENDPOINT not set")
-		os.Exit(1)
+		return 1
 	}
 
 	server := Server("0.0.0.0:8002", cfURL, uaaURL)
@@ -274,8 +274,14 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		server.Close()
 		fmt.Println(err.Error())
-		os.Exit(2)
+		return 2
 	}
+
+	return 0
+}
+
+func main() {
+	os.Exit(meat())
 }
 
 type userResp struct {

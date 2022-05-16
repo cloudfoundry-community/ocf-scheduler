@@ -16,7 +16,6 @@ import (
 func Server(bind string) *http.Server {
 	e := echo.New()
 
-	// not technically necessary, just part of my default API skeleton
 	e.GET("/userinfo", func(c echo.Context) error {
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
@@ -36,18 +35,14 @@ func Server(bind string) *http.Server {
 		}
 
 		userinfo := &uaa.UserInfo{
-			//UserID:            "",
 			Sub:         "12345",
 			Username:    "dummy",
 			GivenName:   "Dummy",
 			FamilyName:  "User",
 			Email:       "dummy@example.com",
 			PhoneNumber: "",
-			//PreviousLoginTime: time.Now().UTC().Unix(),
-			Name: "Dummy User",
+			Name:        "Dummy User",
 		}
-
-		//fmt.Println("payload:", string(payload))
 
 		return c.JSON(
 			http.StatusOK,
@@ -84,7 +79,7 @@ func Server(bind string) *http.Server {
 	return server
 }
 
-func main() {
+func meat() int {
 	server := Server("0.0.0.0:8001")
 
 	go func() {
@@ -106,6 +101,12 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		server.Close()
 		fmt.Println(err.Error())
-		os.Exit(2)
+		return 2
 	}
+
+	return 0
+}
+
+func main() {
+	os.Exit(meat())
 }
