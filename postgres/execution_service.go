@@ -29,19 +29,11 @@ func (service *ExecutionService) Get(guid string) (*core.Execution, error) {
 	return candidates[0], nil
 }
 
-func (service *ExecutionService) ByCall(call *core.Call) []*core.Execution {
-	return service.getCollection(
-		"select * from executions where ref_guid = $1 and ref_type = $2",
-		call.GUID,
-		"call",
-	)
-}
-
-func (service *ExecutionService) ByJob(job *core.Job) []*core.Execution {
+func (service *ExecutionService) ByRef(kind string, guid string) []*core.Execution {
 	return service.getCollection(
 		"select * from executions where ref_type = $1 and ref_guid = $2",
-		"job",
-		job.GUID,
+		kind,
+		guid,
 	)
 }
 

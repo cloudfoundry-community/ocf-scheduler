@@ -29,7 +29,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 				tag,
 				fmt.Sprintf(
 					"cannot handle executables of type %s",
-					executable.Type(),
+					executable.RefType(),
 				),
 			)
 		}

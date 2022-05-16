@@ -29,23 +29,17 @@ func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
 	return candidates[0], nil
 }
 
-func (service *ScheduleService) ByCall(call *core.Call) []*core.Schedule {
-	return service.getCollection(
-		"select * from schedules where ref_type = 'call' and ref_guid = $1",
-		call.GUID,
-	)
-}
-
 func (service *ScheduleService) Enabled() []*core.Schedule {
 	return service.getCollection(
 		"select * from schedules where enabled",
 	)
 }
 
-func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
+func (service *ScheduleService) ByRef(kind string, guid string) []*core.Schedule {
 	return service.getCollection(
-		"select * from schedules where ref_type = 'job' and ref_guid = $1",
-		job.GUID,
+		"select * from schedules where ref_type = $1 and ref_guid = $2",
+		kind,
+		guid,
 	)
 }
 

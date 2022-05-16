@@ -24,7 +24,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 		if err != nil {
 			message := fmt.Sprintf(
 				"cannot handle executables of type %s",
-				executable.Type(),
+				executable.RefType(),
 			)
 
 			services.Logger.Error(tag, message)

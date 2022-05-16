@@ -18,8 +18,12 @@ type Call struct {
 	SpaceGUID string `json:"space_guid"`
 }
 
-func (entity *Call) Type() string {
+func (entity *Call) RefType() string {
 	return "call"
+}
+
+func (entity *Call) RefGUID() string {
+	return entity.GUID
 }
 
 func (entity *Call) ToJob() (*Job, error) {

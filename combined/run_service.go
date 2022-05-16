@@ -17,5 +17,5 @@ func NewRunService(dispatch map[string]core.RunService) *RunService {
 }
 
 func (service *RunService) Execute(services *core.Services, execution *core.Execution, executable core.Executable) {
-	service.dispatch[executable.Type()].Execute(services, execution, executable)
+	service.dispatch[executable.RefType()].Execute(services, execution, executable)
 }

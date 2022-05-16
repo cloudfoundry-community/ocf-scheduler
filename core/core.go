@@ -15,7 +15,8 @@ type CronService interface {
 // Executable is an intermediary interface to allow all things that can be
 // executed to be processed in roughly the same way at the high level.
 type Executable interface {
-	Type() string
+	RefType() string
+	RefGUID() string
 	ToCall() (*Call, error)
 	ToJob() (*Job, error)
 }

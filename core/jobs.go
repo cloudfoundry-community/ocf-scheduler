@@ -20,8 +20,12 @@ type Job struct {
 	SpaceGUID string `json:"space_guid"`
 }
 
-func (entity *Job) Type() string {
+func (entity *Job) RefType() string {
 	return "job"
+}
+
+func (entity *Job) RefGUID() string {
+	return entity.GUID
 }
 
 func (entity *Job) ToJob() (*Job, error) {

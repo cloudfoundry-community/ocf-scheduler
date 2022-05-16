@@ -3,9 +3,9 @@ module github.com/starkandwayne/scheduler-for-ocf
 go 1.17
 
 require (
-	github.com/DATA-DOG/godog v0.7.13
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20220218061834-a7f54630885c
 	github.com/cloudfoundry-community/go-uaa v0.3.1
+	github.com/ess/dry v1.0.0
 	github.com/ess/hype v1.1.4
 	github.com/ess/testscope v1.0.0
 	github.com/gammazero/workerpool v1.1.2
@@ -17,6 +17,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.8.1
+	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602
 	gopkg.in/khaiql/dbcleaner.v2 v2.3.0
 )
 
@@ -52,7 +53,6 @@ require (
 	github.com/valyala/fasttemplate v1.2.1 // indirect
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
-	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602 // indirect
 	golang.org/x/sys v0.0.0-20211103235746-7861aae1554b // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
