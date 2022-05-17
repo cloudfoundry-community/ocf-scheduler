@@ -20,6 +20,9 @@ type Input struct {
 	CallCollection      []*Call
 	ExecutionCollection []*Execution
 	ScheduleCollection  []*Schedule
+
+	// Misc Data
+	Data map[string]string
 }
 
 func NewInput(context echo.Context, services *Services) *Input {
@@ -30,6 +33,7 @@ func NewInput(context echo.Context, services *Services) *Input {
 		CallCollection:      make([]*Call, 0),
 		ExecutionCollection: make([]*Execution, 0),
 		ScheduleCollection:  make([]*Schedule, 0),
+		Data:                make(map[string]string),
 	}
 }
 

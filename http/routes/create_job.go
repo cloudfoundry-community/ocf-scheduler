@@ -15,6 +15,7 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 	e.POST("/jobs", func(c echo.Context) error {
 		tag := "create-job"
 
+		// ops.VerifyAuth
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
 		if services.Auth.Verify(auth) != nil {
@@ -22,6 +23,7 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
+		// ops.ValidateJobInput
 		appGUID := c.QueryParam("app_guid")
 
 		input := &core.Job{}
