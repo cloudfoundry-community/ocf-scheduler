@@ -62,6 +62,20 @@ func (service *CallService) Named(name string) (*core.Call, error) {
 	return candidates[0], nil
 }
 
+func (service *CallService) Exists(appguid string, name string) bool {
+	candidates := service.getCollection(
+		"select * from calls where name = $1 and app_guid = $2",
+		name,
+		appguid,
+	)
+
+	if len(candidates) == 0 {
+		return false
+	}
+
+	return true
+}
+
 func (service *CallService) Persist(candidate *core.Call) (*core.Call, error) {
 	now := time.Now().UTC()
 

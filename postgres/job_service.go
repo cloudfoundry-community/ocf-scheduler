@@ -60,6 +60,20 @@ func (service *JobService) Named(name string) (*core.Job, error) {
 	return candidates[0], nil
 }
 
+func (service *JobService) Exists(appguid string, name string) bool {
+	candidates := service.getCollection(
+		"select * from jobs where name = $1 and app_guid = $2",
+		name,
+		appguid,
+	)
+
+	if len(candidates) == 0 {
+		return false
+	}
+
+	return true
+}
+
 func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 	now := time.Now().UTC()
 

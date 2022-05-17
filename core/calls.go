@@ -38,6 +38,7 @@ type CallService interface {
 	Get(string) (*Call, error)
 	Delete(*Call) error
 	Named(string) (*Call, error)
+	Exists(string, string) bool
 	Persist(*Call) (*Call, error)
 	InSpace(string) []*Call
 }
