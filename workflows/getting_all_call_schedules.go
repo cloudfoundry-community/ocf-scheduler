@@ -6,9 +6,8 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/workflows/ops"
 )
 
-var GettingScheduledCallExecutions = dry.NewTransaction(
+var GettingAllCallSchedules = dry.NewTransaction(
 	ops.VerifyAuth,
 	ops.LoadCall,
-	ops.LoadSchedule,
-	ops.LoadScheduledExecutionCollection,
+	ops.LoadScheduleCollection,
 )

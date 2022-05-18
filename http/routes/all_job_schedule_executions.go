@@ -7,32 +7,27 @@ import (
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
 	"github.com/starkandwayne/scheduler-for-ocf/http/presenters"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 func AllJobScheduleExecutions(e *echo.Echo, services *core.Services) {
 	// Get all execution histories for a Job and Schedule
 	// GET /jobs/{jobGuid}/schedules/{scheduleGuid}/history
 	e.GET("/jobs/:guid/schedules/:schedule_guid/history", func(c echo.Context) error {
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+		result := workflows.
+			GettingScheduledJobExecutions.
+			Call(core.NewInput(c, services))
 
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
+		if result.Failure() {
+			switch core.Causify(result.Error()) {
+			case "auth-failure":
+				return c.JSON(http.StatusUnauthorized, "")
+			default:
+				return c.JSON(http.StatusNotFound, "")
+			}
 		}
 
-		guid := c.Param("guid")
-
-		_, err := services.Jobs.Get(guid)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, "")
-		}
-
-		scheduleGUID := c.Param("schedule_guid")
-		schedule, err := services.Schedules.Get(scheduleGUID)
-		if err != nil {
-			return c.JSON(http.StatusNotFound, "")
-		}
-
-		executions := services.Executions.BySchedule(schedule)
+		executions := core.Inputify(result.Value()).ExecutionCollection
 
 		output := &jobExecutionCollection{
 			Resources: presenters.AsJobExecutionCollection(executions),

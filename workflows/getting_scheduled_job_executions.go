@@ -9,5 +9,6 @@ import (
 var GettingScheduledJobExecutions = dry.NewTransaction(
 	ops.VerifyAuth,
 	ops.LoadJob,
-	ops.LoadExecutions,
+	ops.LoadSchedule,
+	ops.LoadScheduledExecutionCollection,
 )

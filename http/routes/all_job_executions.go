@@ -15,7 +15,7 @@ func AllJobExecutions(e *echo.Echo, services *core.Services) {
 	// GET /jobs/{jobGuid}/history
 	e.GET("/jobs/:guid/history", func(c echo.Context) error {
 		result := workflows.
-			GettingScheduledJobExecutions.
+			GettingJobExecutions.
 			Call(core.NewInput(c, services))
 
 		if result.Failure() {
