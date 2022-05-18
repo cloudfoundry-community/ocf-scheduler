@@ -7,47 +7,29 @@ import (
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
 	"github.com/starkandwayne/scheduler-for-ocf/http/presenters"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 	// Schedule a Job to run later
 	// POST /jobs/{jobGuid}/schedules
 	e.POST("/jobs/:guid/schedules", func(c echo.Context) error {
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+		result := workflows.
+			SchedulingAJob.
+			Call(core.NewInput(c, services))
 
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
+		if result.Failure() {
+			switch core.Causify(result.Error()) {
+			case "auth-failure":
+				return c.JSON(http.StatusUnauthorized, "")
+			case "no-such-job":
+				return c.JSON(http.StatusNotFound, "")
+			default:
+				return c.JSON(http.StatusUnprocessableEntity, "")
+			}
 		}
 
-		guid := c.Param("guid")
-
-		job, err := services.Jobs.Get(guid)
-		if err != nil {
-			return c.JSON(
-				http.StatusNotFound,
-				"",
-			)
-		}
-
-		input := &core.Schedule{}
-
-		if err = c.Bind(&input); err != nil {
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
-
-		input.RefGUID = guid
-		input.RefType = "job"
-
-		if services.Cron.Validate(input.Expression) != nil {
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
-
-		schedule, err := services.Schedules.Persist(input)
-		if err != nil {
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
-
-		services.Cron.Add(core.NewJobRun(job, schedule, services))
+		schedule := core.Inputify(result.Value()).Schedule
 
 		return c.JSON(
 			http.StatusCreated,
