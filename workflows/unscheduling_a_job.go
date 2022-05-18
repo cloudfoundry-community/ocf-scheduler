@@ -6,10 +6,9 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/workflows/ops"
 )
 
-var DeletingAJob = dry.NewTransaction(
+var UnschedulingAJob = dry.NewTransaction(
 	ops.VerifyAuth,
 	ops.LoadJob,
-	ops.LoadScheduleCollection,
-	ops.DeleteScheduleCollection,
-	ops.DeleteJob,
+	ops.LoadSchedule,
+	ops.DeleteSchedule,
 )

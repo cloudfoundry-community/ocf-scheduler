@@ -6,35 +6,27 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
 func DeleteJobSchedule(e *echo.Echo, services *core.Services) {
 	// Delete the given schedule for the given Job
 	// DELETE /jobs/{jobGuid}/schedules/{scheduleGuid}
 	e.DELETE("/jobs/:guid/schedules/:schedule_guid", func(c echo.Context) error {
-		auth := c.Request().Header.Get(echo.HeaderAuthorization)
+		result := workflows.
+			UnschedulingAJob.
+			Call(core.NewInput(c, services))
 
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
+		if result.Failure() {
+			switch core.Causify(result.Error()) {
+			case "auth-failure":
+				return c.JSON(http.StatusUnauthorized, "")
+			case "no-such-job", "no-such-schedule":
+				return c.JSON(http.StatusNotFound, "")
+			default:
+				return c.JSON(http.StatusInternalServerError, "")
+			}
 		}
-
-		//guid := c.Param("guid")
-
-		//job, err := services.Jobs.Get(guid)
-		//if err != nil {
-		//return c.JSON(http.StatusNotFound, "")
-		//}
-
-		//scheduleGUID := c.Param("schedule_guid")
-		//schedule, err := services.Schedules.Get(scheduleGUID)
-		//if err != nil {
-		//return c.JSON(http.StatusNotFound, "")
-		//}
-
-		//err = workflows.DeletingASchedule(services, schedule, job)
-		//if err != nil {
-		//return c.JSON(http.StatusInternalServerError, "")
-		//}
 
 		return c.JSON(
 			http.StatusNoContent,

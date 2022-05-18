@@ -6,7 +6,7 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/core"
 )
 
-func LoadSchedules(raw dry.Value) dry.Result {
+func LoadScheduleCollection(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
 	executable := input.Executable
 
