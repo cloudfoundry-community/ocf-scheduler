@@ -6,6 +6,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func LoadCall(raw dry.Value) dry.Result {
@@ -19,7 +20,7 @@ func LoadCall(raw dry.Value) dry.Result {
 			fmt.Sprintf("could not find call with guid %s", guid),
 		)
 
-		return dry.Failure("no-such-call")
+		return dry.Failure(failures.NoSuchCall)
 	}
 
 	input.Executable = call

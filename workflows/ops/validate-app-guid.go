@@ -4,6 +4,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func ValidateAppGUID(raw dry.Value) dry.Result {
@@ -16,7 +17,7 @@ func ValidateAppGUID(raw dry.Value) dry.Result {
 			"app GUID cannot be blank",
 		)
 
-		return dry.Failure("no-app-guid")
+		return dry.Failure(failures.NoAppGUID)
 	}
 
 	input.Data["appGUID"] = appGUID

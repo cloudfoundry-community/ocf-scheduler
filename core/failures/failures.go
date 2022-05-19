@@ -1,0 +1,27 @@
+package failures
+
+const (
+	AuthFailure               = "auth-failure"
+	CallAuthHeaderBlank       = "call-auth-header-blank"
+	CallNameBlank             = "call-name-blank"
+	CallNameNotUnique         = "call-name-not-unique-for-app"
+	CallURLBlank              = "call-url-blank"
+	DeleteCallFailed          = "delete-call-failed"
+	DeleteJobFailed           = "delete-job-failed"
+	DeleteScheduleFailed      = "delete-schedule-failed"
+	ExecutableTypeMismatch    = "executable-type-mismatch"
+	JobCommandBlank           = "job-command-blank"
+	JobNameBlank              = "job-name-blank"
+	JobNameNotUnique          = "job-name-not-unique-for-app"
+	NoAppGUID                 = "no-app-guid"
+	NoSpaceGUID               = "no-space-guid"
+	NoSuchCall                = "no-such-call"
+	NoSuchJob                 = "no-such-job"
+	NoSuchSchedule            = "no-such-schedule"
+	PersistCallFailure        = "persist-call-failure"
+	PersistExecutionFailure   = "persist-execution-failure"
+	PersistJobFailure         = "persist-job-failure"
+	PersistScheduleFailure    = "persist-schedule-failure"
+	ScheduleExpressionInvalid = "schedule-expression-invalid"
+	UnscheduleFailure         = "unschedule-failure"
+)

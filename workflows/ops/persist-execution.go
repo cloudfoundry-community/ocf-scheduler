@@ -6,6 +6,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func PersistExecution(raw dry.Value) dry.Result {
@@ -19,7 +20,7 @@ func PersistExecution(raw dry.Value) dry.Result {
 			fmt.Sprintf("could not persist the execution: %s", err.Error()),
 		)
 
-		return dry.Failure("persist-execution-failure")
+		return dry.Failure(failures.PersistExecutionFailure)
 	}
 
 	input.Execution = execution

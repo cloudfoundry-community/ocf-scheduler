@@ -4,6 +4,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func DeleteJob(raw dry.Value) dry.Result {
@@ -11,12 +12,12 @@ func DeleteJob(raw dry.Value) dry.Result {
 
 	job, err := input.Executable.ToJob()
 	if err != nil {
-		return dry.Failure("executable-type-mismatch")
+		return dry.Failure(failures.ExecutableTypeMismatch)
 	}
 
 	err = input.Services.Jobs.Delete(job)
 	if err != nil {
-		return dry.Failure("delete-job-failed")
+		return dry.Failure(failures.DeleteJobFailed)
 	}
 
 	return dry.Success(input)

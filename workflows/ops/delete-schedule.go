@@ -6,6 +6,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func DeleteSchedule(raw dry.Value) dry.Result {
@@ -20,7 +21,7 @@ func DeleteSchedule(raw dry.Value) dry.Result {
 		call, err := executable.ToCall()
 		if err != nil {
 			input.Services.Logger.Error(tag, "got a call that isn't a call")
-			return dry.Failure("executable-type-mistmatch")
+			return dry.Failure(failures.ExecutableTypeMismatch)
 		}
 
 		run = core.NewCallRun(call, schedule, input.Services)
@@ -28,7 +29,7 @@ func DeleteSchedule(raw dry.Value) dry.Result {
 		job, err := executable.ToJob()
 		if err != nil {
 			input.Services.Logger.Error(tag, "got a job that isn't a job")
-			return dry.Failure("executable-type-mismatch")
+			return dry.Failure(failures.ExecutableTypeMismatch)
 		}
 
 		run = core.NewJobRun(job, schedule, input.Services)
@@ -43,7 +44,7 @@ func DeleteSchedule(raw dry.Value) dry.Result {
 			),
 		)
 
-		return dry.Failure("unschedule-failure")
+		return dry.Failure(failures.UnscheduleFailure)
 	}
 
 	if input.Services.Schedules.Delete(schedule) != nil {
@@ -55,7 +56,7 @@ func DeleteSchedule(raw dry.Value) dry.Result {
 			),
 		)
 
-		return dry.Failure("delete-schedule-failed")
+		return dry.Failure(failures.DeleteScheduleFailed)
 	}
 
 	return dry.Success(input)

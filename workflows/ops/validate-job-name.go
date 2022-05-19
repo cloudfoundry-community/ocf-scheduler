@@ -4,6 +4,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func ValidateJobName(raw dry.Value) dry.Result {
@@ -19,7 +20,7 @@ func ValidateJobName(raw dry.Value) dry.Result {
 			"job name cannot be blank",
 		)
 
-		return dry.Failure("job-name-blank")
+		return dry.Failure(failures.JobNameBlank)
 	}
 
 	if input.Services.Jobs.Exists(input.Data["appGUID"], job.Name) {
@@ -27,7 +28,7 @@ func ValidateJobName(raw dry.Value) dry.Result {
 			tag,
 			"there is already a job by that name for this app",
 		)
-		return dry.Failure("job-name-not-unique-for-app")
+		return dry.Failure(failures.JobNameNotUnique)
 	}
 
 	return dry.Success(input)

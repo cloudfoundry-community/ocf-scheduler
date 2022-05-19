@@ -4,6 +4,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func ValidateScheduleExpression(raw dry.Value) dry.Result {
@@ -18,7 +19,7 @@ func ValidateScheduleExpression(raw dry.Value) dry.Result {
 			"schedule cron expression invalid",
 		)
 
-		return dry.Failure("schedule-expression-invalid")
+		return dry.Failure(failures.ScheduleExpressionInvalid)
 	}
 
 	return dry.Success(input)

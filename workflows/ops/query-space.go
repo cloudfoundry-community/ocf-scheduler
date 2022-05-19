@@ -6,6 +6,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func QuerySpace(raw dry.Value) dry.Result {
@@ -24,7 +25,7 @@ func QuerySpace(raw dry.Value) dry.Result {
 			),
 		)
 
-		return dry.Failure("no-space-guid")
+		return dry.Failure(failures.NoSpaceGUID)
 	}
 
 	input.Data["spaceGUID"] = spaceGUID

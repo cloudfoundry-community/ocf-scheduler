@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 	"github.com/starkandwayne/scheduler-for-ocf/http/helpers"
 	"github.com/starkandwayne/scheduler-for-ocf/http/presenters"
 	"github.com/starkandwayne/scheduler-for-ocf/workflows"
@@ -26,9 +27,9 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {
-			case "auth-failure":
+			case failures.AuthFailure:
 				return c.JSON(http.StatusUnauthorized, "")
-			case "no-such-call":
+			case failures.NoSuchCall:
 				return c.JSON(http.StatusNotFound, "")
 			default:
 				return c.JSON(http.StatusUnprocessableEntity, "")

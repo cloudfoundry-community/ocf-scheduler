@@ -4,6 +4,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func ValidateCallURL(raw dry.Value) dry.Result {
@@ -17,7 +18,7 @@ func ValidateCallURL(raw dry.Value) dry.Result {
 			"call url cannot be blank",
 		)
 
-		return dry.Failure("call-url-blank")
+		return dry.Failure(failures.CallURLBlank)
 	}
 
 	return dry.Success(input)

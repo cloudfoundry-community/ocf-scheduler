@@ -4,6 +4,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func ValidateJobCommand(raw dry.Value) dry.Result {
@@ -17,7 +18,7 @@ func ValidateJobCommand(raw dry.Value) dry.Result {
 			"job command cannot be blank",
 		)
 
-		return dry.Failure("job-command-blank")
+		return dry.Failure(failures.JobCommandBlank)
 	}
 
 	return dry.Success(input)

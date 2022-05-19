@@ -4,6 +4,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func ValidateCallAuthHeader(raw dry.Value) dry.Result {
@@ -17,7 +18,7 @@ func ValidateCallAuthHeader(raw dry.Value) dry.Result {
 			"call auth header cannot be blank",
 		)
 
-		return dry.Failure("call-auth-header-blank")
+		return dry.Failure(failures.CallAuthHeaderBlank)
 	}
 
 	return dry.Success(input)

@@ -4,6 +4,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func DeleteCall(raw dry.Value) dry.Result {
@@ -11,12 +12,12 @@ func DeleteCall(raw dry.Value) dry.Result {
 
 	call, err := input.Executable.ToCall()
 	if err != nil {
-		return dry.Failure("executable-type-mismatch")
+		return dry.Failure(failures.ExecutableTypeMismatch)
 	}
 
 	err = input.Services.Calls.Delete(call)
 	if err != nil {
-		return dry.Failure("delete-call-failed")
+		return dry.Failure(failures.DeleteCallFailed)
 	}
 
 	return dry.Success(input)

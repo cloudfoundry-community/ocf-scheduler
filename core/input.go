@@ -20,6 +20,7 @@ type Input struct {
 	ScheduleCollection  []*Schedule
 
 	// Misc Data
+	Auth string
 	Data map[string]string
 }
 
@@ -41,7 +42,7 @@ func Inputify(input dry.Value) *Input {
 }
 
 func (input *Input) WithAuth(auth string) *Input {
-	input.Data["auth"] = auth
+	input.Auth = auth
 
 	return input
 }

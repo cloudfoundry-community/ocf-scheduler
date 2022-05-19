@@ -6,6 +6,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func PersistCall(raw dry.Value) dry.Result {
@@ -23,7 +24,7 @@ func PersistCall(raw dry.Value) dry.Result {
 			fmt.Sprintf("could not persist the call: %s", err.Error()),
 		)
 
-		return dry.Failure("persist-call-failure")
+		return dry.Failure(failures.PersistCallFailure)
 	}
 
 	input.Executable = call

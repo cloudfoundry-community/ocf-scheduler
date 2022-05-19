@@ -6,6 +6,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func LoadJob(raw dry.Value) dry.Result {
@@ -19,7 +20,7 @@ func LoadJob(raw dry.Value) dry.Result {
 			fmt.Sprintf("could not find job with guid %s", guid),
 		)
 
-		return dry.Failure("no-such-job")
+		return dry.Failure(failures.NoSuchJob)
 	}
 
 	input.Executable = job

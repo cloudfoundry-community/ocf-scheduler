@@ -6,6 +6,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func PersistJob(raw dry.Value) dry.Result {
@@ -23,7 +24,7 @@ func PersistJob(raw dry.Value) dry.Result {
 			fmt.Sprintf("could not persist the job: %s", err.Error()),
 		)
 
-		return dry.Failure("persist-job-failure")
+		return dry.Failure(failures.PersistJobFailure)
 	}
 
 	input.Executable = job

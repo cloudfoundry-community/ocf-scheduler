@@ -6,6 +6,7 @@ import (
 	"github.com/ess/dry"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
 )
 
 func PersistSchedule(raw dry.Value) dry.Result {
@@ -19,7 +20,7 @@ func PersistSchedule(raw dry.Value) dry.Result {
 			fmt.Sprintf("could not persist the schedule: %s", err.Error()),
 		)
 
-		return dry.Failure("persist-schedule-failure")
+		return dry.Failure(failures.PersistScheduleFailure)
 	}
 
 	input.Schedule = schedule
