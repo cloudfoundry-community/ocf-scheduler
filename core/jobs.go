@@ -20,8 +20,12 @@ type Job struct {
 	SpaceGUID string `json:"space_guid"`
 }
 
-func (entity *Job) Type() string {
+func (entity *Job) RefType() string {
 	return "job"
+}
+
+func (entity *Job) RefGUID() string {
+	return entity.GUID
 }
 
 func (entity *Job) ToJob() (*Job, error) {
@@ -36,6 +40,7 @@ type JobService interface {
 	Get(string) (*Job, error)
 	Delete(*Job) error
 	Named(string) (*Job, error)
+	Exists(string, string) bool
 	Persist(*Job) (*Job, error)
 	InSpace(string) []*Job
 	Success(*Job) (*Job, error)

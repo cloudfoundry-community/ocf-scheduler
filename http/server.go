@@ -16,7 +16,7 @@ func Server(bind string, services *core.Services) *http.Server {
 	e.GET("/", func(c echo.Context) error {
 		return c.JSON(
 			http.StatusOK,
-			[]byte("{}"),
+			"{}",
 		)
 	})
 

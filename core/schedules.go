@@ -17,8 +17,7 @@ type Schedule struct {
 
 type ScheduleService interface {
 	Persist(*Schedule) (*Schedule, error)
-	ByCall(*Call) []*Schedule
-	ByJob(*Job) []*Schedule
+	ByRef(string, string) []*Schedule
 	Get(string) (*Schedule, error)
 	Delete(*Schedule) error
 	Enabled() []*Schedule

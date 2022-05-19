@@ -23,7 +23,6 @@ type ExecutionService interface {
 	Fail(*Execution) (*Execution, error)
 	UpdateMessage(*Execution, string) (*Execution, error)
 	UpdateTaskGUID(*Execution, string) (*Execution, error)
-	ByJob(*Job) []*Execution
-	ByCall(*Call) []*Execution
+	ByRef(string, string) []*Execution
 	BySchedule(*Schedule) []*Execution
 }

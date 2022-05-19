@@ -18,8 +18,12 @@ type Call struct {
 	SpaceGUID string `json:"space_guid"`
 }
 
-func (entity *Call) Type() string {
+func (entity *Call) RefType() string {
 	return "call"
+}
+
+func (entity *Call) RefGUID() string {
+	return entity.GUID
 }
 
 func (entity *Call) ToJob() (*Job, error) {
@@ -34,6 +38,7 @@ type CallService interface {
 	Get(string) (*Call, error)
 	Delete(*Call) error
 	Named(string) (*Call, error)
+	Exists(string, string) bool
 	Persist(*Call) (*Call, error)
 	InSpace(string) []*Call
 }
