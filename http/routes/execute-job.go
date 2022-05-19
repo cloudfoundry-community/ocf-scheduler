@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/http/helpers"
 	"github.com/starkandwayne/scheduler-for-ocf/http/presenters"
 	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
@@ -14,12 +15,9 @@ func ExecuteJob(e *echo.Echo, services *core.Services) {
 	// Execute a Job as soon as possible
 	// POST /jobs/{jobGuid}/execute
 	e.POST("/jobs/:guid/execute", func(c echo.Context) error {
-		candidate := &core.Execution{}
-		c.Bind(&candidate)
-
 		input := core.NewInput(services).
 			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
-			WithExecution(candidate).
+			WithExecution(helpers.Executionify(c)).
 			WithGUID(c.Param("guid"))
 
 		result := workflows.

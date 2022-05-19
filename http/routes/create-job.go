@@ -6,6 +6,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/starkandwayne/scheduler-for-ocf/http/helpers"
 	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
@@ -13,12 +14,9 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 	// Create Job
 	// POST /jobs?app_guid=string
 	e.POST("/jobs", func(c echo.Context) error {
-		candidate := &core.Job{}
-		c.Bind(&candidate)
-
 		input := core.NewInput(services).
 			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
-			WithExecutable(candidate).
+			WithExecutable(helpers.Jobify(c)).
 			WithAppGUID(c.QueryParam("app_guid"))
 
 		result := workflows.
