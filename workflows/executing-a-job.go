@@ -9,7 +9,6 @@ import (
 var ExecutingAJob = dry.NewTransaction(
 	ops.VerifyAuth,
 	ops.LoadJob,
-	ops.InstantiateExecution,
 	ops.PersistExecution,
 	ops.ExecuteJob,
 )

@@ -9,7 +9,7 @@ import (
 func ValidateAppGUID(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
 
-	appGUID := input.Context.QueryParam("app_guid")
+	appGUID := input.Data["appGUID"]
 	if appGUID == "" {
 		input.Services.Logger.Error(
 			"ops.validate-app-guid",

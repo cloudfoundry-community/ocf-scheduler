@@ -13,9 +13,13 @@ func DeleteJob(e *echo.Echo, services *core.Services) {
 	// Delete a Job
 	// DELETE /jobs/{jobGuid}
 	e.DELETE("/jobs/:guid", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			DeletingAJob.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

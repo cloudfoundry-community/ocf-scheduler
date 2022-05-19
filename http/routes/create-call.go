@@ -13,9 +13,17 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 	// Create Call
 	// POST /calls?app_guid=string
 	e.POST("/calls", func(c echo.Context) error {
+		candidate := &core.Call{}
+		c.Bind(&candidate)
+
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithExecutable(candidate).
+			WithAppGUID(c.QueryParam("app_guid"))
+
 		result := workflows.
 			CreatingACall.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

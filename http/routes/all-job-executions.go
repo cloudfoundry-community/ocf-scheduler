@@ -14,9 +14,13 @@ func AllJobExecutions(e *echo.Echo, services *core.Services) {
 	// Get all execution histories for a Job
 	// GET /jobs/{jobGuid}/history
 	e.GET("/jobs/:guid/history", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			GettingJobExecutions.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

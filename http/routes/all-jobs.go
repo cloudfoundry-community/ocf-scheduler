@@ -9,31 +9,17 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/workflows"
 )
 
-type pageref struct {
-	Href string `json:"href"`
-}
-
-type pagination struct {
-	First        *pageref `json:"first"`
-	Last         *pageref `json:"last"`
-	Next         *pageref `json:"next"`
-	Previous     *pageref `json:"previous"`
-	TotalPages   int      `json:"total_pages"`
-	TotalResults int      `json:"total_results"`
-}
-
-type jobCollection struct {
-	Pagination *pagination `json:"pagination"`
-	Resources  []*core.Job `json:"resources"`
-}
-
 func AllJobs(e *echo.Echo, services *core.Services) {
 	// Get all Jobs within space
 	// GET /jobs?space_guid=string
 	e.GET("/jobs", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithSpaceGUID(c.QueryParam("space_guid"))
+
 		result := workflows.
 			GettingAllJobs.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			return c.JSON(http.StatusUnauthorized, "")
@@ -58,4 +44,9 @@ func AllJobs(e *echo.Echo, services *core.Services) {
 			output,
 		)
 	})
+}
+
+type jobCollection struct {
+	Pagination *pagination `json:"pagination"`
+	Resources  []*core.Job `json:"resources"`
 }

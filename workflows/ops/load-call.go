@@ -10,7 +10,7 @@ import (
 
 func LoadCall(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
-	guid := input.Context.Param("guid")
+	guid := input.Data["guid"]
 
 	call, err := input.Services.Calls.Get(guid)
 	if err != nil {

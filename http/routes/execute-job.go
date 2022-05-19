@@ -14,9 +14,17 @@ func ExecuteJob(e *echo.Echo, services *core.Services) {
 	// Execute a Job as soon as possible
 	// POST /jobs/{jobGuid}/execute
 	e.POST("/jobs/:guid/execute", func(c echo.Context) error {
+		candidate := &core.Execution{}
+		c.Bind(&candidate)
+
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithExecution(candidate).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			ExecutingAJob.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

@@ -14,9 +14,13 @@ func AllCallSchedules(e *echo.Echo, services *core.Services) {
 	// Get all schedules for a Call
 	// GET /calls/{callGuid}/schedules
 	e.GET("/calls/:guid/schedules", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			GettingAllCallSchedules.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

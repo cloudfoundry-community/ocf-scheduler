@@ -10,7 +10,7 @@ import (
 
 func LoadJob(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
-	guid := input.Context.Param("guid")
+	guid := input.Data["guid"]
 
 	job, err := input.Services.Jobs.Get(guid)
 	if err != nil {

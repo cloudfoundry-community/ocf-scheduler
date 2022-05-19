@@ -9,7 +9,7 @@ import (
 func LoadCallCollection(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
 
-	spaceGUID := input.Context.QueryParam("space_guid")
+	spaceGUID := input.Data["spaceGUID"]
 	if len(spaceGUID) > 0 {
 		input.CallCollection = input.Services.Calls.InSpace(spaceGUID)
 	}

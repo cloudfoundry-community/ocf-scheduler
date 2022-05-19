@@ -9,7 +9,6 @@ import (
 var ExecutingACall = dry.NewTransaction(
 	ops.VerifyAuth,
 	ops.LoadCall,
-	ops.InstantiateExecution,
 	ops.PersistExecution,
 	ops.ExecuteCall,
 )

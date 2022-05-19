@@ -14,9 +14,17 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 	// Schedule a Call to run later
 	// POST /calls/{callGuid}/schedules
 	e.POST("/calls/:guid/schedules", func(c echo.Context) error {
+		candidate := &core.Schedule{}
+		c.Bind(&candidate)
+
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithSchedule(candidate).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			SchedulingACall.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

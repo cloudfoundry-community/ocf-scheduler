@@ -13,9 +13,17 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 	// Create Job
 	// POST /jobs?app_guid=string
 	e.POST("/jobs", func(c echo.Context) error {
+		candidate := &core.Job{}
+		c.Bind(&candidate)
+
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithExecutable(candidate).
+			WithAppGUID(c.QueryParam("app_guid"))
+
 		result := workflows.
 			CreatingAJob.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

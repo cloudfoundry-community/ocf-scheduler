@@ -10,7 +10,6 @@ var CreatingAJob = dry.NewTransaction(
 	ops.VerifyAuth,
 	ops.ValidateAppGUID,
 	ops.QuerySpace,
-	ops.InstantiateJob,
 	ops.ValidateJobName,
 	ops.ValidateJobCommand,
 	ops.PersistJob,

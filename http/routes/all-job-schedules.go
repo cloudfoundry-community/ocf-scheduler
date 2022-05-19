@@ -14,9 +14,13 @@ func AllJobSchedules(e *echo.Echo, services *core.Services) {
 	// Get all schedules for a Job
 	// GET /jobs/{jobGuid}/schedules
 	e.GET("/jobs/:guid/schedules", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			GettingAllJobSchedules.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

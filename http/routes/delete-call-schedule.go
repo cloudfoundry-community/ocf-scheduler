@@ -13,9 +13,14 @@ func DeleteCallSchedule(e *echo.Echo, services *core.Services) {
 	// Delete the given schedule for the given Call
 	// DELETE /calls/{callGuid}/schedules/{scheduleGuid}
 	e.DELETE("/calls/:guid/schedules/:schedule_guid", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid")).
+			WithScheduleGUID(c.Param("schedule_guid"))
+
 		result := workflows.
 			UnschedulingACall.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

@@ -14,9 +14,13 @@ func AllCallExecutions(e *echo.Echo, services *core.Services) {
 	// Get all execution histories for a Call
 	// GET /calls/{callGuid}/history
 	e.GET("/calls/:guid/history", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			GettingCallExecutions.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

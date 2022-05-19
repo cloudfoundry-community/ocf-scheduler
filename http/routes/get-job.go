@@ -13,9 +13,13 @@ func GetJob(e *echo.Echo, services *core.Services) {
 	// Get a Job (sha-na-na-na, sha-na-na-na-na, ahh-do)
 	// GET /jobs/{jobGuid}
 	e.GET("/jobs/:guid", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			GettingAJob.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

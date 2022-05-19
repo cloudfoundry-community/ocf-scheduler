@@ -18,9 +18,13 @@ func AllCalls(e *echo.Echo, services *core.Services) {
 	// Get all Calls within space
 	// GET /calls?space_guid=string
 	e.GET("/calls", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithSpaceGUID(c.QueryParam("space_guid"))
+
 		result := workflows.
 			GettingAllCalls.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			return c.JSON(http.StatusUnauthorized, "")

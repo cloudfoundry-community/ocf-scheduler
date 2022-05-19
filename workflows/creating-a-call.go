@@ -10,7 +10,6 @@ var CreatingACall = dry.NewTransaction(
 	ops.VerifyAuth,
 	ops.ValidateAppGUID,
 	ops.QuerySpace,
-	ops.InstantiateCall,
 	ops.ValidateCallName,
 	ops.ValidateCallURL,
 	ops.ValidateCallAuthHeader,

@@ -14,9 +14,14 @@ func AllCallScheduleExecutions(e *echo.Echo, services *core.Services) {
 	// Get all execution histories for a Call and Schedule
 	// GET /calls/{callGuid}/schedules/{scheduleGuid}/history
 	e.GET("/calls/:guid/schedules/:schedule_guid/history", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid")).
+			WithScheduleGUID(c.Param("guid"))
+
 		result := workflows.
 			GettingScheduledCallExecutions.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

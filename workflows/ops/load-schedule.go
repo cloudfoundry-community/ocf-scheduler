@@ -10,7 +10,7 @@ import (
 
 func LoadSchedule(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
-	guid := input.Context.Param("schedule_guid")
+	guid := input.Data["scheduleGUID"]
 
 	schedule, err := input.Services.Schedules.Get(guid)
 	if err != nil {

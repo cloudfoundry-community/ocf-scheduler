@@ -2,12 +2,10 @@ package core
 
 import (
 	"github.com/ess/dry"
-	"github.com/labstack/echo/v4"
 )
 
 type Input struct {
 	// Helpers
-	Context  echo.Context
 	Services *Services
 
 	// Single records
@@ -25,9 +23,8 @@ type Input struct {
 	Data map[string]string
 }
 
-func NewInput(context echo.Context, services *Services) *Input {
+func NewInput(services *Services) *Input {
 	return &Input{
-		Context:             context,
 		Services:            services,
 		JobCollection:       make([]*Job, 0),
 		CallCollection:      make([]*Call, 0),
@@ -41,4 +38,52 @@ func Inputify(input dry.Value) *Input {
 	d := input.(*Input)
 
 	return d
+}
+
+func (input *Input) WithAuth(auth string) *Input {
+	input.Data["auth"] = auth
+
+	return input
+}
+
+func (input *Input) WithGUID(guid string) *Input {
+	input.Data["guid"] = guid
+
+	return input
+}
+
+func (input *Input) WithExecutable(exe Executable) *Input {
+	input.Executable = exe
+
+	return input
+}
+
+func (input *Input) WithSchedule(sch *Schedule) *Input {
+	input.Schedule = sch
+
+	return input
+}
+
+func (input *Input) WithExecution(exe *Execution) *Input {
+	input.Execution = exe
+
+	return input
+}
+
+func (input *Input) WithScheduleGUID(guid string) *Input {
+	input.Data["scheduleGUID"] = guid
+
+	return input
+}
+
+func (input *Input) WithAppGUID(guid string) *Input {
+	input.Data["appGUID"] = guid
+
+	return input
+}
+
+func (input *Input) WithSpaceGUID(guid string) *Input {
+	input.Data["spaceGUID"] = guid
+
+	return input
 }

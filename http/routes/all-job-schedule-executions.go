@@ -14,9 +14,14 @@ func AllJobScheduleExecutions(e *echo.Echo, services *core.Services) {
 	// Get all execution histories for a Job and Schedule
 	// GET /jobs/{jobGuid}/schedules/{scheduleGuid}/history
 	e.GET("/jobs/:guid/schedules/:schedule_guid/history", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid")).
+			WithScheduleGUID(c.Param("schedule_guid"))
+
 		result := workflows.
 			GettingScheduledJobExecutions.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

@@ -14,9 +14,17 @@ func ExecuteCall(e *echo.Echo, services *core.Services) {
 	// Execute a Call as soon as possible
 	// POST /calls/{callGuid}/execute
 	e.POST("/calls/:guid/execute", func(c echo.Context) error {
+		candidate := &core.Execution{}
+		c.Bind(&candidate)
+
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithExecution(candidate).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			ExecutingACall.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {

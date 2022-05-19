@@ -13,9 +13,13 @@ func GetCall(e *echo.Echo, services *core.Services) {
 	// Get a Call
 	// GET /calls/{callGuid}
 	e.GET("/calls/:guid", func(c echo.Context) error {
+		input := core.NewInput(services).
+			WithAuth(c.Request().Header.Get(echo.HeaderAuthorization)).
+			WithGUID(c.Param("guid"))
+
 		result := workflows.
 			GettingACall.
-			Call(core.NewInput(c, services))
+			Call(input)
 
 		if result.Failure() {
 			switch core.Causify(result.Error()) {
