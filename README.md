@@ -24,7 +24,7 @@ The cf user associated with the provided token must be a space developer or spac
 
 ### Errors ###
 
-It's worth noting up front that almost every endpoint in the API presents at least one error scenario. In order to preserve the behavior of the system we are mimicing, when an error is returned from an endpoint, the only visibiilty into what went wrong to the client is the HTTP status code returned. The response body for an error is empty.
+It's worth noting up front that almost every endpoint in the API presents at least one error scenario. In order to preserve the behavior of the system we are mimicing, when an error is returned from an endpoint, the only visibility into what went wrong to the client is the HTTP status code returned. The response body for an error is empty.
 
 ### Jobs ###
 
@@ -33,7 +33,7 @@ A Job is an executable object that describes a command that one wishes to run wi
 ```json
 {
   "guid" : "11111111-1111-1111-1111-111111111111",
-  "name" : "command-name",
+  "name" : "job-name",
   "command" : "echo 'I am a command'",
   "disk_in_mb" : 1024,
   "memory_in_mb" : 1024,
@@ -42,7 +42,6 @@ A Job is an executable object that describes a command that one wishes to run wi
   "updated_at" : "2022-05-20T21:21:44.763885632Z",
   "app_guid" : "22222222-2222-2222-2222-222222222222",
   "space_guid" : "33333333-3333-3333-3333-333333333333"
-
 }
 ```
 
@@ -67,6 +66,25 @@ A note on the "state" field: the initial state for a job is `PENDING`. Over the 
 #### Unscheduling a Job ####
 
 ### Calls ###
+
+A Call is an executable object that describes a URL against one wishes to perform a `POST` request. Its JSON representation looks like this:
+
+```json
+{
+  "guid" : "11111111-1111-1111-1111-111111111111",
+  "name" : "call-name",
+  "url" : "https://github.com/starkandwayne/scheduler-for-ocf",
+  "auth_header" : "auth info for the provided URL",
+  "created_at" : "2022-05-20T21:21:44.763885632Z",
+  "updated_at" : "2022-05-20T21:21:44.763885632Z",
+  "app_guid" : "22222222-2222-2222-2222-222222222222",
+  "space_guid" : "33333333-3333-3333-3333-333333333333"
+}
+```
+
+As mentioned above, executing a call performs an HTTP POST request against the provided URL. This request happens from the point of view of the scheduler itself, and it passes in the provided auth header via the `Authorization` header in the request. As there is no documented mechanism to provide a payload to post, we have elected to always post an empty JSON object (`{}`) for Calls.
+
+At the end of the day, one may be better off including a script in one's app that can be executed as a Job to do this sort of thing, but we have included this implementation for the sake of completion. It is entirely possible that this functionality may be deprecated and removed in subsequent releases.
 
 #### Creating a Call ####
 
