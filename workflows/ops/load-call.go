@@ -10,13 +10,21 @@ import (
 )
 
 func LoadCall(raw dry.Value) dry.Result {
+	tag := "ops.load-call"
 	input := core.Inputify(raw)
 	guid := input.Data["guid"]
+
+	if guid == "" {
+		input.Services.Logger.Error(
+			tag,
+			"no call guid provided",
+		)
+	}
 
 	call, err := input.Services.Calls.Get(guid)
 	if err != nil {
 		input.Services.Logger.Error(
-			"ops.load-call",
+			tag,
 			fmt.Sprintf("could not find call with guid %s", guid),
 		)
 

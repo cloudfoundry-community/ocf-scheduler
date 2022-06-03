@@ -10,29 +10,29 @@ import (
 	"github.com/starkandwayne/scheduler-for-ocf/mock"
 )
 
-func Test_LoadJob(t *testing.T) {
+func Test_LoadCall(t *testing.T) {
 	testscope.SkipUnlessUnit(t)
-	logScope := "ops.load-job"
-	jobService := mock.NewJobService()
+	logScope := "ops.load-call"
+	callService := mock.NewCallService()
 	logService := mock.NewLogService()
-	services := &core.Services{Jobs: jobService, Logger: logService}
+	services := &core.Services{Calls: callService, Logger: logService}
 	guid, _ := core.GenGUID()
-	job := dummyJob(&core.Job{GUID: guid, Name: "delete-job-test"})
+	call := dummyCall(&core.Call{GUID: guid, Name: "load-call-test"})
 
 	t.Run("when a guid is provided", func(t *testing.T) {
 		input := core.
 			NewInput(services).
 			WithGUID(guid)
 
-		t.Run("and the job exists", func(t *testing.T) {
-			job, err := jobService.Persist(job)
+		t.Run("and the call exists", func(t *testing.T) {
+			call, err := callService.Persist(call)
 			if err != nil {
-				t.Errorf("could not persist job: %s", err.Error())
+				t.Errorf("could not persist call: %s", err.Error())
 			}
 
-			input = input.WithGUID(job.GUID)
+			input = input.WithGUID(call.GUID)
 
-			result := LoadJob(input)
+			result := LoadCall(input)
 
 			t.Run("the op is a success", func(t *testing.T) {
 				if result.Failure() {
@@ -41,35 +41,35 @@ func Test_LoadJob(t *testing.T) {
 				}
 			})
 
-			t.Run("the payload has an executable job", func(t *testing.T) {
+			t.Run("the payload has an executable call", func(t *testing.T) {
 				payload := core.Inputify(result.Value())
 				if payload.Executable == nil {
 					t.Errorf("expected an executable, got nil")
 				}
 
-				_, err := payload.Executable.ToJob()
+				_, err := payload.Executable.ToCall()
 				if err != nil {
-					t.Errorf("expected executable to be a job")
+					t.Errorf("expected executable to be a call")
 				}
 			})
 		})
 
-		t.Run("but the job doesn't exist", func(t *testing.T) {
+		t.Run("but the call doesn't exist", func(t *testing.T) {
 			logService.Reset()
-			jobService.Delete(job)
+			callService.Delete(call)
 
-			result := LoadJob(input)
+			result := LoadCall(input)
 
-			t.Run("the op logs the issue with finding the job", func(t *testing.T) {
+			t.Run("the op logs the issue with finding the call", func(t *testing.T) {
 				errorLogged := logService.ReceivedError(
 					logScope,
-					"could not find job with guid "+job.GUID,
+					"could not find call with guid "+call.GUID,
 				)
 
 				if !errorLogged {
 					t.Errorf(
-						"expected a logged error regarding the unknown job %s",
-						job.GUID,
+						"expected a logged error regarding the unknown call %s",
+						call.GUID,
 					)
 				}
 			})
@@ -80,8 +80,8 @@ func Test_LoadJob(t *testing.T) {
 				}
 
 				cause := core.Causify(result.Error())
-				if cause != failures.NoSuchJob {
-					t.Errorf("expected '%s', got '%s'", failures.NoSuchJob, cause)
+				if cause != failures.NoSuchCall {
+					t.Errorf("expected '%s', got '%s'", failures.NoSuchCall, cause)
 				}
 			})
 		})
@@ -92,10 +92,10 @@ func Test_LoadJob(t *testing.T) {
 		input := core.
 			NewInput(services)
 
-		result := LoadJob(input)
+		result := LoadCall(input)
 
 		t.Run("the op logs an error", func(t *testing.T) {
-			if !logService.ReceivedError(logScope, "no job guid provided") {
+			if !logService.ReceivedError(logScope, "no call guid provided") {
 				t.Errorf("expected a logged error regarding the missing guid")
 			}
 		})
@@ -106,8 +106,8 @@ func Test_LoadJob(t *testing.T) {
 			}
 
 			cause := core.Causify(result.Error())
-			if cause != failures.NoSuchJob {
-				t.Errorf("expected '%s', got '%s'", failures.NoSuchJob, cause)
+			if cause != failures.NoSuchCall {
+				t.Errorf("expected '%s', got '%s'", failures.NoSuchCall, cause)
 			}
 		})
 	})
