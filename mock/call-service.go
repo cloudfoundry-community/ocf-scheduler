@@ -13,6 +13,7 @@ import (
 type CallService struct {
 	storage []*core.Call
 	locker  sync.Mutex
+	fail    bool
 }
 
 func (service *CallService) Get(guid string) (*core.Call, error) {
@@ -45,6 +46,11 @@ func (service *CallService) get(guid string) (*core.Call, error) {
 func (service *CallService) Delete(call *core.Call) error {
 	service.locker.Lock()
 	defer service.locker.Unlock()
+
+	// this is just the easiest way to force a failure in the mock service
+	if call.Name == "sad-face" {
+		return fmt.Errorf("such a sad thing")
+	}
 
 	keep := make([]*core.Call, 0)
 	for _, item := range service.storage {
@@ -83,6 +89,25 @@ func (service *CallService) named(name string) (*core.Call, error) {
 	}
 
 	return candidates[0], nil
+}
+
+func (service *CallService) Exists(appguid string, name string) bool {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	return service.exists(appguid, name)
+}
+
+func (service *CallService) exists(appguid string, name string) bool {
+	candidates := make([]*core.Call, 0)
+
+	for _, call := range service.storage {
+		if call.Name == name && call.AppGUID == appguid {
+			candidates = append(candidates, call)
+		}
+	}
+
+	return len(candidates) > 0
 }
 
 func (service *CallService) Persist(candidate *core.Call) (*core.Call, error) {
@@ -125,8 +150,16 @@ func (service *CallService) InSpace(guid string) []*core.Call {
 	return spaced
 }
 
+func (service *CallService) Reset() {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	service.storage = make([]*core.Call, 0)
+}
+
 func NewCallService() *CallService {
-	return &CallService{
-		storage: make([]*core.Call, 0),
-	}
+	service := &CallService{fail: false}
+	service.Reset()
+
+	return service
 }

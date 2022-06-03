@@ -10,6 +10,10 @@ import (
 func DeleteCall(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
 
+	if input.Executable == nil {
+		return dry.Failure(failures.ExecutableTypeMismatch)
+	}
+
 	call, err := input.Executable.ToCall()
 	if err != nil {
 		return dry.Failure(failures.ExecutableTypeMismatch)
