@@ -13,7 +13,6 @@ import (
 type CallService struct {
 	storage []*core.Call
 	locker  sync.Mutex
-	fail    bool
 }
 
 func (service *CallService) Get(guid string) (*core.Call, error) {
@@ -158,7 +157,7 @@ func (service *CallService) Reset() {
 }
 
 func NewCallService() *CallService {
-	service := &CallService{fail: false}
+	service := &CallService{}
 	service.Reset()
 
 	return service

@@ -50,6 +50,10 @@ func (service *JobService) Delete(job *core.Job) error {
 }
 
 func (service *JobService) delete(job *core.Job) error {
+	if job.Name == "sad-face" {
+		return fmt.Errorf("such a sad state of affairs")
+	}
+
 	keep := make([]*core.Job, 0)
 	for _, item := range service.storage {
 		if item.GUID != job.GUID {
@@ -87,6 +91,25 @@ func (service *JobService) named(name string) (*core.Job, error) {
 	}
 
 	return candidates[0], nil
+}
+
+func (service *JobService) Exists(appguid string, name string) bool {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	return service.exists(appguid, name)
+}
+
+func (service *JobService) exists(appguid string, name string) bool {
+	candidates := make([]*core.Job, 0)
+
+	for _, call := range service.storage {
+		if call.Name == name && call.AppGUID == appguid {
+			candidates = append(candidates, call)
+		}
+	}
+
+	return len(candidates) > 0
 }
 
 func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
@@ -136,6 +159,16 @@ func (service *JobService) InSpace(guid string) []*core.Job {
 	}
 
 	return spaced
+}
+
+func (service *JobService) Success(job *core.Job) (*core.Job, error) {
+	//TODO: make this actually do the thing
+	return job, nil
+}
+
+func (service *JobService) Fail(job *core.Job) (*core.Job, error) {
+	//TODO: make this actually do the thing
+	return job, nil
 }
 
 func NewJobService() *JobService {

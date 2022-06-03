@@ -10,6 +10,10 @@ import (
 func DeleteJob(raw dry.Value) dry.Result {
 	input := core.Inputify(raw)
 
+	if input.Executable == nil {
+		return dry.Failure(failures.ExecutableTypeMismatch)
+	}
+
 	job, err := input.Executable.ToJob()
 	if err != nil {
 		return dry.Failure(failures.ExecutableTypeMismatch)
