@@ -10,13 +10,23 @@ import (
 )
 
 func LoadJob(raw dry.Value) dry.Result {
+	tag := "ops.load-job"
 	input := core.Inputify(raw)
 	guid := input.Data["guid"]
+
+	if guid == "" {
+		input.Services.Logger.Error(
+			tag,
+			"no job guid provided",
+		)
+
+		return dry.Failure(failures.NoSuchJob)
+	}
 
 	job, err := input.Services.Jobs.Get(guid)
 	if err != nil {
 		input.Services.Logger.Error(
-			"ops.load-job",
+			tag,
 			fmt.Sprintf("could not find job with guid %s", guid),
 		)
 
