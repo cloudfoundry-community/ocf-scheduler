@@ -24,7 +24,7 @@ func dummyCall(call *core.Call) *core.Call {
 	}
 
 	if blank(call.Name) {
-		call.Name = "dummy-call"
+		call.Name = "dummy-call-" + call.GUID
 	}
 
 	if blank(call.URL) {
@@ -60,7 +60,7 @@ func dummyJob(job *core.Job) *core.Job {
 	}
 
 	if blank(job.Name) {
-		job.Name = "dummy-job"
+		job.Name = "dummy-job-" + job.GUID
 	}
 
 	if blank(job.Command) {
@@ -108,4 +108,41 @@ func dummySchedule(schedule *core.Schedule) *core.Schedule {
 	}
 
 	return schedule
+}
+
+func dummyExecution(entity *core.Execution) *core.Execution {
+	if entity == nil {
+		entity = &core.Execution{}
+	}
+
+	now := time.Now().UTC()
+	entity.ScheduledTime = now
+	entity.ExecutionStartTime = now
+	entity.ExecutionEndTime = now
+
+	if blank(entity.GUID) {
+		entity.GUID, _ = core.GenGUID()
+	}
+
+	if blank(entity.TaskGUID) {
+		entity.TaskGUID, _ = core.GenGUID()
+	}
+
+	if blank(entity.Message) {
+		entity.Message = "o hi"
+	}
+
+	if blank(entity.State) {
+		entity.State = "Minnesota"
+	}
+
+	if blank(entity.RefType) {
+		entity.RefType = "job"
+	}
+
+	if blank(entity.RefGUID) {
+		entity.RefGUID, _ = core.GenGUID()
+	}
+
+	return entity
 }

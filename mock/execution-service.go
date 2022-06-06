@@ -87,6 +87,18 @@ func (service *ExecutionService) Fail(execution *core.Execution) (*core.Executio
 //return candidate, nil
 //}
 
+func (service *ExecutionService) ByRef(kind, guid string) []*core.Execution {
+	found := make([]*core.Execution, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.RefType == kind && candidate.RefGUID == guid {
+			found = append(found, candidate)
+		}
+	}
+
+	return found
+}
+
 func (service *ExecutionService) ByJob(job *core.Job) []*core.Execution {
 	found := make([]*core.Execution, 0)
 
@@ -109,6 +121,14 @@ func (service *ExecutionService) ByCall(call *core.Call) []*core.Execution {
 	}
 
 	return found
+}
+
+func (service *ExecutionService) Reset() {
+	service.storage = make(map[string]*core.Execution)
+}
+
+func (service *ExecutionService) UpdateTaskGUID(execution *core.Execution, guid string) (*core.Execution, error) {
+	return nil, fmt.Errorf("unimplemented")
 }
 
 func (service *ExecutionService) BySchedule(schedule *core.Schedule) []*core.Execution {

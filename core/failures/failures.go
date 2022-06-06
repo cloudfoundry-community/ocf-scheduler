@@ -23,5 +23,6 @@ const (
 	PersistJobFailure         = "persist-job-failure"
 	PersistScheduleFailure    = "persist-schedule-failure"
 	ScheduleExpressionInvalid = "schedule-expression-invalid"
+	ScheduleNotProvided       = "schedule-not-provided"
 	UnscheduleFailure         = "unschedule-failure"
 )

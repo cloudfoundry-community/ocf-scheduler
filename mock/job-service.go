@@ -171,6 +171,13 @@ func (service *JobService) Fail(job *core.Job) (*core.Job, error) {
 	return job, nil
 }
 
+func (service *JobService) Reset() {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	service.storage = make([]*core.Job, 0)
+}
+
 func NewJobService() *JobService {
 	return &JobService{
 		storage: make([]*core.Job, 0),
