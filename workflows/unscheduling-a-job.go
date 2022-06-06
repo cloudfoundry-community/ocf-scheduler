@@ -7,8 +7,8 @@ import (
 )
 
 var UnschedulingAJob = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadJob,
+	ops.VerifyAuth, //tested
+	ops.LoadJob,    //tested
 	ops.LoadSchedule,
 	ops.DeleteSchedule,
 )

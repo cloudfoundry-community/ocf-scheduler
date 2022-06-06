@@ -7,6 +7,6 @@ import (
 )
 
 var GettingACall = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadCall,
+	ops.VerifyAuth, //tested
+	ops.LoadCall,   //tested
 )

@@ -7,8 +7,8 @@ import (
 )
 
 var SchedulingACall = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadCall,
+	ops.VerifyAuth, //tested
+	ops.LoadCall,   //tested
 	ops.ValidateScheduleExpression,
 	ops.PersistSchedule,
 	ops.ScheduleCall,

@@ -7,8 +7,8 @@ import (
 )
 
 var ExecutingACall = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadCall,
+	ops.VerifyAuth, //tested
+	ops.LoadCall,   //tested
 	ops.PersistExecution,
 	ops.ExecuteCall,
 )

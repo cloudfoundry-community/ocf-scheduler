@@ -7,7 +7,7 @@ import (
 )
 
 var GettingJobExecutions = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadJob,
-	ops.LoadExecutionCollection,
+	ops.VerifyAuth,              //tested
+	ops.LoadJob,                 //tested
+	ops.LoadExecutionCollection, //tested
 )

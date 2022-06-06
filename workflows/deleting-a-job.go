@@ -7,9 +7,9 @@ import (
 )
 
 var DeletingAJob = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadJob,
-	ops.LoadScheduleCollection,
+	ops.VerifyAuth,             //tested
+	ops.LoadJob,                //tested
+	ops.LoadScheduleCollection, //tested
 	ops.DeleteScheduleCollection,
-	ops.DeleteJob,
+	ops.DeleteJob, //tested
 )

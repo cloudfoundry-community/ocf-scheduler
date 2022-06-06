@@ -7,8 +7,8 @@ import (
 )
 
 var UnschedulingACall = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadCall,
+	ops.VerifyAuth, //tested
+	ops.LoadCall,   //tested
 	ops.LoadSchedule,
 	ops.DeleteSchedule,
 )

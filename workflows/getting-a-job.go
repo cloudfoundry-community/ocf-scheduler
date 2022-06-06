@@ -7,6 +7,6 @@ import (
 )
 
 var GettingAJob = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadJob,
+	ops.VerifyAuth, //tested
+	ops.LoadJob,    //tested
 )

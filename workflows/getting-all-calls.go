@@ -7,6 +7,6 @@ import (
 )
 
 var GettingAllCalls = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadCallCollection,
+	ops.VerifyAuth,         //tested
+	ops.LoadCallCollection, //tested
 )

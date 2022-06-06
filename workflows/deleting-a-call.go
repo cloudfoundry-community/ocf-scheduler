@@ -7,9 +7,9 @@ import (
 )
 
 var DeletingACall = dry.NewTransaction(
-	ops.VerifyAuth,
-	ops.LoadCall,
-	ops.LoadScheduleCollection,
+	ops.VerifyAuth,             //tested
+	ops.LoadCall,               //tested
+	ops.LoadScheduleCollection, //tested
 	ops.DeleteScheduleCollection,
-	ops.DeleteCall,
+	ops.DeleteCall, //tested
 )
