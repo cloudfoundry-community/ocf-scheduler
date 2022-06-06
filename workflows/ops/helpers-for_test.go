@@ -77,3 +77,35 @@ func dummyJob(job *core.Job) *core.Job {
 
 	return job
 }
+
+func dummySchedule(schedule *core.Schedule) *core.Schedule {
+	if schedule == nil {
+		schedule = &core.Schedule{}
+	}
+
+	now := time.Now().UTC()
+	schedule.CreatedAt = now
+	schedule.UpdatedAt = now
+
+	if blank(schedule.GUID) {
+		schedule.GUID, _ = core.GenGUID()
+	}
+
+	if blank(schedule.Expression) {
+		schedule.Expression = "* * * * *"
+	}
+
+	if blank(schedule.ExpressionType) {
+		schedule.ExpressionType = "cron_expression"
+	}
+
+	if blank(schedule.RefGUID) {
+		schedule.RefGUID, _ = core.GenGUID()
+	}
+
+	if blank(schedule.RefType) {
+		schedule.RefType = "job"
+	}
+
+	return schedule
+}
