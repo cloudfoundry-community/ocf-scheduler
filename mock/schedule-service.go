@@ -125,3 +125,26 @@ func (service *ScheduleService) Enabled() []*core.Schedule {
 
 	return enabled
 }
+
+func (service *ScheduleService) ByRef(kind, guid string) []*core.Schedule {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	byref := make([]*core.Schedule, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.RefType == kind && candidate.RefGUID == guid {
+			byref = append(byref, candidate)
+		}
+	}
+
+	return byref
+
+}
+
+func (service *ScheduleService) Reset() {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	service.storage = make([]*core.Schedule, 0)
+}
