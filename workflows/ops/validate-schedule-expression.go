@@ -13,6 +13,10 @@ func ValidateScheduleExpression(raw dry.Value) dry.Result {
 	logger := input.Services.Logger
 	schedule := input.Schedule
 
+	if schedule == nil {
+		return dry.Failure(failures.ScheduleNotProvided)
+	}
+
 	if input.Services.Cron.Validate(schedule.Expression) != nil {
 		logger.Error(
 			tag,

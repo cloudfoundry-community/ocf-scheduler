@@ -7,9 +7,9 @@ import (
 )
 
 var SchedulingAJob = dry.NewTransaction(
-	ops.VerifyAuth, //tested
-	ops.LoadJob,    //tested
-	ops.ValidateScheduleExpression,
+	ops.VerifyAuth,                 //tested
+	ops.LoadJob,                    //tested
+	ops.ValidateScheduleExpression, //tested
 	ops.PersistSchedule,
 	ops.ScheduleJob,
 )
