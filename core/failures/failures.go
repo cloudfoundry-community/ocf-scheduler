@@ -14,6 +14,7 @@ const (
 	JobNameBlank              = "job-name-blank"
 	JobNameNotUnique          = "job-name-not-unique-for-app"
 	NoAppGUID                 = "no-app-guid"
+	NoScheduleGUID            = "no-schedule-guid"
 	NoSpaceGUID               = "no-space-guid"
 	NoSuchCall                = "no-such-call"
 	NoSuchJob                 = "no-such-job"

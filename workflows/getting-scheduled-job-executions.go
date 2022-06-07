@@ -7,8 +7,8 @@ import (
 )
 
 var GettingScheduledJobExecutions = dry.NewTransaction(
-	ops.VerifyAuth, //tested
-	ops.LoadJob,    //tested
-	ops.LoadSchedule,
+	ops.VerifyAuth,                       //tested
+	ops.LoadJob,                          //tested
+	ops.LoadSchedule,                     //tested
 	ops.LoadScheduledExecutionCollection, //tested
 )

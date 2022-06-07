@@ -7,8 +7,8 @@ import (
 )
 
 var GettingScheduledCallExecutions = dry.NewTransaction(
-	ops.VerifyAuth, //tested
-	ops.LoadCall,   //tested
-	ops.LoadSchedule,
+	ops.VerifyAuth,                       //tested
+	ops.LoadCall,                         //tested
+	ops.LoadSchedule,                     //tested
 	ops.LoadScheduledExecutionCollection, //tested
 )

@@ -10,13 +10,22 @@ import (
 )
 
 func LoadSchedule(raw dry.Value) dry.Result {
+	tag := "ops.load-schedule"
 	input := core.Inputify(raw)
 	guid := input.Data["scheduleGUID"]
+
+	if guid == "" {
+		input.Services.Logger.Error(
+			tag,
+			"no schedule guid provided",
+		)
+		return dry.Failure(failures.NoScheduleGUID)
+	}
 
 	schedule, err := input.Services.Schedules.Get(guid)
 	if err != nil {
 		input.Services.Logger.Error(
-			"ops.load-schedule",
+			tag,
 			fmt.Sprintf("could not find schedule with guid %s", guid),
 		)
 
