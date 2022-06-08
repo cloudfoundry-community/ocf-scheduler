@@ -7,8 +7,8 @@ import (
 )
 
 var CreatingAJob = dry.NewTransaction(
-	ops.VerifyAuth, //tested
-	ops.ValidateAppGUID,
+	ops.VerifyAuth,      //tested
+	ops.ValidateAppGUID, //tested
 	ops.QuerySpace,
 	ops.ValidateJobName,
 	ops.ValidateJobCommand,

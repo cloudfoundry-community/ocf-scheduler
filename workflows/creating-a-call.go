@@ -7,8 +7,8 @@ import (
 )
 
 var CreatingACall = dry.NewTransaction(
-	ops.VerifyAuth, //tested
-	ops.ValidateAppGUID,
+	ops.VerifyAuth,      //tested
+	ops.ValidateAppGUID, //tested
 	ops.QuerySpace,
 	ops.ValidateCallName,
 	ops.ValidateCallURL,

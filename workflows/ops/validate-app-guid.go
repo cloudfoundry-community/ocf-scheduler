@@ -20,7 +20,5 @@ func ValidateAppGUID(raw dry.Value) dry.Result {
 		return dry.Failure(failures.NoAppGUID)
 	}
 
-	input.Data["appGUID"] = appGUID
-
 	return dry.Success(input)
 }
