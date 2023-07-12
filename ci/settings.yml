@@ -1,0 +1,32 @@
+---
+meta:
+  name:    ocf-scheduler
+  release: OCF Scheduler
+  target:  pipes/cloudfoundry-community
+  url:     https://pipes.scalecf.net
+
+  initial_version: 1.0.0
+
+  go:
+    cmd_path: cmd/scheduler
+    force_static_binary: true
+
+  git:
+    email: ((github.email))
+    name:  ((github.name))
+
+  aws:
+    access_key: ((aws.access_key_id))
+    secret_key: ((aws.secret_access_key))
+
+  github:
+    owner:           cloudfoundry-community
+    repo:            ocf-scheduler
+    branch:          develop
+    main-branch:     main
+    private_key:     ((github.private_key))
+    access_token:    ((github.access_token))
+    access_token_rw: ((github.access_token_rw))
+
+  slack:
+    webhook: ((slack.webhook))

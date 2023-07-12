@@ -1,0 +1,26 @@
+backends:
+- type: vault
+  name: (( grab meta.name ))
+  refresh_interval: 30
+  properties:
+    # (string) The URL where the Vault API is located
+    address: (( grab meta.url ))
+    insecure_skip_verfiy: true
+    base_path: "secret/"
+    auth:
+      token: (( grab $SAFE_TOKEN ))
+
+# (hash) Configuration for the doomsday server API
+server:
+  port: 8111
+  tls:
+    cert: (( vault "secret/dd/ssl:certificate" ))
+    key:  (( vault "secret/dd/ssl:key" ))
+
+  auth:
+    type: userpass
+    properties:
+      username: admin
+      password: password
+      timeout: 30
+      refresh: true

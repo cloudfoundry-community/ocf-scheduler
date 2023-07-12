@@ -1,0 +1,35 @@
+#!/bin/bash
+# vim:et:ts=2:sts=2:sw=2
+set -ue
+
+header() {
+	echo
+	echo "================================================================================"
+	echo "$1"
+	echo "--------------------------------------------------------------------------------"
+	echo
+}
+
+bail() {
+	echo >&2 "$*  Did you misconfigure Concourse?"
+	exit 2
+}
+export ROOT_PATH="$(pwd)"
+
+export PATH=${PATH}:${GOPATH}/bin
+export REPO_ROOT="${ROOT_PATH}/git"
+export BUILD_ROOT="${ROOT_PATH}/build"
+
+test -n "${APP_NAME:-}" || bail "GIT_CI must be set to the path of the git repo containing the CI assets."
+export VERSION_FROM="${VERSION_FROM:-version/number}"
+test -f "${VERSION_FROM}"     || bail "Version file (${VERSION_FROM}) not found."
+export VERSION=$(cat "${VERSION_FROM}")
+test -n "${VERSION}"          || bail "Version file (${VERSION_FROM}) was empty."
+
+#TODO: Actually do some testing
+[[ -f ${BUILD_ROOT}/${APP_NAME}-${VERSION}-linux-amd64 ]]
+
+echo
+echo "================================================================================"
+echo "SUCCESS!"
+exit 0
