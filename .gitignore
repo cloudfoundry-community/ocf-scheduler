@@ -1,7 +1,9 @@
 *~
 *.swp
 /scheduler
-/scheduler-for-ocf
+/ocf-scheduler
+/scheduler-*.tar.gz
 /coverage.out
 /ignoremelol
 /demo
+/builds
