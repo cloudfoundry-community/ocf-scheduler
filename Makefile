@@ -1,14 +1,15 @@
 # This how we want to name the binary output
-BINARY=scheduler
+BINARY ?= scheduler
 
 # These are the values we want to pass for VERSION and BUILD
 # git tag 1.0.1
 # git commit -am "One more change after the tags"
-VERSION=`./scripts/genver`
-BUILD=`date +%FT%T%z`
-PACKAGE="github.com/starkandwayne/scheduler-for-ocf/cmd/scheduler"
-TARGET="builds/${BINARY}-${VERSION}"
-PREFIX="${TARGET}/${BINARY}-${VERSION}"
+VERSION ?= `./scripts/genver`" (dev)"
+
+MODULE ?= "github.com/cloudfoundry-community/ocf-scheduler"
+CMD_PATH ?= "cmd/scheduler"
+BUILD_PATH="builds"
+BUILD=${BINARY}-${VERSION}"
 TESTFILES=`go list ./... | grep -v /vendor/`
 
 # Setup the -ldflags option for go build here, interpolate the variable values
@@ -23,15 +24,15 @@ release: distclean distbuild linux package
 
 # Builds the project
 build:
-	go build ${LDFLAGS} -o ${BINARY} ${PACKAGE}
+	go build ${LDFLAGS} -o ${BINARY} ${MODULE}/$CMD_PATH
 
 cli:
-	go build ${LDFLAGS} -o sch github.com/starkandwayne/scheduler-for-ocf/cmd/cli
+	go build ${LDFLAGS} -o sch ${MODULE}/cmd/cli
 
 
 # Builds the project for all possible platforms
 distbuild:
-	mkdir -p ${TARGET}
+	mkdir -p ${BUILD_PATH}
 
 # Installs our project: copies binaries
 install:
@@ -49,8 +50,8 @@ test:
 	./scripts/blanket
 
 linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -o ${TARGET}/${BINARY}-linux-amd64 ${PACKAGE}
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm go build ${LDFLAGS} -o ${TARGET}/${BINARY}-linux-arm ${PACKAGE}
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -o ${BUILD_PATH}/${BINARY}-${VERSION}-linux-amd64 ${MODULE}/${CMD_PATH}
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ${LDFLAGS} -o ${BUILD_PATH}/${BINARY}-${VERSION}-linux-arm64 ${MODULE}/${CMD_PATH}
 
 package:
 	tar -C builds -z -c -v -f ${TARGET}.tar.gz ${BINARY}-${VERSION}
