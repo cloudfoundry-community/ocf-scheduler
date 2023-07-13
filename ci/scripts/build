@@ -41,10 +41,9 @@ header "Building $APP_NAME v$VERSION..."
 
 cd $REPO_ROOT
 make release VERSION=$VERSION APP_NAME=$APP_NAME CGO_ENABLED=$CGO_ENABLED
-cd $RELEASE_ROOT
-tar -zcvf $BUILD_ROOT/$APP_NAME.tar.gz $APP_NAME-*
+cp ${APP_NAME}-${VERSION}.tar.gz  $BUILD_ROOT/
 
 echo
 echo "================================================================================"
 echo "SUCCESS!"
-exit 1
+exit 0

@@ -47,7 +47,7 @@ clean:
 
 # Cleans release files
 distclean:
-	rm -rf ${TARGET} ${TARGET}.tar.gz
+	rm -rf ${BUILD_PATH} ${APP_NAME}-*.tar.gz
 
 test:
 	./scripts/blanket
@@ -57,4 +57,4 @@ linux:
 	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o "${BUILD_PATH}/${BUILD}-linux-arm64" "${MODULE}/${CMD_PATH}"
 
 package:
-	tar -C builds -z -c -v -f ${TARGET}.tar.gz "${APP_NAME}-${VERSION}"
+	cd builds && tar -z -c -v -f ../${BUILD}.tar.gz "${BUILD}"-*
