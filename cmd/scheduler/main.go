@@ -25,11 +25,14 @@ import (
 	"github.com/cloudfoundry-community/ocf-scheduler/postgres/migrations"
 )
 
+var AppName = "ocf-scheduler"
+var Version = "(development)"
+
 var callRunner = http.NewRunService()
 
 func meat() int {
 	log := logger.New()
-	tag := "scheduler-for-ocf"
+	tag := AppName + " " + Version
 
 	port := 8000
 	portEnv := os.Getenv("SCHEDULER_PORT")
