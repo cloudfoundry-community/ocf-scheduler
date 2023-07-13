@@ -15,6 +15,9 @@ jobs:
       file: git-ci/ci/tasks/build.yml
       params:
         APP_NAME:         (( grab meta.name ))
+        MODULE:           (( grab meta.go.module ))
+        CMD_PATH:         (( grab meta.go.cmd_path ))
+        STATIC_BINARY:    (( grab meta.go.force_static_binary ))
     - task: release
       file: git-ci/ci/tasks/release.yml
       params:
