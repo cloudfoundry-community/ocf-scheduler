@@ -3,10 +3,10 @@ package schedules
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/calls/schedules/create"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/calls/schedules/del"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/calls/schedules/history"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/calls/schedules/list"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/calls/schedules/create"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/calls/schedules/del"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/calls/schedules/history"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/calls/schedules/list"
 )
 
 var Command = &cobra.Command{

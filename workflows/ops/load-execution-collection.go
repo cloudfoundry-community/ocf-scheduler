@@ -3,7 +3,7 @@ package ops
 import (
 	"github.com/ess/dry"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 func LoadExecutionCollection(raw dry.Value) dry.Result {

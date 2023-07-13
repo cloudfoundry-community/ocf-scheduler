@@ -10,7 +10,7 @@ import (
 	_ "github.com/lib/pq"
 	migrate "github.com/rubenv/sql-migrate"
 
-	"github.com/starkandwayne/scheduler-for-ocf/postgres/migrations"
+	"github.com/cloudfoundry-community/ocf-scheduler/postgres/migrations"
 )
 
 var Cleaner = dbcleaner.New()

@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 type ExecutionService struct {

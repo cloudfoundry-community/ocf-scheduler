@@ -5,10 +5,10 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
-	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
-	"github.com/starkandwayne/scheduler-for-ocf/http/presenters"
-	"github.com/starkandwayne/scheduler-for-ocf/workflows"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core/failures"
+	"github.com/cloudfoundry-community/ocf-scheduler/http/presenters"
+	"github.com/cloudfoundry-community/ocf-scheduler/workflows"
 )
 
 func AllJobScheduleExecutions(e *echo.Echo, services *core.Services) {

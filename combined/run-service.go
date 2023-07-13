@@ -1,7 +1,7 @@
 package combined
 
 import (
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 // A combined RunService implementation that dispatches to a more specific

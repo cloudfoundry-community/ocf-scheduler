@@ -5,8 +5,8 @@ import (
 
 	"github.com/ess/dry"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
-	"github.com/starkandwayne/scheduler-for-ocf/core/failures"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core/failures"
 )
 
 func PersistJob(raw dry.Value) dry.Result {

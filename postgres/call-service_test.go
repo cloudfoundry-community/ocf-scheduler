@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ess/testscope"
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 func TestCallService_Get(t *testing.T) {

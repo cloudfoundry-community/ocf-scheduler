@@ -3,12 +3,12 @@ package jobs
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/all"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/create"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/del"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/execute"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/history"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs/schedules"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/jobs/all"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/jobs/create"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/jobs/del"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/jobs/execute"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/jobs/history"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/jobs/schedules"
 )
 
 var Command = &cobra.Command{

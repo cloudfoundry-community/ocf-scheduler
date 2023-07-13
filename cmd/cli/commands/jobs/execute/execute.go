@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	scheduler "github.com/starkandwayne/scheduler-for-ocf/core"
+	scheduler "github.com/cloudfoundry-community/ocf-scheduler/core"
 
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/core"
 )
 
 var Command = &cobra.Command{

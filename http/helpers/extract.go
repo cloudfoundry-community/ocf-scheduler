@@ -3,7 +3,7 @@ package helpers
 import (
 	"github.com/labstack/echo/v4"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 func Jobify(c echo.Context) *core.Job {
