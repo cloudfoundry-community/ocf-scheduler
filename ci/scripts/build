@@ -28,8 +28,7 @@ test -n "${VERSION}"          || bail "Version file (${VERSION_FROM}) was empty.
 export ROOT_PATH="$(pwd)"
 
 export PATH=${PATH}:${GOPATH}/bin
-export REPO_ROOT="${GOPATH}/src/${MODULE}"
-
+export REPO_ROOT="${ROOT_PATH}/git"
 export BUILD_ROOT="${ROOT_PATH}/build"
 export CI_ROOT="${ROOT_PATH}/git-ci"
 export RELEASE_ROOT="${REPO_ROOT}/builds/"
@@ -43,7 +42,7 @@ header "Building $APP_NAME v$VERSION..."
 cd $REPO_ROOT
 make release VERSION=$VERSION APP_NAME=$APP_NAME CGO_ENABLED=$CGO_ENABLED
 cd $RELEASE_ROOT
-tar -zcvf ../../$BUILD_ROOT/$APP_NAME.tar.gz $APP_NAME-*
+tar -zcvf $BUILD_ROOT/$APP_NAME.tar.gz $APP_NAME-*
 
 echo
 echo "================================================================================"
