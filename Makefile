@@ -14,9 +14,9 @@ BUILD=${APP_NAME}-${VERSION}
 TESTFILES=`go list ./... | grep -v /vendor/`
 
 # Setup the -ldflags option for go build here, interpolate the variable values
-LDFLAGS=-w -s -X main.Version=$(VERSION)
+LDFLAGS := -w -s -X main.Version=$(VERSION)
 ifeq ($(CGO_ENABLED),0)
-LDFLAGS=${LDFLAGS} -extldflags '-static'
+LDFLAGS += -extldflags '-static'
 endif
 
 # Build for the current platform
