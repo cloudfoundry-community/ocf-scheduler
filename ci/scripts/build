@@ -27,8 +27,6 @@ test -n "${VERSION}"          || bail "Version file (${VERSION_FROM}) was empty.
 # Resource Directories
 export ROOT_PATH="$(pwd)"
 
-mkdir -p "$(dirname "${GOPATH}/src/${MODULE}")"
-cp -R "${ROOT_PATH}/git" "${GOPATH}/src/${MODULE}"
 export PATH=${PATH}:${GOPATH}/bin
 export REPO_ROOT="${GOPATH}/src/${MODULE}"
 
@@ -36,7 +34,7 @@ export BUILD_ROOT="${ROOT_PATH}/build"
 export CI_ROOT="${ROOT_PATH}/git-ci"
 export RELEASE_ROOT="${REPO_ROOT}/builds/"
 
-export CGO_ENABLED=$([ "STATIC_BINARY:-false" == "true" ] && echo "0" || echo "1")
+export CGO_ENABLED=$([ "${STATIC_BINARY:-'false'}" == "true" ] && echo "0" || echo "1")
 
 go version;
 

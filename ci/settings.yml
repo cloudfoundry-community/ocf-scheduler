@@ -8,7 +8,7 @@ meta:
   initial_version: 1.0.0
 
   go:
-    cmd_path: cmd/scheduler/main.go
+    cmd_path: cmd/scheduler
     force_static_binary: true
 
   git:
