@@ -1,5 +1,5 @@
 # This how we want to name the binary output
-BINARY ?= scheduler
+APP_NAME ?= scheduler
 
 # These are the values we want to pass for VERSION and BUILD
 # git tag 1.0.1
@@ -10,7 +10,7 @@ MODULE ?= "github.com/cloudfoundry-community/ocf-scheduler"
 CMD_PATH ?= "cmd/scheduler"
 CGO_ENABLED ?= 0
 BUILD_PATH="builds"
-BUILD=${BINARY}-${VERSION}"
+BUILD=${APP_NAME}-${VERSION}"
 TESTFILES=`go list ./... | grep -v /vendor/`
 
 # Setup the -ldflags option for go build here, interpolate the variable values
@@ -27,7 +27,7 @@ release: distclean distbuild linux package
 
 # Builds the project
 build:
-	go build -ldflags="${LDFLAGS}" -o ${BINARY} ${MODULE}/${CMD_PATH}
+	go build -ldflags="${LDFLAGS}" -o ${APP_NAME} ${MODULE}/${CMD_PATH}
 
 cli:
 	go build -ldflags="${LDFLAGS}" -o sch ${MODULE}/cmd/cli
@@ -43,7 +43,7 @@ install:
 
 # Cleans our project: deletes binaries
 clean:
-	rm -rf ${BINARY}
+	rm -rf ${APP_NAME}
 
 # Cleans release files
 distclean:
@@ -57,4 +57,4 @@ linux:
 	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o ${BUILD_PATH}/${BUILD}-linux-arm64 ${MODULE}/${CMD_PATH}
 
 package:
-	tar -C builds -z -c -v -f ${TARGET}.tar.gz ${BINARY}-${VERSION}
+	tar -C builds -z -c -v -f ${TARGET}.tar.gz ${APP_NAME}-${VERSION}

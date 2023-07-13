@@ -3,7 +3,7 @@ meta:
   name:    ocf-scheduler
   release: OCF Scheduler
   target:  pipes/cloudfoundry-community
-  url:     https://pipes.scalecf.com
+  url:     https://pipes.scalecf.net
 
   initial_version: 1.0.0
 
