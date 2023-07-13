@@ -8,13 +8,16 @@ VERSION ?= `./scripts/genver`" (dev)"
 
 MODULE ?= "github.com/cloudfoundry-community/ocf-scheduler"
 CMD_PATH ?= "cmd/scheduler"
+CGO_ENABLED ?= 0
 BUILD_PATH="builds"
 BUILD=${BINARY}-${VERSION}"
 TESTFILES=`go list ./... | grep -v /vendor/`
 
 # Setup the -ldflags option for go build here, interpolate the variable values
-LDFLAGS=-ldflags "-w -s \
-				-extldflags '-static'"
+LDFLAGS=-w -s -X main.Version=$(VERSION)
+ifeq ($(CGO_ENABLED),0)
+LDFLAGS=${LDFLAGS} -extldflags '-static'
+endif
 
 # Build for the current platform
 all: clean build
@@ -24,10 +27,10 @@ release: distclean distbuild linux package
 
 # Builds the project
 build:
-	go build ${LDFLAGS} -o ${BINARY} ${MODULE}/$CMD_PATH
+	go build -ldflags="${LDFLAGS}" -o ${BINARY} ${MODULE}/${CMD_PATH}
 
 cli:
-	go build ${LDFLAGS} -o sch ${MODULE}/cmd/cli
+	go build -ldflags="${LDFLAGS}" -o sch ${MODULE}/cmd/cli
 
 
 # Builds the project for all possible platforms
@@ -36,7 +39,7 @@ distbuild:
 
 # Installs our project: copies binaries
 install:
-	go install ${LDFLAGS}
+	go install -ldflags="${LDFLAGS}"
 
 # Cleans our project: deletes binaries
 clean:
@@ -50,8 +53,8 @@ test:
 	./scripts/blanket
 
 linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ${LDFLAGS} -o ${BUILD_PATH}/${BINARY}-${VERSION}-linux-amd64 ${MODULE}/${CMD_PATH}
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ${LDFLAGS} -o ${BUILD_PATH}/${BINARY}-${VERSION}-linux-arm64 ${MODULE}/${CMD_PATH}
+	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o ${BUILD_PATH}/${BUILD}-linux-amd64 ${MODULE}/${CMD_PATH}
+	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o ${BUILD_PATH}/${BUILD}-linux-arm64 ${MODULE}/${CMD_PATH}
 
 package:
 	tar -C builds -z -c -v -f ${TARGET}.tar.gz ${BINARY}-${VERSION}
