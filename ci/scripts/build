@@ -1,0 +1,52 @@
+#!/bin/bash
+set -eu
+
+
+header() {
+	echo
+	echo "================================================================================"
+	echo "$1"
+	echo "--------------------------------------------------------------------------------"
+	echo
+}
+
+bail() {
+	echo >&2 "$*  Did you misconfigure Concourse?"
+	exit 2
+}
+test -n "${APP_NAME:-}"       || bail "APP_NAME must be set to the name of this package."
+test -n "${MODULE:-}"         || bail "MODULE must be set to the Go Module path of this package."
+test -n "${CMD_PATH:-}"       || bail "CMD_PATH must be set to the built target command path offset from the module."
+test -n "${GOPATH:-}"         || bail "Expecting GOPATH to be set -- make sure correct image is specified."
+
+test -f "${VERSION_FROM}"     || bail "Version file (${VERSION_FROM}) not found."
+VERSION=$(cat "${VERSION_FROM}")
+test -n "${VERSION}"          || bail "Version file (${VERSION_FROM}) was empty."
+
+# Resource Directories
+export ROOT_PATH="$(pwd)"
+
+mkdir -p "$(dirname "${GOPATH}/src/${MODULE}")"
+cp -R "${ROOT_PATH}/git" "${GOPATH}/src/${MODULE}"
+export PATH=${PATH}:${GOPATH}/bin
+export REPO_ROOT="${GOPATH}/src/${MODULE}"
+
+export BUILD_ROOT="${ROOT_PATH}/build"
+export CI_ROOT="${ROOT_PATH}/git-ci"
+export VERSION_FROM="version/number"
+export RELEASE_ROOT="${REPO_ROOT}/builds/"
+
+export CGO_ENABLED=$([ "STATIC_BINARY:-false" == "true" ] && echo "0" || echo "1")
+
+go version;
+
+header "Building $APP_NAME v$VERSION..."
+
+make release VERSION=$VERSION APP_NAME=$APP_NAME CGO_ENABLED=$CGO_ENABLED
+cd $RELEASE_ROOT
+tar -zcvf ../../$BUILD_ROOT/$APP_NAME.tar.gz $APP_NAME-*
+
+echo
+echo "================================================================================"
+echo "SUCCESS!"
+exit 1
