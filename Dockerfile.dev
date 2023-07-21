@@ -11,7 +11,7 @@ RUN apk add git bash vim gcc g++ make curl && \
 
 RUN go get ./...
 
-RUN go build -o /app/scheduler github.com/starkandwayne/scheduler-for-ocf/cmd/scheduler
+RUN go build -o /app/scheduler github.com/cloudfoundry-community/ocf-scheduler/cmd/scheduler
 
 EXPOSE 8675
 

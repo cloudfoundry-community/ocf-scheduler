@@ -15,14 +15,14 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/starkandwayne/scheduler-for-ocf/cf"
-	"github.com/starkandwayne/scheduler-for-ocf/combined"
-	"github.com/starkandwayne/scheduler-for-ocf/core"
-	"github.com/starkandwayne/scheduler-for-ocf/cron"
-	"github.com/starkandwayne/scheduler-for-ocf/http"
-	"github.com/starkandwayne/scheduler-for-ocf/logger"
-	"github.com/starkandwayne/scheduler-for-ocf/postgres"
-	"github.com/starkandwayne/scheduler-for-ocf/postgres/migrations"
+	"github.com/cloudfoundry-community/ocf-scheduler/cf"
+	"github.com/cloudfoundry-community/ocf-scheduler/combined"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/cron"
+	"github.com/cloudfoundry-community/ocf-scheduler/http"
+	"github.com/cloudfoundry-community/ocf-scheduler/logger"
+	"github.com/cloudfoundry-community/ocf-scheduler/postgres"
+	"github.com/cloudfoundry-community/ocf-scheduler/postgres/migrations"
 )
 
 var callRunner = http.NewRunService()

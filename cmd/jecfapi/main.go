@@ -13,7 +13,7 @@ import (
 	cf "github.com/cloudfoundry-community/go-cfclient"
 	"github.com/labstack/echo/v4"
 
-	"github.com/starkandwayne/scheduler-for-ocf/mock"
+	"github.com/cloudfoundry-community/ocf-scheduler/mock"
 )
 
 type pageref struct {

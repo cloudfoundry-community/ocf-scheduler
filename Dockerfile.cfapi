@@ -11,7 +11,7 @@ RUN apk add git bash vim gcc g++ make curl && \
 
 RUN go get ./...
 
-RUN go build -o /app/cf-api github.com/starkandwayne/scheduler-for-ocf/cmd/jecfapi
+RUN go build -o /app/cf-api github.com/cloudfoundry-community/ocf-scheduler/cmd/jecfapi
 
 EXPOSE 8002
 

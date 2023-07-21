@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 type ScheduleService struct {

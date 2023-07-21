@@ -9,7 +9,7 @@ import (
 
 	cf "github.com/cloudfoundry-community/go-cfclient"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 const (

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/core"
 )
 
 func main() {

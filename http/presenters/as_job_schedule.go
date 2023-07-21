@@ -3,7 +3,7 @@ package presenters
 import (
 	"time"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 func AsJobSchedule(schedule *core.Schedule) *JobSchedule {

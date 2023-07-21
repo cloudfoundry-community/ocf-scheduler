@@ -1,4 +1,4 @@
-module github.com/starkandwayne/scheduler-for-ocf
+module github.com/cloudfoundry-community/ocf-scheduler
 
 go 1.17
 

@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/calls"
-	"github.com/starkandwayne/scheduler-for-ocf/cmd/cli/commands/jobs"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/calls"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/jobs"
 )
 
 var cfgFile string

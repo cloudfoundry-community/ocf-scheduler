@@ -5,7 +5,7 @@ import (
 
 	"github.com/ess/hype"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 type RunService struct {

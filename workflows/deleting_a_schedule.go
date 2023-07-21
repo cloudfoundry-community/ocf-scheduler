@@ -3,7 +3,7 @@ package workflows
 import (
 	"fmt"
 
-	"github.com/starkandwayne/scheduler-for-ocf/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 func DeletingASchedule(services *core.Services, schedule *core.Schedule, executable core.Executable) error {
