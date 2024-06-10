@@ -16,9 +16,10 @@ type CronService struct {
 
 func NewCronService(log core.LogService) *CronService {
 	return &CronService{
-		cron.New(),
-		log,
-		make(map[string]cron.EntryID)}
+		Cron:    cron.New(),
+		log:     log,
+		mapping: make(map[string]cron.EntryID),
+	}
 }
 
 func (service *CronService) Add(runnable core.Runnable) error {
