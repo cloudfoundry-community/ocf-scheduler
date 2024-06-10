@@ -23,10 +23,13 @@ func NewJobService(db *sql.DB) *JobService {
 }
 
 func (service *JobService) Get(guid string) (*core.Job, error) {
-	candidates := service.getCollection(
-		"select * from jobs where guid = $1",
+	candidates, err := service.getCollection(
+		"SELECT * FROM jobs WHERE guid = $1",
 		guid,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := expectingOne(len(candidates)); err != nil {
 		return nil, err
@@ -38,7 +41,7 @@ func (service *JobService) Get(guid string) (*core.Job, error) {
 func (service *JobService) Delete(job *core.Job) error {
 	// Let's not try to delete something that isn't in the db
 	if _, err := service.Get(job.GUID); err != nil {
-		return nil
+		return fmt.Errorf("job with GUID %s not found: %v", job.GUID, err)
 	}
 
 	err := WithTransaction(service.db, func(tx Transaction) error {
@@ -54,10 +57,13 @@ func (service *JobService) Delete(job *core.Job) error {
 }
 
 func (service *JobService) Named(name string) (*core.Job, error) {
-	candidates := service.getCollection(
-		"select * from jobs where name = $1",
+	candidates, err := service.getCollection(
+		"SELECT * FROM jobs WHERE name = $1",
 		name,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := expectingOne(len(candidates)); err != nil {
 		return nil, err
@@ -71,7 +77,7 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 
 	guid, err := core.GenGUID()
 	if err != nil {
-		return nil, fmt.Errorf("coult not generate a job id")
+		return nil, fmt.Errorf("could not generate a job id: %v", err)
 	}
 
 	candidate.GUID = guid
@@ -89,7 +95,7 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 
 	err = WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"INSERT INTO jobs VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+			"INSERT INTO jobs (guid, name, command, disk_in_mb, memory_in_mb, state, app_guid, space_guid, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
 			candidate.GUID,
 			candidate.Name,
 			candidate.Command,
@@ -129,7 +135,7 @@ func (service *JobService) update(candidate *core.Job) (*core.Job, error) {
 
 	err := WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"update jobs set updated_at = $3, state = $2 where guid = $1",
+			"UPDATE jobs SET updated_at = $3, state = $2 WHERE guid = $1",
 			candidate.GUID,
 			candidate.State,
 			candidate.UpdatedAt,
@@ -145,11 +151,15 @@ func (service *JobService) update(candidate *core.Job) (*core.Job, error) {
 	return candidate, nil
 }
 
-func (service *JobService) InSpace(guid string) []*core.Job {
-	return service.getCollection(
-		"select * from jobs where space_guid = $1 ORDER BY name ASC",
+func (service *JobService) InSpace(guid string) ([]*core.Job, error) {
+	candidates, err := service.getCollection(
+		"SELECT * FROM jobs WHERE space_guid = $1 ORDER BY name ASC",
 		guid,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return candidates, nil
 }
 
 func (service *JobService) getCollection(query string, args ...interface{}) []*core.Job {
