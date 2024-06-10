@@ -12,6 +12,12 @@ type JobService struct {
 	db *sql.DB
 }
 
+const (
+	JobStatePending   = "PENDING"
+	JobStateSucceeded = "SUCCEEDED"
+	JobStateFailed    = "FAILED"
+)
+
 func NewJobService(db *sql.DB) *JobService {
 	return &JobService{db}
 }
@@ -71,7 +77,7 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 	candidate.GUID = guid
 	candidate.CreatedAt = now
 	candidate.UpdatedAt = now
-	candidate.State = "PENDING"
+	candidate.State = JobStatePending
 
 	if candidate.DiskInMb == 0 {
 		candidate.DiskInMb = 1024
@@ -107,14 +113,12 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 }
 
 func (service *JobService) Success(candidate *core.Job) (*core.Job, error) {
-	candidate.State = "SUCCEEDED"
-
+	candidate.State = JobStateSucceeded
 	return service.update(candidate)
 }
 
 func (service *JobService) Fail(candidate *core.Job) (*core.Job, error) {
-	candidate.State = "FAILED"
-
+	candidate.State = JobStateFailed
 	return service.update(candidate)
 }
 
