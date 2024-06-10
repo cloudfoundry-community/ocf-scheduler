@@ -162,46 +162,31 @@ func (service *JobService) InSpace(guid string) ([]*core.Job, error) {
 	return candidates, nil
 }
 
-func (service *JobService) getCollection(query string, args ...interface{}) []*core.Job {
-	collection := make([]*core.Job, 0)
+func (service *JobService) scanJob(rows *sql.Rows) (*core.Job, error) {
+	var job core.Job
+	err := rows.Scan(&job.GUID, &job.Name, &job.Command, &job.DiskInMb, &job.MemoryInMb, &job.State, &job.AppGUID, &job.SpaceGUID, &job.CreatedAt, &job.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (service *JobService) getCollection(query string, args ...interface{}) ([]*core.Job, error) {
+	var collection []*core.Job
 
 	rows, err := service.db.Query(query, args...)
 	if err != nil {
-		return collection
+		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
-		var guid string
-		var name string
-		var command string
-		var diskInMb int
-		var memoryInMb int
-		var state string
-		var spaceGUID string
-		var appGUID string
-		var createdAt time.Time
-		var updatedAt time.Time
-
-		err := rows.Scan(&guid, &name, &command, &diskInMb, &memoryInMb, &state, &appGUID, &spaceGUID, &createdAt, &updatedAt)
+		job, err := service.scanJob(rows)
 		if err != nil {
-			continue
+			return nil, err
 		}
-
-		candidate := &core.Job{
-			GUID:       guid,
-			Name:       name,
-			Command:    command,
-			DiskInMb:   diskInMb,
-			MemoryInMb: memoryInMb,
-			State:      state,
-			SpaceGUID:  spaceGUID,
-			AppGUID:    appGUID,
-			CreatedAt:  createdAt,
-			UpdatedAt:  updatedAt,
-		}
-
-		collection = append(collection, candidate)
+		collection = append(collection, job)
 	}
 
-	return collection
+	return collection, rows.Err()
 }
