@@ -73,6 +73,7 @@ func (service *CronService) Delete(runnable core.Runnable) error {
 	}
 
 	service.Remove(id)
+	delete(service.mapping, runnable.Schedule().GUID)
 	service.logMappingSize("Deleted job from cron service")
 
 	return nil
