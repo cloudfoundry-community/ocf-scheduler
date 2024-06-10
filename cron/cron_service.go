@@ -61,6 +61,7 @@ func (service *CronService) Add(runnable core.Runnable) error {
 	}
 
 	service.mapping[schedule.GUID] = id
+	service.logMappingSize("Added job to cron service")
 
 	return nil
 }
@@ -72,6 +73,7 @@ func (service *CronService) Delete(runnable core.Runnable) error {
 	}
 
 	service.Remove(id)
+	service.logMappingSize("Deleted job from cron service")
 
 	return nil
 }
@@ -84,4 +86,13 @@ func (service *CronService) Validate(expression string) error {
 	_, err := cron.ParseStandard(expression)
 
 	return err
+}
+
+func (service *CronService) MappingSize() int {
+	return len(service.mapping)
+}
+
+func (service *CronService) logMappingSize(action string) {
+	size := service.MappingSize()
+	service.log.Info("cron-service", fmt.Sprintf("%s: current mapping size is %d", action, size))
 }
