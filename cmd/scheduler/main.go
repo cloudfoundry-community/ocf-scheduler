@@ -102,7 +102,7 @@ func main() {
 
 	log.Info(tag, "got the cf client set up")
 
-	auth := cf.NewAuthService(cfclient)
+	auth := cf.NewAuthService(cfclient, log)
 	jobs := postgres.NewJobService(db)
 	calls := postgres.NewCallService(db)
 	info := cf.NewInfoService(cfclient)
