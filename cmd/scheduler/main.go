@@ -102,7 +102,7 @@ func main() {
 
 	log.Info(tag, "got the cf client set up")
 
-	auth := cf.NewAuthService(cfclient)
+	auth := cf.NewAuthService(cfclient, log)
 	jobs := postgres.NewJobService(db)
 	calls := postgres.NewCallService(db)
 	info := cf.NewInfoService(cfclient)
@@ -168,6 +168,38 @@ func main() {
 		}
 	}
 
+	// Schedule cleanup tasks
+	retentionPeriod := 5 * 30 * 24 * time.Hour // 30 days
+	ticker := time.NewTicker(24 * time.Hour)   // run cleanup every day
+	quit := make(chan struct{})
+	signalChan := make(chan os.Signal, 1) // New channel for OS signals
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				log.Info(tag, "Starting cleanup of old executions")
+
+				deletedExecutions, err := executions.CleanupOldExecutions(retentionPeriod)
+				if err != nil {
+					log.Error(tag, fmt.Sprintf("Error cleaning up old executions: %s", err.Error()))
+				} else {
+					if len(deletedExecutions) == 0 {
+						log.Info(tag, "No executions were deleted.")
+					} else {
+						for _, execution := range deletedExecutions {
+							log.Info(tag, fmt.Sprintf("Deleted execution: %s, Last Updated: %s", execution["guid"], execution["execution_end_time"]))
+						}
+					}
+				}
+
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
 	server := http.Server(fmt.Sprintf("0.0.0.0:%d", port), services)
 
 	go func() {
@@ -178,10 +210,12 @@ func main() {
 
 	log.Info(tag, fmt.Sprintf("listening for connections on %s", server.Addr))
 
-	quit := make(chan os.Signal)
-	signal.Notify(quit, os.Interrupt)
+	signal.Notify(signalChan, os.Interrupt) // Use signalChan for signal notification
 
-	<-quit
+	<-signalChan // Wait for signal
+
+	// Stop the cleanup ticker
+	close(quit)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
