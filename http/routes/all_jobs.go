@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -42,7 +43,11 @@ func AllJobs(e *echo.Echo, services *core.Services) {
 
 		spaceGUID := c.QueryParam("space_guid")
 
-		jobs := services.Jobs.InSpace(spaceGUID)
+		jobs, err := services.Jobs.InSpace(spaceGUID)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("error retrieving jobs: %v", err))
+			return c.JSON(http.StatusInternalServerError, "error retrieving jobs")
+		}
 
 		output := &jobCollection{
 			Resources: jobs,

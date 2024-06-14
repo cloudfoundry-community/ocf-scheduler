@@ -37,7 +37,7 @@ type JobService interface {
 	Delete(*Job) error
 	Named(string) (*Job, error)
 	Persist(*Job) (*Job, error)
-	InSpace(string) []*Job
+	InSpace(string) ([]*Job, error)
 	Success(*Job) (*Job, error)
 	Fail(*Job) (*Job, error)
 }

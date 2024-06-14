@@ -12,15 +12,24 @@ type JobService struct {
 	db *sql.DB
 }
 
+const (
+	JobStatePending   = "PENDING"
+	JobStateSucceeded = "SUCCEEDED"
+	JobStateFailed    = "FAILED"
+)
+
 func NewJobService(db *sql.DB) *JobService {
 	return &JobService{db}
 }
 
 func (service *JobService) Get(guid string) (*core.Job, error) {
-	candidates := service.getCollection(
-		"select * from jobs where guid = $1",
+	candidates, err := service.getCollection(
+		"SELECT * FROM jobs WHERE guid = $1",
 		guid,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := expectingOne(len(candidates)); err != nil {
 		return nil, err
@@ -32,7 +41,7 @@ func (service *JobService) Get(guid string) (*core.Job, error) {
 func (service *JobService) Delete(job *core.Job) error {
 	// Let's not try to delete something that isn't in the db
 	if _, err := service.Get(job.GUID); err != nil {
-		return nil
+		return fmt.Errorf("job with GUID %s not found: %v", job.GUID, err)
 	}
 
 	err := WithTransaction(service.db, func(tx Transaction) error {
@@ -48,10 +57,13 @@ func (service *JobService) Delete(job *core.Job) error {
 }
 
 func (service *JobService) Named(name string) (*core.Job, error) {
-	candidates := service.getCollection(
-		"select * from jobs where name = $1",
+	candidates, err := service.getCollection(
+		"SELECT * FROM jobs WHERE name = $1",
 		name,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := expectingOne(len(candidates)); err != nil {
 		return nil, err
@@ -65,13 +77,13 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 
 	guid, err := core.GenGUID()
 	if err != nil {
-		return nil, fmt.Errorf("coult not generate a job id")
+		return nil, fmt.Errorf("could not generate a job id: %v", err)
 	}
 
 	candidate.GUID = guid
 	candidate.CreatedAt = now
 	candidate.UpdatedAt = now
-	candidate.State = "PENDING"
+	candidate.State = JobStatePending
 
 	if candidate.DiskInMb == 0 {
 		candidate.DiskInMb = 1024
@@ -83,7 +95,7 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 
 	err = WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"INSERT INTO jobs VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+			"INSERT INTO jobs (guid, name, command, disk_in_mb, memory_in_mb, state, app_guid, space_guid, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
 			candidate.GUID,
 			candidate.Name,
 			candidate.Command,
@@ -107,14 +119,12 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 }
 
 func (service *JobService) Success(candidate *core.Job) (*core.Job, error) {
-	candidate.State = "SUCCEEDED"
-
+	candidate.State = JobStateSucceeded
 	return service.update(candidate)
 }
 
 func (service *JobService) Fail(candidate *core.Job) (*core.Job, error) {
-	candidate.State = "FAILED"
-
+	candidate.State = JobStateFailed
 	return service.update(candidate)
 }
 
@@ -125,7 +135,7 @@ func (service *JobService) update(candidate *core.Job) (*core.Job, error) {
 
 	err := WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"update jobs set updated_at = $3, state = $2 where guid = $1",
+			"UPDATE jobs SET updated_at = $3, state = $2 WHERE guid = $1",
 			candidate.GUID,
 			candidate.State,
 			candidate.UpdatedAt,
@@ -141,53 +151,42 @@ func (service *JobService) update(candidate *core.Job) (*core.Job, error) {
 	return candidate, nil
 }
 
-func (service *JobService) InSpace(guid string) []*core.Job {
-	return service.getCollection(
-		"select * from jobs where space_guid = $1 ORDER BY name ASC",
+func (service *JobService) InSpace(guid string) ([]*core.Job, error) {
+	candidates, err := service.getCollection(
+		"SELECT * FROM jobs WHERE space_guid = $1 ORDER BY name ASC",
 		guid,
 	)
+	if err != nil {
+		return nil, err
+	}
+	return candidates, nil
 }
 
-func (service *JobService) getCollection(query string, args ...interface{}) []*core.Job {
-	collection := make([]*core.Job, 0)
+func (service *JobService) scanJob(rows *sql.Rows) (*core.Job, error) {
+	var job core.Job
+	err := rows.Scan(&job.GUID, &job.Name, &job.Command, &job.DiskInMb, &job.MemoryInMb, &job.State, &job.AppGUID, &job.SpaceGUID, &job.CreatedAt, &job.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func (service *JobService) getCollection(query string, args ...interface{}) ([]*core.Job, error) {
+	var collection []*core.Job
 
 	rows, err := service.db.Query(query, args...)
 	if err != nil {
-		return collection
+		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
-		var guid string
-		var name string
-		var command string
-		var diskInMb int
-		var memoryInMb int
-		var state string
-		var spaceGUID string
-		var appGUID string
-		var createdAt time.Time
-		var updatedAt time.Time
-
-		err := rows.Scan(&guid, &name, &command, &diskInMb, &memoryInMb, &state, &appGUID, &spaceGUID, &createdAt, &updatedAt)
+		job, err := service.scanJob(rows)
 		if err != nil {
-			continue
+			return nil, err
 		}
-
-		candidate := &core.Job{
-			GUID:       guid,
-			Name:       name,
-			Command:    command,
-			DiskInMb:   diskInMb,
-			MemoryInMb: memoryInMb,
-			State:      state,
-			SpaceGUID:  spaceGUID,
-			AppGUID:    appGUID,
-			CreatedAt:  createdAt,
-			UpdatedAt:  updatedAt,
-		}
-
-		collection = append(collection, candidate)
+		collection = append(collection, job)
 	}
 
-	return collection
+	return collection, rows.Err()
 }

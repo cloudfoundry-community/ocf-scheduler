@@ -207,3 +207,42 @@ func (service *ExecutionService) finish(execution *core.Execution, state string)
 
 	return service.update(execution)
 }
+
+func (service *ExecutionService) CleanupOldExecutions(retentionPeriod time.Duration) ([]map[string]string, error) {
+	cutoffTime := time.Now().Add(-retentionPeriod).UTC()
+	var deletedExecutions []map[string]string
+
+	err := WithTransaction(service.db, func(tx Transaction) error {
+		rows, err := tx.Query(
+			"SELECT guid, execution_end_time FROM executions WHERE execution_end_time < $1 AND state IN ('SUCCEEDED', 'FAILED')",
+			cutoffTime,
+		)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var guid string
+			var execution_end_time time.Time
+			if err := rows.Scan(&guid, &execution_end_time); err != nil {
+				return err
+			}
+			deletedExecutions = append(deletedExecutions, map[string]string{
+				"guid":               guid,
+				"execution_end_time": execution_end_time.Format(time.RFC3339),
+			})
+		}
+
+		_, err = tx.Exec(
+			"DELETE FROM executions WHERE execution_end_time < $1 AND state IN ('SUCCEEDED', 'FAILED')",
+			cutoffTime,
+		)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return deletedExecutions, nil
+}
