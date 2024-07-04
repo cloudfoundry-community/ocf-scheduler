@@ -4,7 +4,7 @@ APP_NAME ?= scheduler
 # These are the values we want to pass for VERSION and BUILD
 # git tag 1.0.1
 # git commit -am "One more change after the tags"
-VERSION ?= `./scripts/genver` (dev)
+VERSION ?= `./scripts/genver \(dev\)`
 
 MODULE ?= github.com/cloudfoundry-community/ocf-scheduler
 CMD_PATH ?= cmd/scheduler
