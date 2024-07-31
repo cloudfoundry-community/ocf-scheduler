@@ -102,6 +102,22 @@ func main() {
 
 	log.Info(tag, "got the cf client set up")
 
+	log.Info(tag, "trying to acquire the desired number of workers")
+
+	workerNumStr := os.Getenv("workerNum")
+	if len(workerNumStr) == 0 {
+		workerNumStr = "20"
+		log.Info(tag, "No `workerNum` provided, defaulting to 20")
+	} else {
+		log.Info(tag, fmt.Sprintf("workerNum set to %s", workerNumStr))
+	}
+
+	workerNum, err := strconv.Atoi(workerNumStr)
+	if err != nil {
+		log.Error("Invalid workerNum: %v", err.Error())
+		os.Exit(255)
+	}
+
 	auth := cf.NewAuthService(cfclient, log)
 	jobs := postgres.NewJobService(db)
 	calls := postgres.NewCallService(db)
@@ -116,7 +132,7 @@ func main() {
 		},
 	)
 
-	workers := workerpool.New(10)
+	workers := workerpool.New(workerNum)
 	defer workers.StopWait()
 
 	cronService := cron.NewCronService(log)
