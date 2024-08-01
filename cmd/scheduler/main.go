@@ -104,17 +104,17 @@ func main() {
 
 	log.Info(tag, "trying to acquire the desired number of workers")
 
-	workerNumStr := os.Getenv("workerNum")
+	workerNumStr := os.Getenv("WORKER_NUM")
 	if len(workerNumStr) == 0 {
 		workerNumStr = "20"
-		log.Info(tag, "No `workerNum` provided, defaulting to 20")
+		log.Info(tag, "No `WORKER_NUM` provided, defaulting to 20")
 	} else {
-		log.Info(tag, fmt.Sprintf("workerNum set to %s", workerNumStr))
+		log.Info(tag, fmt.Sprintf("WORKER_NUM set to %s", workerNumStr))
 	}
 
 	workerNum, err := strconv.Atoi(workerNumStr)
 	if err != nil {
-		log.Error("Invalid workerNum: %v", err.Error())
+		log.Error("Invalid WORKER_NUM: %v", err.Error())
 		os.Exit(255)
 	}
 
