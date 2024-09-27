@@ -16,6 +16,7 @@ import (
 type Logger interface {
 	Info(tag, message string)
 	Error(tag, message string)
+	Debug(tag, message string)
 }
 
 type AuthService struct {
@@ -32,43 +33,43 @@ func NewAuthService(client *cf.Client, logger Logger) *AuthService {
 
 func (service *AuthService) Verify(auth string) error {
 	tag := "AuthService.Verify"
-	service.logger.Info(tag, "Starting verification process")
+	service.logger.Debug(tag, "Starting verification process")
 	username, err := getUsername(auth)
 	if err != nil {
 		service.logger.Error(tag, fmt.Sprintf("Error getting username: %v", err))
 		return err
 	}
-	service.logger.Info(tag, fmt.Sprintf("Username obtained: %s", username))
+	service.logger.Debug(tag, fmt.Sprintf("Username obtained: %s", username))
 
 	user, err := service.getUser(username)
 	if err != nil {
 		service.logger.Error(tag, fmt.Sprintf("Error getting user: %v", err))
 		return err
 	}
-	//  Debugging = noisy
-	//	service.logger.Info(tag, fmt.Sprintf("User obtained: %v", user))
+
+	service.logger.Debug(tag, fmt.Sprintf("User obtained: %v", user))
 
 	roles, err := service.getUserRoles(user)
 	if err != nil {
 		service.logger.Error(tag, fmt.Sprintf("Error getting user roles: %v", err))
 		return err
 	}
-	//  Debugging = noisy
-	// service.logger.Info(tag, fmt.Sprintf("User roles obtained: %v", roles))
+
+	service.logger.Debug(tag, fmt.Sprintf("User roles obtained: %v", roles))
 
 	tokenScopes, err := getTokenScopes(auth, service.logger)
 	if err != nil {
 		service.logger.Error(tag, fmt.Sprintf("Error getting token scopes: %v", err))
 		return err
 	}
-	service.logger.Info(tag, fmt.Sprintf("Token scopes obtained: %v", tokenScopes))
+	service.logger.Debug(tag, fmt.Sprintf("Token scopes obtained: %v", tokenScopes))
 
 	// Check all the roles, but return good early if we find one that works.
 
 	// Check token scopes for cloud_controller.admin
 	for _, scope := range tokenScopes {
 		if scope == "cloud_controller.admin" {
-			service.logger.Info(tag, "User has cloud_controller.admin scope")
+			service.logger.Debug(tag, "User has cloud_controller.admin scope")
 			return nil
 		}
 	}
@@ -76,7 +77,7 @@ func (service *AuthService) Verify(auth string) error {
 	// Check CF roles for space_manager or space_developer
 	for _, role := range roles {
 		if role.Type == "space_manager" || role.Type == "space_developer" {
-			service.logger.Info(tag, fmt.Sprintf("User has role: %s", role.Type))
+			service.logger.Debug(tag, fmt.Sprintf("User has role: %s", role.Type))
 			return nil
 		}
 	}
@@ -208,6 +209,6 @@ func getTokenScopes(auth string, logger Logger) ([]string, error) {
 		return nil, err
 	}
 
-	logger.Info(tag, fmt.Sprintf("Scopes found in token: %v", claims.Scope))
+	logger.Debug(tag, fmt.Sprintf("Scopes found in token: %v", claims.Scope))
 	return claims.Scope, nil
 }

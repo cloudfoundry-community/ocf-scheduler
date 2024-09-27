@@ -1,6 +1,6 @@
 module github.com/cloudfoundry-community/ocf-scheduler
 
-go 1.17
+go 1.22
 
 require (
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20220218061834-a7f54630885c
@@ -9,7 +9,7 @@ require (
 	github.com/ess/testscope v1.0.0
 	github.com/gammazero/workerpool v1.1.2
 	github.com/google/uuid v1.3.0
-	github.com/labstack/echo/v4 v4.7.2
+	github.com/labstack/echo/v4 v4.9.0
 	github.com/lib/pq v1.10.4
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rubenv/sql-migrate v1.1.1
@@ -50,13 +50,13 @@ require (
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
-	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f // indirect
-	golang.org/x/sys v0.0.0-20211103235746-7861aae1554b // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/crypto v0.25.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
