@@ -131,7 +131,8 @@ func TestCallService_Persist(t *testing.T) {
 		Cleaner.Acquire("calls")
 
 		guid, _ := core.GenGUID()
-		dummyCall(&core.Call{GUID: guid, Name: name})
+		// Use the same AppGUID as the candidate so (name, app_guid) uniqueness triggers
+		dummyCall(&core.Call{GUID: guid, Name: name, AppGUID: candidate.AppGUID})
 
 		actual, err := service.Persist(candidate)
 

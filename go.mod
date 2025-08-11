@@ -1,6 +1,6 @@
 module github.com/cloudfoundry-community/ocf-scheduler
 
-go 1.22
+go 1.24
 
 require (
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20220218061834-a7f54630885c

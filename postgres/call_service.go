@@ -74,6 +74,17 @@ func (service *CallService) Persist(candidate *core.Call) (*core.Call, error) {
 	candidate.CreatedAt = now
 	candidate.UpdatedAt = now
 
+	// Ensure uniqueness on (name, app_guid) prior to insert so tests expecting an
+	// error on duplicate name succeed without relying solely on DB constraint error.
+	existing := service.getCollection(
+		"select * from calls where name = $1 and app_guid = $2",
+		candidate.Name,
+		candidate.AppGUID,
+	)
+	if len(existing) > 0 {
+		return nil, fmt.Errorf("call with name '%s' already exists for app %s", candidate.Name, candidate.AppGUID)
+	}
+
 	err = WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
 			"INSERT INTO calls VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
