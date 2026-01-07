@@ -3,7 +3,7 @@ package cron
 import (
 	"fmt"
 
-	"github.com/robfig/cron/v3"
+	cron "github.com/netresearch/go-cron"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
@@ -16,7 +16,7 @@ type CronService struct {
 
 func NewCronService(log core.LogService) *CronService {
 	return &CronService{
-		Cron:    cron.New(),
+		Cron:    cron.New(cron.WithParser(cron.FullParser())),
 		log:     log,
 		mapping: make(map[string]cron.EntryID),
 	}
@@ -84,7 +84,7 @@ func (service *CronService) Count() int {
 }
 
 func (service *CronService) Validate(expression string) error {
-	_, err := cron.ParseStandard(expression)
+	_, err := cron.FullParser().Parse(expression)
 
 	return err
 }

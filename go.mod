@@ -1,6 +1,6 @@
 module github.com/cloudfoundry-community/ocf-scheduler
 
-go 1.22
+go 1.25
 
 require (
 	github.com/cloudfoundry-community/go-cfclient v0.0.0-20220218061834-a7f54630885c
@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/labstack/echo/v4 v4.9.0
 	github.com/lib/pq v1.10.4
-	github.com/robfig/cron/v3 v3.0.1
+	github.com/netresearch/go-cron v0.8.0
 	github.com/rubenv/sql-migrate v1.1.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.2.1
