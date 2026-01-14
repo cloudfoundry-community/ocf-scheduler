@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	scheduler "github.com/cloudfoundry-community/ocf-scheduler/core"
 	"github.com/ess/hype"
 	"github.com/spf13/cobra"
-	scheduler "github.com/cloudfoundry-community/ocf-scheduler/core"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/core"
 )
