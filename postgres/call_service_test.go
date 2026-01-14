@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ess/testscope"
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/ess/testscope"
 )
 
 func TestCallService_Get(t *testing.T) {
