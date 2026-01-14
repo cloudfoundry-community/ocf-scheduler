@@ -121,9 +121,10 @@ func main() {
 	timezoneFile := "/var/vcap/store/scheduler/scheduler_timezones.json"
 	if err := cron.InitializeTimezones(timezoneFile); err != nil {
 		log.Error(tag, fmt.Sprintf("Cannot process timezone file: %v", err.Error()))
-		os.Exit(255)
+		log.Error(tag, "Starting scheduler without timezones loaded")
+	} else {
+		log.Info(tag, fmt.Sprintf("Timezone file loaded successfully with %d entries", len(cron.TimezonesSlice)))
 	}
-	log.Info(tag, fmt.Sprintf("Timezone file loaded successfully with %d entries", len(cron.TimezonesSlice)))
 
 	auth := cf.NewAuthService(cfclient, log)
 	jobs := postgres.NewJobService(db)
