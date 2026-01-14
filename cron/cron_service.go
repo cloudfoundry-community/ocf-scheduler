@@ -1,17 +1,94 @@
 package cron
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"time"
 
 	cron "github.com/netresearch/go-cron"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
+/*
+type Timezone struct {
+	Name    string   `json:"Name,omitempty"` // omitempty is in case we do a map instead of a slice
+	HasDst  bool     `json:"HasDst"`
+	Std     string   `json:"Std"`
+	Dst     string   `json:"Dst,omitempty"`
+	Aliases []string `json:"Aliases,omitempty"`
+	Rules   string   `json:"Rules,omitempty"`
+}
+*/
+
+// type TimezoneSlice []Timezone
+var TimezonesSlice core.TimezoneSlice = make(core.TimezoneSlice, 0, 800)
+
+type TimezoneMap map[string]core.Timezone
+
+var TimezonesMap TimezoneMap = make(TimezoneMap, 800)
+
+type TimezoneFileState struct {
+	Filename string
+	ModTime  time.Time
+	FileSize int64
+}
+
+var TimezoneFile TimezoneFileState
+
+func (tzs *TimezoneFileState) IsModified() (bool, error) {
+	if tzs.Filename == "" {
+		return true, nil
+	}
+	stat, err := os.Stat(tzs.Filename)
+	if err != nil {
+		return false, err
+	}
+	return !stat.ModTime().Equal(tzs.ModTime) || tzs.FileSize != stat.Size(), nil
+}
+
+func (tzs *TimezoneFileState) SetState() error {
+	if tzs.Filename != "" {
+		stat, err := os.Stat(tzs.Filename)
+		if err != nil {
+			return err
+		}
+		tzs.ModTime = stat.ModTime()
+		tzs.FileSize = stat.Size()
+		return nil
+	}
+	return fmt.Errorf("timezone file not set")
+}
+
 type CronService struct {
 	*cron.Cron
 	log     core.LogService
 	mapping map[string]cron.EntryID
+}
+
+func InitializeTimezones(file string) error {
+
+	stat, err := os.Stat(file)
+	if err != nil {
+		return err
+	}
+
+	fileData, err := ioutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(fileData, &TimezonesSlice)
+	if err != nil {
+		return err
+	}
+
+	TimezoneFile.Filename = file
+	TimezoneFile.ModTime = stat.ModTime()
+	TimezoneFile.FileSize = stat.Size()
+	return nil
 }
 
 func NewCronService(log core.LogService) *CronService {
@@ -96,4 +173,8 @@ func (service *CronService) MappingSize() int {
 func (service *CronService) logMappingSize(action string) {
 	size := service.MappingSize()
 	service.log.Info("cron-service", fmt.Sprintf("%s: current mapping size is %d", action, size))
+}
+
+func (service *CronService) GetTimezones() (*core.TimezoneSlice, error) {
+	return &TimezonesSlice, nil
 }
