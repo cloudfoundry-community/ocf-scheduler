@@ -17,7 +17,7 @@ type timezoneCollection struct {
 func Timezones(e *echo.Echo, services *core.Services) {
 	// Get server timezones
 	// GET /timezones
-	e.GET("/timezones", func(c echo.Context) error {
+	e.GET("/scheduler-time-zones", func(c echo.Context) error {
 		tag := "timezones"
 		services.Logger.Info(tag, "trying to get timezones")
 
