@@ -77,8 +77,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mattn/go-sqlite3 v1.14.19 h1:fhGleo2h1p8tVChob4I9HpmVFIAkKGpiukdrgQbWfGI=
 github.com/mattn/go-sqlite3 v1.14.19/go.mod h1:2eHXhiwb8IkHr+BDWZGa96P6+rkvnG63S2DGjv9HUNg=
-github.com/netresearch/go-cron v0.8.0 h1:2kgxsBMAFONMWQvhFbFIlc1xO6upNs/jJ7D7OAFzKmw=
-github.com/netresearch/go-cron v0.8.0/go.mod h1:oRPUA7fHC/ul86n+d3SdUD54cEuHIuCLiFJCua5a5/E=
+github.com/netresearch/go-cron v0.8.1-0.20260115123729-e1cb8aa662d0 h1:T7nb25DCM0Ui2Q4VeSN7olPXttWeBhXx0/WS2aGzqmc=
+github.com/netresearch/go-cron v0.8.1-0.20260115123729-e1cb8aa662d0/go.mod h1:oRPUA7fHC/ul86n+d3SdUD54cEuHIuCLiFJCua5a5/E=
 github.com/onsi/ginkgo/v2 v2.23.0 h1:FA1xjp8ieYDzlgS5ABTpdUDB7wtngggONc8a7ku2NqQ=
 github.com/onsi/ginkgo/v2 v2.23.0/go.mod h1:zXTP6xIp3U8aVuXN8ENK9IXRaTjFnpVB9mGmaSRvxnM=
 github.com/onsi/gomega v1.36.2 h1:koNYke6TVk6ZmnyHrCXba/T/MoLBXFjeC1PtvYgw0A8=
