@@ -20,6 +20,7 @@ import (
 
 type SchedulerJson struct {
 	Name    string   `json:"Name,omitempty"`
+	IsServerTimeZone string   `json:"IsServerTimeZone ,omitempty"`
 	HasDst  bool     `json:"HasDst"`
 	Std     string   `json:"Std"`
 	Dst     string   `json:"Dst,omitempty"`
@@ -54,6 +55,7 @@ type TzZoneType struct {
 
 type TzInfoType struct {
 	Aliases []string
+	IsServerTimeZone bool
 	Offsets []TzZoneType
 	Extend  string
 }
@@ -77,6 +79,12 @@ func (tzi TzInfoMap) AddZoneAlias(zone string, alias string) {
 	if !exists {
 		zoneInfo = NewTzInfo()
 	}
+
+	tzname := time.Now().Location().String()
+	if (tzname == "Local" && alias == "localtime") || tzname == alias {
+		slog.Debug ("IsServerTimeZone is set")
+		zoneInfo.IsServerTimeZone = true
+	}
 	index, found := slices.BinarySearch(zoneInfo.Aliases, alias)
 
 	if !found {
@@ -93,11 +101,17 @@ func (tzi TzInfoMap) Add(zone string, data *rfc9636.Location) {
 		zoneInfo = NewTzInfo()
 	}
 
-	year := time.Now().Year()
+	localTime := time.Now()
+	year := localTime.Year()
+	tzname := localTime.Location().String()
 	loc, err := time.LoadLocation(zone)
 	if err != nil {
 		Fatal("LoadLocation failed", "error", err)
+	}
 
+	if (tzname == "Local" && zone == "localtime") || tzname == zone {
+		zoneInfo.IsServerTimeZone = true
+		slog.Debug ("IsServerTimeZone is set")
 	}
 
 	// Check offset on a winter date (Jan 1) and a summer date (Jul 1)
@@ -120,6 +134,7 @@ func (tzi TzInfoMap) Add(zone string, data *rfc9636.Location) {
 func NewTzInfo() TzInfoType {
 	return TzInfoType{
 		Aliases: make([]string, 0),
+		IsServerTimeZone: false,
 		Offsets: make([]TzZoneType, 0, 2),
 		Extend:  "",
 	}
@@ -132,9 +147,14 @@ func SupportsDST(numOffsets int) string {
 	return "no"
 }
 
-func NewSchedulerJson(name, std, dst string, dstFlag bool, aliases []string, rules string) SchedulerJson {
+func NewSchedulerJson(name, std, dst string, dstFlag bool, aliases []string, rules string, isServerTimeZone bool) SchedulerJson {
+	isSvrTz := ""
+	if isServerTimeZone {
+		isSvrTz = "yes"
+	}
 	return SchedulerJson{
 		Name:    name,
+		IsServerTimeZone:  isSvrTz,
 		HasDst:  dstFlag,
 		Std:     std,
 		Dst:     dst,
@@ -142,6 +162,8 @@ func NewSchedulerJson(name, std, dst string, dstFlag bool, aliases []string, rul
 		Rules:   rules,
 	}
 }
+
+
 
 func GenerateJson(zones []string) {
 	for _, name := range zones {
@@ -151,12 +173,13 @@ func GenerateJson(zones []string) {
 				slog.Error("DecodeTZ failure", "TZ", zone.Extend, "error", err)
 			}
 			if jsonFileFormat == "slices" {
-				zj := NewSchedulerJson(name, std, dst, len(zone.Offsets) > 1, zone.Aliases, rules)
+				zj := NewSchedulerJson(name, std, dst, len(zone.Offsets) > 1, zone.Aliases, rules, zone.IsServerTimeZone)
 				SchedulerZoneSlices = append(SchedulerZoneSlices, zj)
 			} else if jsonFileFormat == "objects" {
-				zj := NewSchedulerJson("", std, dst, len(zone.Offsets) > 1, zone.Aliases, rules)
+				zj := NewSchedulerJson("", std, dst, len(zone.Offsets) > 1, zone.Aliases, rules, zone.IsServerTimeZone)
 				SchedulerZoneObjects[name] = zj
 			}
+
 
 		} else {
 			fmt.Printf("Missing zone %s\n", name)
@@ -205,7 +228,7 @@ func main() {
 		return nil
 	})
 	pflag.StringVarP(&SchedulerFilename, "json", "j", "", "TBD")
-	pflag.Lookup("json").NoOptDefVal = "scheduler.json"
+	pflag.Lookup("json").NoOptDefVal = "scheduler_timezones.json"
 	// Parsed Arguments	Resulting Value
 	// --json=hulu		hulu
 	// --json		scheduler.json
@@ -220,7 +243,7 @@ func main() {
 		return
 	}
 
-	keylen += 3 // for output spacing
+	keylen += 4 // for output spacing
 	slog.Info("Statistics", "numKeys", len(zones), "keylen", keylen)
 	for _, name := range zones {
 		zone, exist := TzInfos[name]
@@ -231,6 +254,9 @@ func main() {
 			description, err = tzposix.HumanReadableTZ(zone.Extend)
 			if err != nil {
 				slog.Error("HumanReadableTZ failure", "extend", zone.Extend, "error", err)
+			}
+			if zone.IsServerTimeZone {
+				name = name + "*"
 			}
 
 			fmt.Printf("%-*s DST: %-3s %+v Extend %s\n", keylen, name, SupportsDST(len(zone.Offsets)), zone.Aliases, zone.Extend)

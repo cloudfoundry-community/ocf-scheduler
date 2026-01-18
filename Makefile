@@ -113,7 +113,7 @@ clean:
 	rm -f ./tzlist ./scheduler
 
 # Cleans release files
-distclean:
+distclean: clean
 	rm -rf ${BUILD_PATH} ${APP_NAME}-*.tar.gz
 
 test:
@@ -126,6 +126,4 @@ linux:
 	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=arm64 go build -ldflags="${GO_LDFLAGS}" -o "${BUILD_PATH}/linux-arm64-${SEMVER_VERSION}" "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
 
 package:
-	# cd ${BUILD_PATH} && tar -z -c -v -f ../${BUILD}.tar.gz "${BUILD_PATH}/*-${SEMVER_VERSION}/*"
-	#tar -z -c -v -f ${BUILD}.tar.gz "${BUILD_PATH}/*-${SEMVER_VERSION}/*"
 	tar -z -c -v -f ${BUILD}.tar.gz "${BUILD_PATH}/"

@@ -7,6 +7,7 @@ import (
 // CronService is an interface to which all Cron providers must conform.
 type Timezone struct {
 	Name    string   `json:"Name,omitempty"` // omitempty is in case we do a map instead of a slice
+	IsServerTimeZone string   `json:"IsServerTimeZone,omitempty"`
 	HasDst  bool     `json:"HasDst"`
 	Std     string   `json:"Std"`
 	Dst     string   `json:"Dst,omitempty"`

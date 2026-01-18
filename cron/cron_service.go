@@ -12,17 +12,6 @@ import (
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
-/*
-type Timezone struct {
-	Name    string   `json:"Name,omitempty"` // omitempty is in case we do a map instead of a slice
-	HasDst  bool     `json:"HasDst"`
-	Std     string   `json:"Std"`
-	Dst     string   `json:"Dst,omitempty"`
-	Aliases []string `json:"Aliases,omitempty"`
-	Rules   string   `json:"Rules,omitempty"`
-}
-*/
-
 // type TimezoneSlice []Timezone
 var TimezonesSlice core.TimezoneSlice = make(core.TimezoneSlice, 0, 800)
 
