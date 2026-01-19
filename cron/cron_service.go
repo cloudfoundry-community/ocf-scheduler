@@ -2,6 +2,7 @@ package cron
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,17 +12,6 @@ import (
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
-
-/*
-type Timezone struct {
-	Name    string   `json:"Name,omitempty"` // omitempty is in case we do a map instead of a slice
-	HasDst  bool     `json:"HasDst"`
-	Std     string   `json:"Std"`
-	Dst     string   `json:"Dst,omitempty"`
-	Aliases []string `json:"Aliases,omitempty"`
-	Rules   string   `json:"Rules,omitempty"`
-}
-*/
 
 // type TimezoneSlice []Timezone
 var TimezonesSlice core.TimezoneSlice = make(core.TimezoneSlice, 0, 800)
@@ -66,6 +56,15 @@ type CronService struct {
 	*cron.Cron
 	log     core.LogService
 	mapping map[string]cron.EntryID
+}
+
+func GetServerTimezone() (string, error) {
+	for _, tz := range TimezonesSlice {
+		if tz.IsServerTimeZone != "" {
+			return tz.Name, nil
+		}
+	}
+	return "", errors.New("No server timezone found")
 }
 
 func InitializeTimezones(file string) error {

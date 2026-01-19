@@ -4,14 +4,18 @@ import (
 	"context"
 )
 
+const TimezoneJsonBase string = "scheduler-timezones.json"
+const TimezoneJsonDir string = "/var/vcap/store/scheduler/"
+
 // CronService is an interface to which all Cron providers must conform.
 type Timezone struct {
-	Name    string   `json:"Name,omitempty"` // omitempty is in case we do a map instead of a slice
-	HasDst  bool     `json:"HasDst"`
-	Std     string   `json:"Std"`
-	Dst     string   `json:"Dst,omitempty"`
-	Aliases []string `json:"Aliases,omitempty"`
-	Rules   string   `json:"Rules,omitempty"`
+	Name             string   `json:"Name,omitempty"` // omitempty is in case we do a map instead of a slice
+	IsServerTimeZone string   `json:"IsServerTimeZone,omitempty"`
+	HasDst           bool     `json:"HasDst"`
+	Std              string   `json:"Std"`
+	Dst              string   `json:"Dst,omitempty"`
+	Aliases          []string `json:"Aliases,omitempty"`
+	Rules            string   `json:"Rules,omitempty"`
 }
 
 type TimezoneSlice []Timezone
