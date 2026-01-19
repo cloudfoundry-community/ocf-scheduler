@@ -2,6 +2,7 @@
 *.swp
 /scheduler
 /tzlist
+/scheduler-timezones.json
 /ocf-scheduler
 /scheduler-*.tar.gz
 /coverage.out

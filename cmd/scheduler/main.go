@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -118,8 +119,8 @@ func main() {
 		os.Exit(255)
 	}
 
-	timezoneFile := "/var/vcap/store/scheduler/scheduler_timezones.json"
-	if err := cron.InitializeTimezones(timezoneFile); err != nil {
+	timezonePath := filepath.Join(core.TimezoneJsonDir, core.TimezoneJsonBase)
+	if err := cron.InitializeTimezones(timezonePath); err != nil {
 		log.Error(tag, fmt.Sprintf("Cannot process timezone file: %v", err.Error()))
 		log.Error(tag, "Starting scheduler without timezones loaded")
 	} else {

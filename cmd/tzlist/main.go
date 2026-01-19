@@ -206,6 +206,13 @@ func GenerateJson(zones []string) {
 }
 
 func main() {
+	pflag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "NAME:\n   %s - Generate scheduler's timezones file\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "USAGE:\n   tzlist [OPTIONS]\n\n")
+
+		fmt.Fprintf(os.Stderr, "OPTIONS:\n")
+		pflag.PrintDefaults()
+	}
 	pflag.FuncP("loglevel", "l", "Set loglevel to trace, debug, info, warning, error or fatal", func(value string) error {
 		lv := strings.ToLower(value)
 		if strings.HasPrefix("trace", lv) {
@@ -225,8 +232,9 @@ func main() {
 		}
 		return nil
 	})
-	pflag.StringVarP(&SchedulerFilename, "json", "j", "", "TBD")
-	pflag.Lookup("json").NoOptDefVal = "scheduler_timezones.json"
+	pflag.StringVarP(&SchedulerFilename, "json", "j", "", "pathname to write the json file to")
+	jsonPath := filepath.Join(core.TimezoneJsonDir, core.TimezoneJsonBase)
+	pflag.Lookup("json").NoOptDefVal = jsonPath
 	// Parsed Arguments	Resulting Value
 	// --json=hulu		hulu
 	// --json		scheduler.json
