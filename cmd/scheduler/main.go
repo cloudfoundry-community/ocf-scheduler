@@ -124,6 +124,9 @@ func main() {
 		log.Error(tag, fmt.Sprintf("Cannot process timezone file: %v", err.Error()))
 		log.Error(tag, "Starting scheduler without timezones loaded")
 	} else {
+		if serverTimezone, err := cron.GetServerTimezone(); err == nil {
+			log.Info(tag, fmt.Sprintf("Sever timezone is %s", serverTimezone))
+		}
 		log.Info(tag, fmt.Sprintf("Timezone file loaded successfully with %d entries", len(cron.TimezonesSlice)))
 	}
 

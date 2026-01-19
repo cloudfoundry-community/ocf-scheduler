@@ -2,6 +2,7 @@ package cron
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -55,6 +56,15 @@ type CronService struct {
 	*cron.Cron
 	log     core.LogService
 	mapping map[string]cron.EntryID
+}
+
+func GetServerTimezone() (string, error) {
+	for _, tz := range TimezonesSlice {
+		if tz.IsServerTimeZone != "" {
+			return tz.Name, nil
+		}
+	}
+	return "", errors.New("No server timezone found")
 }
 
 func InitializeTimezones(file string) error {
