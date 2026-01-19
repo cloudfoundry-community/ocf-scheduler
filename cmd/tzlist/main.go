@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/spf13/pflag"
-	"github.com/cloudfoundry-community/ocf-scheduler/cmd/tzlist/tzposix"
 	"github.com/cloudfoundry-community/ocf-scheduler/cmd/tzlist/rfc9636"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/tzlist/tzposix"
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/spf13/pflag"
 	"io/ioutil"
 	"log/slog"
 	"os"
@@ -19,13 +20,13 @@ import (
 )
 
 type SchedulerJson struct {
-	Name    string   `json:"Name,omitempty"`
+	Name             string   `json:"Name,omitempty"`
 	IsServerTimeZone string   `json:"IsServerTimeZone ,omitempty"`
-	HasDst  bool     `json:"HasDst"`
-	Std     string   `json:"Std"`
-	Dst     string   `json:"Dst,omitempty"`
-	Aliases []string `json:"Aliases,omitempty"`
-	Rules   string   `json:"Rules,omitempty"`
+	HasDst           bool     `json:"HasDst"`
+	Std              string   `json:"Std"`
+	Dst              string   `json:"Dst,omitempty"`
+	Aliases          []string `json:"Aliases,omitempty"`
+	Rules            string   `json:"Rules,omitempty"`
 }
 
 const (
@@ -54,15 +55,15 @@ type TzZoneType struct {
 // len[Offsets] > 1 Has daylight savings time
 
 type TzInfoType struct {
-	Aliases []string
+	Aliases          []string
 	IsServerTimeZone bool
-	Offsets []TzZoneType
-	Extend  string
+	Offsets          []TzZoneType
+	Extend           string
 }
 
-var SchedulerZoneSlices []SchedulerJson = make([]SchedulerJson, 0, 800)
+var SchedulerZoneSlices []core.Timezone = make([]core.Timezone, 0, 800)
 
-type SchedulerZoneMap map[string]SchedulerJson
+type SchedulerZoneMap map[string]core.Timezone
 
 var SchedulerZoneObjects = make(SchedulerZoneMap)
 
@@ -82,7 +83,7 @@ func (tzi TzInfoMap) AddZoneAlias(zone string, alias string) {
 
 	tzname := time.Now().Location().String()
 	if (tzname == "Local" && alias == "localtime") || tzname == alias {
-		slog.Debug ("IsServerTimeZone is set")
+		slog.Debug("IsServerTimeZone is set")
 		zoneInfo.IsServerTimeZone = true
 	}
 	index, found := slices.BinarySearch(zoneInfo.Aliases, alias)
@@ -111,7 +112,7 @@ func (tzi TzInfoMap) Add(zone string, data *rfc9636.Location) {
 
 	if (tzname == "Local" && zone == "localtime") || tzname == zone {
 		zoneInfo.IsServerTimeZone = true
-		slog.Debug ("IsServerTimeZone is set")
+		slog.Debug("IsServerTimeZone is set")
 	}
 
 	// Check offset on a winter date (Jan 1) and a summer date (Jul 1)
@@ -133,10 +134,10 @@ func (tzi TzInfoMap) Add(zone string, data *rfc9636.Location) {
 
 func NewTzInfo() TzInfoType {
 	return TzInfoType{
-		Aliases: make([]string, 0),
+		Aliases:          make([]string, 0),
 		IsServerTimeZone: false,
-		Offsets: make([]TzZoneType, 0, 2),
-		Extend:  "",
+		Offsets:          make([]TzZoneType, 0, 2),
+		Extend:           "",
 	}
 }
 
@@ -147,23 +148,21 @@ func SupportsDST(numOffsets int) string {
 	return "no"
 }
 
-func NewSchedulerJson(name, std, dst string, dstFlag bool, aliases []string, rules string, isServerTimeZone bool) SchedulerJson {
+func NewSchedulerJson(name, std, dst string, dstFlag bool, aliases []string, rules string, isServerTimeZone bool) core.Timezone {
 	isSvrTz := ""
 	if isServerTimeZone {
 		isSvrTz = "yes"
 	}
-	return SchedulerJson{
-		Name:    name,
-		IsServerTimeZone:  isSvrTz,
-		HasDst:  dstFlag,
-		Std:     std,
-		Dst:     dst,
-		Aliases: aliases,
-		Rules:   rules,
+	return core.Timezone{
+		Name:             name,
+		IsServerTimeZone: isSvrTz,
+		HasDst:           dstFlag,
+		Std:              std,
+		Dst:              dst,
+		Aliases:          aliases,
+		Rules:            rules,
 	}
 }
-
-
 
 func GenerateJson(zones []string) {
 	for _, name := range zones {
@@ -179,7 +178,6 @@ func GenerateJson(zones []string) {
 				zj := NewSchedulerJson("", std, dst, len(zone.Offsets) > 1, zone.Aliases, rules, zone.IsServerTimeZone)
 				SchedulerZoneObjects[name] = zj
 			}
-
 
 		} else {
 			fmt.Printf("Missing zone %s\n", name)
