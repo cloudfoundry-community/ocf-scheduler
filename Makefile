@@ -11,8 +11,6 @@ TARGETS        ?=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 MODULE         ?= github.com/cloudfoundry-community/ocf-scheduler
 
 CGO_ENABLED    ?= 0
-BUILD_PATH     =builds
-BUILD          =${APP_NAME}-${SEMVER_VERSION}
 TESTFILES      =`go list ./... | grep -v /vendor/`
 
 define is_not_number 
@@ -54,6 +52,8 @@ BUILD_VCS_ID_DATE :=$(shell TZ=UTC0 git log -n 1 --date=iso-strict-local --forma
 
 build: SEMVER_PRERELEASE := dev
 
+build: GO_LDFLAGS+=-X '$(GOMODULECMD).GoOs=$(GOOS)' -X '$(GOMODULECMD).GoArch=$(GOARCH)'
+
 GO_LDFLAGS = -X '$(GOMODULECMD).SemVerMajor=$(SEMVER_MAJOR)' \
 	         -X '$(GOMODULECMD).SemVerMinor=$(SEMVER_MINOR)' \
 	         -X '$(GOMODULECMD).SemVerPatch=$(SEMVER_PATCH)' \
@@ -62,7 +62,7 @@ GO_LDFLAGS = -X '$(GOMODULECMD).SemVerMajor=$(SEMVER_MAJOR)' \
 	         -X '$(GOMODULECMD).BuildDate=$(BUILD_DATE)' \
 	         -X '$(GOMODULECMD).BuildVcsUrl=$(BUILD_VCS_URL)' \
 	         -X '$(GOMODULECMD).BuildVcsId=$(BUILD_VCS_ID)' \
-		     -X '$(GOMODULECMD).BuildVcsIdDate=$(BUILD_VCS_ID_DATE)'
+	         -X '$(GOMODULECMD).BuildVcsIdDate=$(BUILD_VCS_ID_DATE)'
 
 # The build meta data is added when the build is done
 #
@@ -74,8 +74,6 @@ SEMVER_VERSION := $(SEMVER_VERSION)$(if $(SEMVER_PRERELEASE),-$(SEMVER_PRERELEAS
 MODULE ?= github.com/cloudfoundry-community/ocf-scheduler
 CMD_PATH ?= cmd
 CGO_ENABLED ?= 0
-BUILD_PATH=builds
-BUILD=${APP_NAME}-${SEMVER_VERSION}
 TARGETS        ?=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 TESTFILES=`go list ./... | grep -v /vendor/`
 
@@ -88,10 +86,13 @@ endif
 # Build for the current platform
 all: clean build
 
+RELEASES := $(foreach target,$(TARGETS),release-$(target)-$(PROJECT))
+
 # Build a new release
-release: distclean distbuild linux package
+release: distclean distbuild $(RELEASES)  package
 
 # Builds the project
+
 build:
 	go build -ldflags="${GO_LDFLAGS}" -o ./  "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
 
@@ -100,13 +101,13 @@ cli:
 
 
 # Builds the project for all possible platforms
-distbuild:
-	mkdir -p ${BUILD_PATH}/linux-amd64-${SEMVER_VERSION}
-	mkdir -p ${BUILD_PATH}/linux-arm64-${SEMVER_VERSION}
 
-# Installs our project: copies binaries
-install:
-	go install -ldflags="${LDFLAGS}"
+define distbuild
+	mkdir -p ${RELEASE_ROOT}/${1}-${2}-${SEMVER_VERSION}
+
+endef
+distbuild:
+	$(foreach target,$(TARGETS), $(call distbuild,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target)))))
 
 # Cleans our project: deletes binaries
 clean:
@@ -114,16 +115,27 @@ clean:
 
 # Cleans release files
 distclean: clean
-	rm -rf ${BUILD_PATH} ${APP_NAME}-*.tar.gz
+	rm -rf ${RELEASE_ROOT} ${APP_NAME}-*.tar.gz
 
 test:
 	./scripts/blanket
 
-RELEASES := $(foreach target,$(TARGETS),release-$(target)-$(PROJECT))
 
-linux:
-	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=amd64 go build -ldflags="${GO_LDFLAGS}" -o "${BUILD_PATH}/linux-amd64-${SEMVER_VERSION}" "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
-	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=arm64 go build -ldflags="${GO_LDFLAGS}" -o "${BUILD_PATH}/linux-arm64-${SEMVER_VERSION}" "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
+define build-target
+release-$(1)/$(2)-$(PROJECT): RELEASE_GO_LDFLAGS:=-ldflags="$(GO_LDFLAGS) -X '$(GOMODULECMD).GoOs=$(1)' -X '$(GOMODULECMD).GoArch=$(2)'"
+
+release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_DIR:=$(RELEASE_ROOT)/$(1)-$(2)-$(SEMVER_VERSION)
+
+release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_SHA1:=$$(RELEASE_EXECUTABLE_BASE).sha1
+
+release-$(1)/$(2)-$(PROJECT):
+	@echo "Building $$(PROJECT) version $$(SEMVER_VERSION) for $(1) $(2) ..."
+	@CGO_ENABLED=0 GOOS=$(1) GOARCH=$(2) go build -o $$(RELEASE_EXECUTABLE_DIR) $$(RELEASE_GO_LDFLAGS) "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
+	find $$(RELEASE_EXECUTABLE_DIR)  -type f -exec openssl dgst -sha256 -out \{\}.sha256 \{\} \; 
+
+endef
+
+$(foreach target,$(TARGETS), $(eval $(call build-target,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target))),$(SEMVER_BUILDMETA))))
 
 package:
-	tar -z -c -v -f ${BUILD}.tar.gz "${BUILD_PATH}/"
+	tar -z -c -v -f ${BUILD}.tar.gz "${RELEASE_ROOT}/"
