@@ -3,14 +3,12 @@ package main
 import (
 	"strings"
 	"fmt"
-
+	"runtime"
 )
 
-
-
-func createBuildMeta(buildOs, buildArch, build string) string {
-	p1 := strings.TrimSpace(buildOs)
-	p2 := strings.TrimSpace(buildArch)
+func createBuildMeta(build string) string {
+	p1 := runtime.GOOS
+	p2 := runtime.GOARCH
 	p3 := strings.TrimSpace(build)
 	if p1 == "" || p2 == "" {
 		panic(fmt.Sprintf("Go meta data is missing one of its parts: %s, %s ", p1, p2))

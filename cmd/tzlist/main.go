@@ -38,8 +38,6 @@ var BuildDate string
 var BuildVcsUrl string
 var BuildVcsId string
 var BuildVcsIdDate string
-var GoArch string
-var GoOs string
 
 
 const (
@@ -219,7 +217,7 @@ func GenerateJson(zones []string) {
 }
 
 func main() {
-	bm := createBuildMeta(GoOs, GoArch, SemVerBuild)
+	bm := createBuildMeta(SemVerBuild)
 	sv := createSemVer(SemVerMajor, SemVerMinor, SemVerPatch, SemVerPrerelease, bm)
 	slog.Info("tzlist", "version", sv, "build date", BuildDate)
 	slog.Info("Vcs Info", "url", BuildVcsUrl, "id", BuildVcsId, "date", BuildVcsIdDate)
