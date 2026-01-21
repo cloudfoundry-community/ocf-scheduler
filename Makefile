@@ -121,7 +121,6 @@ distclean: clean
 test:
 	./scripts/blanket
 
-
 define build-target
 release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_DIR:=$(RELEASE_ROOT)/$(1)-$(2)-$(SEMVER_VERSION)
 
