@@ -52,8 +52,6 @@ BUILD_VCS_ID_DATE :=$(shell TZ=UTC0 git log -n 1 --date=iso-strict-local --forma
 
 build: SEMVER_PRERELEASE := dev
 
-build: GO_LDFLAGS+=-X '$(GOMODULECMD).GoOs=$(GOOS)' -X '$(GOMODULECMD).GoArch=$(GOARCH)'
-
 GO_LDFLAGS = -X '$(GOMODULECMD).SemVerMajor=$(SEMVER_MAJOR)' \
 	         -X '$(GOMODULECMD).SemVerMinor=$(SEMVER_MINOR)' \
 	         -X '$(GOMODULECMD).SemVerPatch=$(SEMVER_PATCH)' \
@@ -103,39 +101,41 @@ cli:
 # Builds the project for all possible platforms
 
 define distbuild
-	mkdir -p ${RELEASE_ROOT}/${1}-${2}-${SEMVER_VERSION}
+	@mkdir -p ${RELEASE_ROOT}/${1}-${2}-${SEMVER_VERSION}
 
 endef
 distbuild:
+	@echo "Building release directories..."
 	$(foreach target,$(TARGETS), $(call distbuild,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target)))))
 
 # Cleans our project: deletes binaries
 clean:
-	rm -f ./tzlist ./scheduler
+	@echo "Cleaning built executables..."
+	@rm -f ./tzlist ./scheduler
 
 # Cleans release files
 distclean: clean
-	rm -rf ${RELEASE_ROOT} ${APP_NAME}-*.tar.gz
+	@echo "Cleaning ${RELEASE_ROOT} directories..."
+	@ rm -rf ${RELEASE_ROOT} ${APP_NAME}-*.tar.gz
 
 test:
 	./scripts/blanket
 
 
 define build-target
-release-$(1)/$(2)-$(PROJECT): RELEASE_GO_LDFLAGS:=-ldflags="$(GO_LDFLAGS) -X '$(GOMODULECMD).GoOs=$(1)' -X '$(GOMODULECMD).GoArch=$(2)'"
-
 release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_DIR:=$(RELEASE_ROOT)/$(1)-$(2)-$(SEMVER_VERSION)
 
 release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_SHA1:=$$(RELEASE_EXECUTABLE_BASE).sha1
 
 release-$(1)/$(2)-$(PROJECT):
-	@echo "Building $$(PROJECT) version $$(SEMVER_VERSION) for $(1) $(2) ..."
+	@echo "Building $$(PROJECT) executables version $$(SEMVER_VERSION) for $(1) $(2) ..."
 	@CGO_ENABLED=0 GOOS=$(1) GOARCH=$(2) go build -o $$(RELEASE_EXECUTABLE_DIR) $$(RELEASE_GO_LDFLAGS) "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
-	find $$(RELEASE_EXECUTABLE_DIR)  -type f -exec openssl dgst -sha256 -out \{\}.sha256 \{\} \; 
+	@echo "Generate $$(PROJECT) digests ..."
+	@scripts/shait "$$(RELEASE_EXECUTABLE_DIR)" sha1 sha256
 
 endef
 
 $(foreach target,$(TARGETS), $(eval $(call build-target,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target))),$(SEMVER_BUILDMETA))))
 
 package:
-	tar -z -c -v -f ${BUILD}.tar.gz "${RELEASE_ROOT}/"
+	tar -z -c -f "${APP_NAME}-${SEMVER_VERSION}.tar.gz" "${RELEASE_ROOT}/"
