@@ -1,0 +1,75 @@
+#!/bin/bash 
+set -eu
+
+release_dir="releases"
+
+help_regex='^(-{0,2})(h|he|hel|help)$'
+
+function usage {
+	echo generate digests for executables
+	echo shait release_directory digests...
+}
+
+if [[ $# -eq 0 || $1 =~ ${help_regex} ]] ; then
+	usage
+	exit 0
+fi
+
+if [[ $# -lt 2 ]]; then
+	usage
+	exit 1
+fi
+
+release_dir="$1"
+if [[ ! -d "${release_dir}" ]] ; then
+	echo The first parameter must must be a release directory ${release_dir}
+	usage
+	exit 1
+fi
+
+shift
+
+digests="${@}"
+
+function is_supported_digest {
+	openssl dgst "-$1" /dev/null >/dev/null 2>&1
+}
+
+for digest in ${digests} ; do
+	if ! is_supported_digest "${digest}"; then
+		echo \"$digest\" is not a supported digest for the openssl command
+		exit 1
+	fi
+done
+
+function is_executable() {
+	file $1 | grep executable &> /dev/null
+}
+
+function remove_old_sha_files {
+	local file="$1"
+	shift
+	for sha in "$@" ; do
+		rm -f "${file}.${sha}" || true
+	done
+}
+
+function create_new_sha_files {
+	local file="$1"
+	shift
+	for sha in "$@"; do
+		local cmd=( openssl dgst "-${sha}" -out "${file}.${sha}" "${file}" )
+		# cmd=(openssl dgst "-${sha}" -out "${file}.${sha}" "${file}")
+		if ! "${cmd[@]}" ; then
+			echo "openssl command failed to execute:" "${cmd[@]}"
+			exit 1
+		fi
+	done
+}
+
+for file in $(find ${release_dir} -type f -print); do
+	if is_executable "${file}"; then
+		remove_old_sha_files "${file}" ${digests}
+		create_new_sha_files "${file}" ${digests}
+	fi
+done
