@@ -29,6 +29,17 @@ type SchedulerJson struct {
 	Rules            string   `json:"Rules,omitempty"`
 }
 
+var SemVerMajor string
+var SemVerMinor string
+var SemVerPatch string
+var SemVerPrerelease string
+var SemVerBuild string
+var BuildDate string
+var BuildVcsUrl string
+var BuildVcsId string
+var BuildVcsIdDate string
+
+
 const (
 	LevelTrace = slog.Level(-8)
 	LevelFatal = slog.Level(12)
@@ -206,6 +217,10 @@ func GenerateJson(zones []string) {
 }
 
 func main() {
+	bm := createBuildMeta(SemVerBuild)
+	sv := createSemVer(SemVerMajor, SemVerMinor, SemVerPatch, SemVerPrerelease, bm)
+	slog.Info("tzlist", "version", sv, "build date", BuildDate)
+	slog.Info("Vcs Info", "url", BuildVcsUrl, "id", BuildVcsId, "date", BuildVcsIdDate)
 	pflag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "NAME:\n   %s - Generate scheduler's timezones file\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "USAGE:\n   tzlist [OPTIONS]\n\n")

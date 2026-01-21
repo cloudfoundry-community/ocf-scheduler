@@ -29,11 +29,25 @@ import (
 var AppName = "ocf-scheduler"
 var Version = "(development)"
 
+var SemVerMajor string
+var SemVerMinor string
+var SemVerPatch string
+var SemVerPrerelease string
+var SemVerBuild string
+var BuildDate string
+var BuildVcsUrl string
+var BuildVcsId string
+var BuildVcsIdDate string
+
 var callRunner = http.NewRunService()
 
 func main() {
 	log := logger.New()
-	tag := AppName + " " + Version
+	tag := AppName
+	bm := createBuildMeta(SemVerBuild)
+	sv := createSemVer(SemVerMajor, SemVerMinor, SemVerPatch, SemVerPrerelease, bm)
+	log.Info(tag, fmt.Sprintf("Version %s Build Date %s", sv, BuildDate))
+	log.Info(tag, fmt.Sprintf("Vcs Info Url %s ID %s Date %s", BuildVcsUrl, BuildVcsId, BuildVcsIdDate))
 
 	port := 8000
 	portEnv := os.Getenv("SCHEDULER_PORT")

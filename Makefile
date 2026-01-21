@@ -11,8 +11,6 @@ TARGETS        ?=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 MODULE         ?= github.com/cloudfoundry-community/ocf-scheduler
 
 CGO_ENABLED    ?= 0
-BUILD_PATH     =builds
-BUILD          =${APP_NAME}-${SEMVER_VERSION}
 TESTFILES      =`go list ./... | grep -v /vendor/`
 
 define is_not_number 
@@ -62,7 +60,7 @@ GO_LDFLAGS = -X '$(GOMODULECMD).SemVerMajor=$(SEMVER_MAJOR)' \
 	         -X '$(GOMODULECMD).BuildDate=$(BUILD_DATE)' \
 	         -X '$(GOMODULECMD).BuildVcsUrl=$(BUILD_VCS_URL)' \
 	         -X '$(GOMODULECMD).BuildVcsId=$(BUILD_VCS_ID)' \
-		     -X '$(GOMODULECMD).BuildVcsIdDate=$(BUILD_VCS_ID_DATE)'
+	         -X '$(GOMODULECMD).BuildVcsIdDate=$(BUILD_VCS_ID_DATE)'
 
 # The build meta data is added when the build is done
 #
@@ -74,8 +72,6 @@ SEMVER_VERSION := $(SEMVER_VERSION)$(if $(SEMVER_PRERELEASE),-$(SEMVER_PRERELEAS
 MODULE ?= github.com/cloudfoundry-community/ocf-scheduler
 CMD_PATH ?= cmd
 CGO_ENABLED ?= 0
-BUILD_PATH=builds
-BUILD=${APP_NAME}-${SEMVER_VERSION}
 TARGETS        ?=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 TESTFILES=`go list ./... | grep -v /vendor/`
 
@@ -88,10 +84,13 @@ endif
 # Build for the current platform
 all: clean build
 
+RELEASES := $(foreach target,$(TARGETS),release-$(target)-$(PROJECT))
+
 # Build a new release
-release: distclean distbuild linux package
+release: distclean distbuild $(RELEASES)  package
 
 # Builds the project
+
 build:
 	go build -ldflags="${GO_LDFLAGS}" -o ./  "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
 
@@ -100,30 +99,42 @@ cli:
 
 
 # Builds the project for all possible platforms
-distbuild:
-	mkdir -p ${BUILD_PATH}/linux-amd64-${SEMVER_VERSION}
-	mkdir -p ${BUILD_PATH}/linux-arm64-${SEMVER_VERSION}
 
-# Installs our project: copies binaries
-install:
-	go install -ldflags="${LDFLAGS}"
+define distbuild
+	@mkdir -p ${RELEASE_ROOT}/${1}-${2}-${SEMVER_VERSION}
+
+endef
+distbuild:
+	@echo "Building release directories..."
+	$(foreach target,$(TARGETS), $(call distbuild,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target)))))
 
 # Cleans our project: deletes binaries
 clean:
-	rm -f ./tzlist ./scheduler
+	@echo "Cleaning built executables..."
+	@rm -f ./tzlist ./scheduler
 
 # Cleans release files
 distclean: clean
-	rm -rf ${BUILD_PATH} ${APP_NAME}-*.tar.gz
+	@echo "Cleaning ${RELEASE_ROOT} directories..."
+	@ rm -rf ${RELEASE_ROOT} ${APP_NAME}-*.tar.gz
 
 test:
 	./scripts/blanket
 
-RELEASES := $(foreach target,$(TARGETS),release-$(target)-$(PROJECT))
+define build-target
+release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_DIR:=$(RELEASE_ROOT)/$(1)-$(2)-$(SEMVER_VERSION)
 
-linux:
-	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=amd64 go build -ldflags="${GO_LDFLAGS}" -o "${BUILD_PATH}/linux-amd64-${SEMVER_VERSION}" "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
-	CGO_ENABLED=${CGO_ENABLED} GOOS=linux GOARCH=arm64 go build -ldflags="${GO_LDFLAGS}" -o "${BUILD_PATH}/linux-arm64-${SEMVER_VERSION}" "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
+release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_SHA1:=$$(RELEASE_EXECUTABLE_BASE).sha1
+
+release-$(1)/$(2)-$(PROJECT):
+	@echo "Building $$(PROJECT) executables version $$(SEMVER_VERSION) for $(1) $(2) ..."
+	@CGO_ENABLED=0 GOOS=$(1) GOARCH=$(2) go build -o $$(RELEASE_EXECUTABLE_DIR) $$(RELEASE_GO_LDFLAGS) "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
+	@echo "Generate $$(PROJECT) digests ..."
+	@scripts/shait "$$(RELEASE_EXECUTABLE_DIR)" sha1 sha256
+
+endef
+
+$(foreach target,$(TARGETS), $(eval $(call build-target,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target))),$(SEMVER_BUILDMETA))))
 
 package:
-	tar -z -c -v -f ${BUILD}.tar.gz "${BUILD_PATH}/"
+	tar -z -c -f "${APP_NAME}-${SEMVER_VERSION}.tar.gz" "${RELEASE_ROOT}/"
