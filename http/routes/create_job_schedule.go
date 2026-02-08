@@ -47,7 +47,9 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		services.Cron.Add(core.NewJobRun(job, schedule, services))
+		if err := services.Cron.Add(core.NewJobRun(job, schedule, services)); err != nil {
+			return c.JSON(http.StatusInternalServerError, err.Error())
+		}
 
 		return c.JSON(
 			http.StatusCreated,
