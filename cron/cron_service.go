@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -74,7 +73,7 @@ func InitializeTimezones(file string) error {
 		return err
 	}
 
-	fileData, err := ioutil.ReadFile(file)
+	fileData, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
