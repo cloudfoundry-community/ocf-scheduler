@@ -163,7 +163,10 @@ func main() {
 
 	cronService := cron.NewCronService(log)
 	cronService.Start()
-	defer cronService.Stop()
+	defer func() {
+		ctx := cronService.Stop()
+		<-ctx.Done()
+	}()
 
 	services := &core.Services{
 		Jobs:       jobs,

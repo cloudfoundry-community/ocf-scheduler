@@ -52,7 +52,9 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		services.Cron.Add(core.NewCallRun(call, schedule, services))
+		if err := services.Cron.Add(core.NewCallRun(call, schedule, services)); err != nil {
+			return c.JSON(http.StatusInternalServerError, err.Error())
+		}
 
 		return c.JSON(
 			http.StatusCreated,
