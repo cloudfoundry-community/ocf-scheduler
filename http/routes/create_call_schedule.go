@@ -43,7 +43,7 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 
 		services.Logger.Info(tag, fmt.Sprintf("expression == '%s', expression_type == '%s'", input.Expression, input.ExpressionType))
 
-		if services.Cron.Validate(input.Expression) != nil {
+		if err := services.Cron.Validate(input.Expression); err != nil {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
@@ -53,7 +53,7 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 		}
 
 		if err := services.Cron.Add(core.NewCallRun(call, schedule, services)); err != nil {
-			return c.JSON(http.StatusInternalServerError, err.Error())
+			return c.JSON(http.StatusUnprocessableEntity, err.Error())
 		}
 
 		return c.JSON(
