@@ -44,7 +44,7 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 		services.Logger.Info(tag, fmt.Sprintf("expression == '%s', expression_type == '%s'", input.Expression, input.ExpressionType))
 
 		if err := services.Cron.Validate(input.Expression); err != nil {
-			return c.JSON(http.StatusUnprocessableEntity, "")
+			return c.JSON(http.StatusUnprocessableEntity, err.Error())
 		}
 
 		schedule, err := services.Schedules.Persist(input)
