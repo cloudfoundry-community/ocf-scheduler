@@ -38,8 +38,8 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 		input.RefGUID = guid
 		input.RefType = "job"
 
-		if services.Cron.Validate(input.Expression) != nil {
-			return c.JSON(http.StatusUnprocessableEntity, "")
+		if err := services.Cron.Validate(input.Expression); err != nil {
+			return c.JSON(http.StatusUnprocessableEntity, err.Error())
 		}
 
 		schedule, err := services.Schedules.Persist(input)
@@ -48,7 +48,7 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 		}
 
 		if err := services.Cron.Add(core.NewJobRun(job, schedule, services)); err != nil {
-			return c.JSON(http.StatusInternalServerError, err.Error())
+			return c.JSON(http.StatusUnprocessableEntity, err.Error())
 		}
 
 		return c.JSON(
