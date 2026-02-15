@@ -17,10 +17,22 @@ define is_not_number
 $(shell echo ${1} | sed -e 's/[0123456789]//g')
 endef
 
-ifneq ($(VERSION),)
-VERSION_SPLIT:=$(subst ., ,$(VERSION))
+CLEAN_VERSION = $(patsubst v%,%,$(VERSION))
+HAS_BUILDMETA := $(findstring +,$(CLEAN_VERSION))
+VERSION_BUILDMETA := $(if $(HAS_BUILDMETA),$(lastword $(subst +, ,$(CLEAN_VERSION))),)
+
+VERSION_AND_PRERELEASE := $(firstword $(subst +, ,$(CLEAN_VERSION)))
+
+HAS_PRERELEASE := $(findstring -,$(VERSION_AND_PRERELEASE))
+VERSION_ONLY := $(firstword $(subst -, ,$(VERSION_AND_PRERELEASE)))
+VERSION_PRERELEASE := $(if $(HAS_PRERELEASE),$(patsubst $(VERSION_ONLY)-%,%,$(VERSION_AND_PRERELEASE)),)
+
+# Output results
+
+ifneq ($(VERSION_ONLY),)
+VERSION_SPLIT:=$(subst ., ,$(VERSION_ONLY))
   ifneq ($(words $(VERSION_SPLIT)),3)
-    $(error VERSION does not have 3 parts |$(words $(VERSION_SPLIT))|$(VERSION)|$(VERSION_SPLIT)|)
+    $(error VERSION does not have 3 parts |$(words $(VERSION_SPLIT))|$(VERSION_ONLY)|$(VERSION_SPLIT)|)
   endif
 else
 VERSION_TAG:=$(shell (git describe --tags --abbrev=0 2>/dev/null || echo 0.0.0) | sed -e "s/^v//")
@@ -43,8 +55,8 @@ endif
 SEMVER_MAJOR    ?=$(word 1,$(VERSION_SPLIT))
 SEMVER_MINOR    ?=$(word 2,$(VERSION_SPLIT))
 SEMVER_PATCH    ?=$(word 3,$(VERSION_SPLIT))
-SEMVER_PRERELEASE ?=
-SEMVER_BUILDMETA  ?=
+SEMVER_PRERELEASE ?=$(VERSION_PRERELEASE)
+SEMVER_BUILDMETA  ?=$(VERSION_BUILDMETA)
 BUILD_DATE        :=$(shell date -u -Iseconds)
 BUILD_VCS_URL     :=$(shell git config --get remote.origin.url)
 BUILD_VCS_ID      :=$(shell git log -n 1 --date=iso-strict-local --format="%h")
@@ -83,6 +95,16 @@ endif
 
 # Build for the current platform
 all: clean build
+
+debug_version:
+	@echo VERSION $(VERSION)
+	@echo CLEAN_VERSION $(CLEAN_VERSION)
+	@echo VERSION_BUILDMETA $(VERSION_BUILDMETA)
+	@echo VERSION_AND_PRERELEASE $(VERSION_AND_PRERELEASE)
+	@echo VERSION_PRERELEASE $(VERSION_PRERELEASE)
+	@echo VERSION_ONLY  $(VERSION_ONLY)
+	@echo VERSION_SPLIT  $(VERSION_SPLIT)
+	@echo VERSION_TAG  $(VERSION_TAG)
 
 RELEASES := $(foreach target,$(TARGETS),release-$(target)-$(PROJECT))
 PACKAGES := $(foreach target,$(TARGETS),package-$(target)-$(PROJECT))
