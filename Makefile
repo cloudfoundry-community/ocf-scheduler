@@ -85,9 +85,10 @@ endif
 all: clean build
 
 RELEASES := $(foreach target,$(TARGETS),release-$(target)-$(PROJECT))
+PACKAGES := $(foreach target,$(TARGETS),package-$(target)-$(PROJECT))
 
 # Build a new release
-release: distclean distbuild $(RELEASES)  package
+release: distclean distbuild $(RELEASES)  $(PACKAGES)
 
 # Builds the project
 
@@ -122,9 +123,11 @@ test:
 	./scripts/blanket
 
 define build-target
-release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_DIR:=$(RELEASE_ROOT)/$(1)-$(2)-$(SEMVER_VERSION)
+release-$(1)/$(2)-$(PROJECT): RELEASE_BUILD_DIR:=$(1)-$(2)-$(SEMVER_VERSION)
 
-release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_SHA1:=$$(RELEASE_EXECUTABLE_BASE).sha1
+release-$(1)/$(2)-$(PROJECT): RELEASE_EXECUTABLE_DIR:=$(RELEASE_ROOT)/$$(RELEASE_BUILD_DIR)
+
+release-$(1)/$(2)-$(PROJECT): RELEASE_GO_LDFLAGS:=-ldflags="$$(GO_LDFLAGS)"
 
 release-$(1)/$(2)-$(PROJECT):
 	@echo "Building $$(PROJECT) executables version $$(SEMVER_VERSION) for $(1) $(2) ..."
@@ -136,5 +139,13 @@ endef
 
 $(foreach target,$(TARGETS), $(eval $(call build-target,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target))),$(SEMVER_BUILDMETA))))
 
-package:
-	tar -z -c -f "${APP_NAME}-${SEMVER_VERSION}.tar.gz" "${RELEASE_ROOT}/"
+define package-target
+package-$(1)/$(2)-$(PROJECT): RELEASE_BUILD_DIR:=$(1)-$(2)-$(SEMVER_VERSION)
+
+package-$(1)/$(2)-$(PROJECT):
+	@echo "Packaging $$(PROJECT) for $$(RELEASE_BUILD_DIR) ..."
+	@(cd $(RELEASE_ROOT); tar -z -c -f "${APP_NAME}-$$(RELEASE_BUILD_DIR).tar.gz" "$$(RELEASE_BUILD_DIR)")
+
+endef
+
+$(foreach target,$(TARGETS), $(eval $(call package-target,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target))))))
