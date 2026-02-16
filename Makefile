@@ -35,8 +35,9 @@ VERSION_SPLIT:=$(subst ., ,$(VERSION_ONLY))
     $(error VERSION does not have 3 parts |$(words $(VERSION_SPLIT))|$(VERSION_ONLY)|$(VERSION_SPLIT)|)
   endif
 else
-VERSION_TAG:=$(shell (git describe --tags --abbrev=0 2>/dev/null || echo 0.0.0) | sed -e "s/^v//")
-VERSION_SPLIT:=$(subst ., ,$(VERSION_TAG))
+VERSION_TAG:=$(shell git describe --tags --abbrev=0 2>/dev/null || echo 0.0.0)
+CLEAN_VERSION_TAG = $(patsubst v%,%,$(VERSION_TAG))
+VERSION_SPLIT:=$(subst ., ,$(CLEAN_VERSION_TAG))
   ifneq ($(words $(VERSION_SPLIT)),3)
     $(error VERSION_TAG does not have 3 parts |$(words $(VERSION_SPLIT))|$(VERSION_TAG)|$(VERSION_SPLIT)|)
   endif
@@ -105,6 +106,7 @@ debug_version:
 	@echo VERSION_ONLY  $(VERSION_ONLY)
 	@echo VERSION_SPLIT  $(VERSION_SPLIT)
 	@echo VERSION_TAG  $(VERSION_TAG)
+	@echo CLEAN_VERSION_TAG  $(CLEAN_VERSION_TAG)
 
 RELEASES := $(foreach target,$(TARGETS),release-$(target)-$(PROJECT))
 PACKAGES := $(foreach target,$(TARGETS),package-$(target)-$(PROJECT))
