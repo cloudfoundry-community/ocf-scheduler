@@ -39,7 +39,6 @@ var BuildVcsUrl string
 var BuildVcsId string
 var BuildVcsIdDate string
 
-
 const (
 	LevelTrace = slog.Level(-8)
 	LevelFatal = slog.Level(12)

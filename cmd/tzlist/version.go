@@ -1,9 +1,9 @@
 package main
 
 import (
-	"strings"
 	"fmt"
 	"runtime"
+	"strings"
 )
 
 func createBuildMeta(build string) string {
