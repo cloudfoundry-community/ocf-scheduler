@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 
 	cf "github.com/cloudfoundry-community/go-cfclient"
@@ -67,11 +68,9 @@ func (service *AuthService) Verify(auth string) error {
 	// Check all the roles, but return good early if we find one that works.
 
 	// Check token scopes for cloud_controller.admin
-	for _, scope := range tokenScopes {
-		if scope == "cloud_controller.admin" {
-			service.logger.Debug(tag, "User has cloud_controller.admin scope")
-			return nil
-		}
+	if slices.Contains(tokenScopes, "cloud_controller.admin") {
+		service.logger.Debug(tag, "User has cloud_controller.admin scope")
+		return nil
 	}
 
 	// Check CF roles for space_manager or space_developer

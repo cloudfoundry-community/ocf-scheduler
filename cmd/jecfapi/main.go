@@ -46,7 +46,7 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 	e.GET("/v2/info", func(c echo.Context) error {
 		return c.JSON(
 			http.StatusOK,
-			map[string]interface{}{
+			map[string]any{
 				"authorization_endpoint":       uaaURL,
 				"token_endpoint":               uaaURL,
 				"logging_endpoint":             cfURL,

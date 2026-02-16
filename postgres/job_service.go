@@ -171,7 +171,7 @@ func (service *JobService) scanJob(rows *sql.Rows) (*core.Job, error) {
 	return &job, nil
 }
 
-func (service *JobService) getCollection(query string, args ...interface{}) ([]*core.Job, error) {
+func (service *JobService) getCollection(query string, args ...any) ([]*core.Job, error) {
 	var collection []*core.Job
 
 	rows, err := service.db.Query(query, args...)

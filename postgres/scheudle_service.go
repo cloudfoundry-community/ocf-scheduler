@@ -102,7 +102,7 @@ func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedul
 	return candidate, nil
 }
 
-func (service *ScheduleService) getCollection(query string, args ...interface{}) []*core.Schedule {
+func (service *ScheduleService) getCollection(query string, args ...any) []*core.Schedule {
 	collection := make([]*core.Schedule, 0)
 
 	rows, err := service.db.Query(query, args...)

@@ -105,7 +105,7 @@ func (service *CallService) InSpace(guid string) []*core.Call {
 	)
 }
 
-func (service *CallService) getCollection(query string, args ...interface{}) []*core.Call {
+func (service *CallService) getCollection(query string, args ...any) []*core.Call {
 	collection := make([]*core.Call, 0)
 
 	rows, err := service.db.Query(query, args...)

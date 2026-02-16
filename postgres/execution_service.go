@@ -105,7 +105,7 @@ func (service *ExecutionService) Start(execution *core.Execution) (*core.Executi
 	return service.update(execution)
 }
 
-func (service *ExecutionService) getCollection(query string, args ...interface{}) []*core.Execution {
+func (service *ExecutionService) getCollection(query string, args ...any) []*core.Execution {
 	collection := make([]*core.Execution, 0)
 
 	rows, err := service.db.Query(query, args...)

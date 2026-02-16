@@ -146,7 +146,7 @@ func LoadLocationFromTZData(name string, data []byte) (*Location, error) {
 		NChar
 	)
 	var n [6]int
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		nn, ok := d.big4()
 		if !ok {
 			return nil, errBadData
@@ -179,7 +179,7 @@ func LoadLocationFromTZData(name string, data []byte) (*Location, error) {
 		is64 = true
 
 		// Read the counts again, they can differ.
-		for i := 0; i < 6; i++ {
+		for i := range 6 {
 			nn, ok := d.big4()
 			if !ok {
 				return nil, errBadData

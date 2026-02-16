@@ -144,10 +144,10 @@ func parseOffset(offsetStr string) (int, error) {
 	// "EST5" means 5 hours West of UTC (UTC+5 if we follow standard notation)
 
 	sign := 1
-	if strings.HasPrefix(offsetStr, "+") {
-		offsetStr = strings.TrimPrefix(offsetStr, "+")
-	} else if strings.HasPrefix(offsetStr, "-") {
-		offsetStr = strings.TrimPrefix(offsetStr, "-")
+	if after, ok := strings.CutPrefix(offsetStr, "+"); ok {
+		offsetStr = after
+	} else if after, ok := strings.CutPrefix(offsetStr, "-"); ok {
+		offsetStr = after
 		sign = -1
 	}
 
@@ -197,9 +197,9 @@ func formatOffset(offsetSeconds int) string {
 
 // parseRule converts a POSIX rule string (e.g., "M3.2.0/02:00:00") to a description
 func parseRule(rule string) string {
-	if strings.HasPrefix(rule, "M") {
+	if after, ok := strings.CutPrefix(rule, "M"); ok {
 		// Month.Week.Day format
-		parts := strings.Split(strings.TrimPrefix(rule, "M"), ".")
+		parts := strings.Split(after, ".")
 		if len(parts) >= 3 {
 			month := parts[0]
 			week := parts[1]
@@ -255,8 +255,8 @@ func parseRule(rule string) string {
 
 			return fmt.Sprintf("on the %s %s of %s at %s", weekDesc[week], dayDesc[day], months[atoi(month)-1], timeStr)
 		}
-	} else if strings.HasPrefix(rule, "J") {
-		julianDay := strings.TrimPrefix(rule, "J")
+	} else if after, ok := strings.CutPrefix(rule, "J"); ok {
+		julianDay := after
 		if julianDay == "365/25" {
 			return "at the end of the year"
 		}

@@ -39,7 +39,7 @@ type JobExecution struct {
 	JobGUID       string    `json:"job_guid"`
 	TaskGUID      string    `json:"task_guid"`
 	ScheduleGUID  string    `json:"schedule_guid,omitempty"`
-	ScheduledTime time.Time `json:"scheduled_time,omitempty"`
+	ScheduledTime time.Time `json:"scheduled_time"`
 
 	Message string `json:"message"`
 	State   string `json:"state"`

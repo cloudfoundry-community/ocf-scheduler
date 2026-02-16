@@ -58,7 +58,7 @@ func Server(bind string) *http.Server {
 	e.POST("/oauth/token", func(c echo.Context) error {
 		return c.JSON(
 			http.StatusOK,
-			map[string]interface{}{
+			map[string]any{
 				"token_type":    "bearer",
 				"access_token":  "jeremy",
 				"refresh_token": "bearamy",
