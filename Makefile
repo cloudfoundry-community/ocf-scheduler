@@ -83,7 +83,6 @@ SEMVER_VERSION := $(SEMVER_VERSION)$(if $(SEMVER_PATCH),.$(SEMVER_PATCH),$(error
 SEMVER_VERSION := $(SEMVER_VERSION)$(if $(SEMVER_PRERELEASE),-$(SEMVER_PRERELEASE))
 
 MODULE ?= github.com/cloudfoundry-community/ocf-scheduler
-CMD_PATH ?= cmd
 CGO_ENABLED ?= 0
 TARGETS        ?=linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
 TESTFILES=`go list ./... | grep -v /vendor/`
@@ -117,7 +116,7 @@ release: distclean distbuild $(RELEASES)  $(PACKAGES)
 # Builds the project
 
 build:
-	go build -ldflags="${GO_LDFLAGS}" -o ./  "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
+	go build -ldflags="${GO_LDFLAGS}" -o ./  "./cmd/tzlist/..." "./cmd/scheduler/..."
 
 cli:
 	$(MAKE) build APP_NAME=sch CMD_PATH=cmd/cli
@@ -155,7 +154,7 @@ release-$(1)/$(2)-$(PROJECT): RELEASE_GO_LDFLAGS:=-ldflags="$$(GO_LDFLAGS)"
 
 release-$(1)/$(2)-$(PROJECT):
 	@echo "Building $$(PROJECT) executables version $$(SEMVER_VERSION) for $(1) $(2) ..."
-	@CGO_ENABLED=0 GOOS=$(1) GOARCH=$(2) go build -o $$(RELEASE_EXECUTABLE_DIR) $$(RELEASE_GO_LDFLAGS) "./${CMD_PATH}/tzlist/..." "./${CMD_PATH}/scheduler/..."
+	@CGO_ENABLED=0 GOOS=$(1) GOARCH=$(2) go build -o $$(RELEASE_EXECUTABLE_DIR) $$(RELEASE_GO_LDFLAGS) "./cmd/tzlist/..." "./cmd/scheduler/..."
 	@echo "Generate $$(PROJECT) digests ..."
 	@scripts/shait "$$(RELEASE_EXECUTABLE_DIR)" sha1 sha256
 
