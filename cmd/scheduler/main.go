@@ -119,19 +119,18 @@ func main() {
 
 	log.Info(tag, "trying to acquire the desired number of workers")
 
-	workerNumStr := os.Getenv("WORKER_NUM")
-	if len(workerNumStr) == 0 {
-		workerNumStr = "20"
-		log.Info(tag, "No `WORKER_NUM` provided, defaulting to 20")
+	workerNum := 20
+	workerNumStr, exists := os.LookupEnv("SCHEDULER_WORKERS")
+	if !exists {
+		log.Info(tag, "No SCHEDULER_WORKERS provided, defaulting to 20")
 	} else {
-		log.Info(tag, fmt.Sprintf("WORKER_NUM set to %s", workerNumStr))
+		workerNum, err = strconv.Atoi(workerNumStr)
+		if err != nil || workerNum < 10 {
+			log.Error(tag, fmt.Sprintf("Invalid SCHEDULER_WORKERS value '%s': %v, defaulting to 20", workerNumStr, err.Error()))
+			workerNum = 20
+		}
 	}
-
-	workerNum, err := strconv.Atoi(workerNumStr)
-	if err != nil {
-		log.Error("Invalid WORKER_NUM: %v", err.Error())
-		os.Exit(255)
-	}
+	log.Info(tag, fmt.Sprintf("SCHEDULER_WORKERS set to %d", workerNum))
 
 	timezonePath := filepath.Join(core.TimezoneJsonDir, core.TimezoneJsonBase)
 	if err := cron.InitializeTimezones(timezonePath); err != nil {
