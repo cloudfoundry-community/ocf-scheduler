@@ -41,6 +41,13 @@ var BuildVcsIdDate string
 
 var callRunner = http.NewRunService()
 
+func ErrorString (err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
 func main() {
 	log := logger.New()
 	tag := AppName
@@ -126,7 +133,7 @@ func main() {
 	} else {
 		workerNum, err = strconv.Atoi(workerNumStr)
 		if err != nil || workerNum < 10 {
-			log.Error(tag, fmt.Sprintf("Invalid SCHEDULER_WORKERS value '%s': %v, defaulting to 20", workerNumStr, err.Error()))
+			log.Error(tag, fmt.Sprintf("Invalid SCHEDULER_WORKERS value '%s': %v, defaulting to 20", workerNumStr, ErrorString(err)))
 			workerNum = 20
 		}
 	}
