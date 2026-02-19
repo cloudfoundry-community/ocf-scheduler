@@ -66,32 +66,27 @@ func main() {
 
 	clientID := os.Getenv("CLIENT_ID")
 	if len(clientID) == 0 {
-		log.Error(tag, "CLIENT_ID not set")
-		os.Exit(255)
+		log.Fatal(tag, "CLIENT_ID not set")
 	}
 
 	clientSecret := os.Getenv("CLIENT_SECRET")
 	if len(clientSecret) == 0 {
-		log.Error(tag, "CLIENT_SECRET not set")
-		os.Exit(255)
+		log.Fatal(tag, "CLIENT_SECRET not set")
 	}
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if len(dbURL) == 0 {
-		log.Error(tag, "DATABASE_URL not set")
-		os.Exit(255)
+		log.Fatal(tag, "DATABASE_URL not set")
 	}
 
 	cfEndpoint := os.Getenv("CF_ENDPOINT")
 	if len(cfEndpoint) == 0 {
-		log.Error(tag, "CF_ENDPOINT not set")
-		os.Exit(255)
+		log.Fatal(tag, "CF_ENDPOINT not set")
 	}
 
 	uaaEndpoint := os.Getenv("UAA_ENDPOINT")
 	if len(uaaEndpoint) == 0 {
-		log.Error(tag, "UAA_ENDPOINT not set")
-		os.Exit(255)
+		log.Fatal(tag, "UAA_ENDPOINT not set")
 	}
 
 	db, err := sql.Open("postgres", dbURL)
@@ -102,8 +97,7 @@ func main() {
 
 	_, err = migrate.Exec(db, "postgres", migrations.Collection, migrate.Up)
 	if err != nil {
-		log.Error(tag, fmt.Sprintf("could not update database schema: %s", err.Error()))
-		os.Exit(255)
+		log.Fatal(tag, fmt.Sprintf("could not update database schema: %s", err.Error()))
 	}
 
 	//cfclient, err := mock.NewCFClient()
@@ -118,8 +112,7 @@ func main() {
 
 	cfclient, err := realcf.NewClient(cfg)
 	if err != nil {
-		log.Error(tag, fmt.Sprintf("could not instantiate cf client: %s", err.Error()))
-		os.Exit(255)
+		log.Fatal(tag, fmt.Sprintf("could not instantiate cf client: %s", err.Error()))
 	}
 
 	log.Info(tag, "got the cf client set up")
@@ -133,7 +126,7 @@ func main() {
 	} else {
 		workerNum, err = strconv.Atoi(workerNumStr)
 		if err != nil || workerNum < 10 {
-			log.Error(tag, fmt.Sprintf("Invalid SCHEDULER_WORKERS value '%s': %v, defaulting to 20", workerNumStr, ErrorString(err)))
+			log.Warn(tag, fmt.Sprintf("Invalid SCHEDULER_WORKERS value '%s': %v, defaulting to 20", workerNumStr, ErrorString(err)))
 			workerNum = 20
 		}
 	}
@@ -141,8 +134,8 @@ func main() {
 
 	timezonePath := filepath.Join(core.TimezoneJsonDir, core.TimezoneJsonBase)
 	if err := cron.InitializeTimezones(timezonePath); err != nil {
-		log.Error(tag, fmt.Sprintf("Cannot process timezone file: %v", err.Error()))
-		log.Error(tag, "Starting scheduler without timezones loaded")
+		log.Warn(tag, fmt.Sprintf("Cannot process timezone file: %v", err.Error()))
+		log.Warn(tag, "Starting scheduler without timezones loaded")
 	} else {
 		if serverTimezone, err := cron.GetServerTimezone(); err == nil {
 			log.Info(tag, fmt.Sprintf("Sever timezone is %s", serverTimezone))
@@ -202,6 +195,8 @@ func main() {
 				)
 
 				cronService.Add(core.NewJobRun(job, schedule, services))
+			} else {
+				log.Warn(tag, fmt.Sprintf("skipping schedule %s: job %s not found", schedule.GUID, schedule.RefGUID))
 			}
 		} else {
 			if call, err := calls.Get(schedule.RefGUID); err == nil {
@@ -215,6 +210,8 @@ func main() {
 				)
 
 				cronService.Add(core.NewCallRun(call, schedule, services))
+			} else {
+				log.Warn(tag, fmt.Sprintf("skipping schedule %s: call %s not found", schedule.GUID, schedule.RefGUID))
 			}
 		}
 	}
@@ -272,8 +269,6 @@ func main() {
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		server.Close()
-		log.Error(tag, err.Error())
-		os.Exit(2)
+		log.Fatal(tag, fmt.Sprintf("server shutdown failed: %s", err.Error()))
 	}
 }

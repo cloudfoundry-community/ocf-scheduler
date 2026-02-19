@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 // JobRun is a struct that wraps a Job and makes it Runnable.
 type JobRun struct {
 	job      *Job
@@ -22,7 +24,10 @@ func (run *JobRun) Run() {
 		ScheduleGUID: run.schedule.GUID,
 	}
 
-	execution, _ = run.services.Executions.Persist(execution)
+	execution, err := run.services.Executions.Persist(execution)
+	if err != nil {
+		run.services.Logger.Warn("job-run", fmt.Sprintf("failed to persist execution for job %s: %v", run.job.GUID, err))
+	}
 
 	run.services.Runner.Execute(
 		run.services,

@@ -45,7 +45,7 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 		}
 
 		input.SpaceGUID = spaceGUID
-		services.Logger.Info(tag, fmt.Sprintf("Space GUID is '%s'", spaceGUID))
+		services.Logger.Debug(tag, fmt.Sprintf("Space GUID is '%s'", spaceGUID))
 
 		if len(input.Name) == 0 {
 			services.Logger.Error(tag, "got a blank call name")

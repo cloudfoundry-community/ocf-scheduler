@@ -19,6 +19,7 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
 		if services.Auth.Verify(auth) != nil {
+			services.Logger.Error(tag, "authentication failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
@@ -26,6 +27,7 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 
 		call, err := services.Calls.Get(guid)
 		if err != nil {
+			services.Logger.Warn(tag, fmt.Sprintf("call %s not found", guid))
 			return c.JSON(
 				http.StatusNotFound,
 				"",
@@ -35,27 +37,32 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 		input := &core.Schedule{}
 
 		if err = c.Bind(&input); err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("failed to parse schedule request for call %s: %v", guid, err))
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
 		input.RefGUID = guid
 		input.RefType = "call"
 
-		services.Logger.Info(tag, fmt.Sprintf("expression == '%s', expression_type == '%s'", input.Expression, input.ExpressionType))
+		services.Logger.Debug(tag, fmt.Sprintf("expression == '%s', expression_type == '%s'", input.Expression, input.ExpressionType))
 
 		if err := services.Cron.Validate(input.Expression); err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("invalid cron expression '%s' for call %s: %v", input.Expression, guid, err))
 			return c.JSON(http.StatusUnprocessableEntity, err.Error())
 		}
 
 		schedule, err := services.Schedules.Persist(input)
 		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("failed to persist schedule for call %s: %v", guid, err))
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
 		if err := services.Cron.Add(core.NewCallRun(call, schedule, services)); err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("failed to add cron entry for call %s: %v", guid, err))
 			return c.JSON(http.StatusUnprocessableEntity, err.Error())
 		}
 
+		services.Logger.Info(tag, fmt.Sprintf("created schedule %s for call %s", schedule.GUID, guid))
 		return c.JSON(
 			http.StatusCreated,
 			presenters.AsCallSchedule(schedule),

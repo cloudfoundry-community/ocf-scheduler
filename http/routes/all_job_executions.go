@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -13,9 +14,11 @@ func AllJobExecutions(e *echo.Echo, services *core.Services) {
 	// Get all execution histories for a Job
 	// GET /jobs/{jobGuid}/history
 	e.GET("/jobs/:guid/history", func(c echo.Context) error {
+		tag := "all-job-executions"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
 		if services.Auth.Verify(auth) != nil {
+			services.Logger.Error(tag, "authentication failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
@@ -23,6 +26,7 @@ func AllJobExecutions(e *echo.Echo, services *core.Services) {
 
 		job, err := services.Jobs.Get(guid)
 		if err != nil {
+			services.Logger.Warn(tag, fmt.Sprintf("job %s not found", guid))
 			return c.JSON(http.StatusNotFound, "")
 		}
 
