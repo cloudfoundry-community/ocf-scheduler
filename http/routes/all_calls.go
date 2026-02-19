@@ -17,9 +17,11 @@ func AllCalls(e *echo.Echo, services *core.Services) {
 	// Get all Calls within space
 	// GET /calls?space_guid=string
 	e.GET("/calls", func(c echo.Context) error {
+		tag := "all-calls"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
 		if services.Auth.Verify(auth) != nil {
+			services.Logger.Error(tag, "authentication failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 

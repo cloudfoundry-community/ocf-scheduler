@@ -1,5 +1,7 @@
 package core
 
+import "fmt"
+
 // CallRun is a struct that wraps a Call and makes it Runnable.
 type CallRun struct {
 	call     *Call
@@ -22,7 +24,10 @@ func (run *CallRun) Run() {
 		ScheduleGUID: run.schedule.GUID,
 	}
 
-	execution, _ = run.services.Executions.Persist(execution)
+	execution, err := run.services.Executions.Persist(execution)
+	if err != nil {
+		run.services.Logger.Warn("call-run", fmt.Sprintf("failed to persist execution for call %s: %v", run.call.GUID, err))
+	}
 
 	run.services.Runner.Execute(
 		run.services,

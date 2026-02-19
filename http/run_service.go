@@ -30,6 +30,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 			services.Logger.Error(tag, message)
 			services.Executions.UpdateMessage(execution, message)
 			services.Executions.Fail(execution)
+			return
 		}
 
 		// do real stuff
@@ -38,6 +39,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 
 		driver, err := hype.New(call.URL)
 		if err != nil {
+			services.Logger.Warn(tag, fmt.Sprintf("malformed URL for call %s (%s): %v", call.Name, call.GUID, err))
 			services.Executions.UpdateMessage(execution, "failed due to malformed URL")
 			services.Executions.Fail(execution)
 		} else {

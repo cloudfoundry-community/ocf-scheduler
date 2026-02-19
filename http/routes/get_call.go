@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -12,9 +13,11 @@ func GetCall(e *echo.Echo, services *core.Services) {
 	// Get a Call
 	// GET /calls/{callGuid}
 	e.GET("/calls/:guid", func(c echo.Context) error {
+		tag := "get-call"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
 		if services.Auth.Verify(auth) != nil {
+			services.Logger.Error(tag, "authentication failed")
 			return c.JSON(http.StatusUnauthorized, "")
 		}
 
@@ -22,6 +25,7 @@ func GetCall(e *echo.Echo, services *core.Services) {
 
 		call, err := services.Calls.Get(guid)
 		if err != nil {
+			services.Logger.Warn(tag, fmt.Sprintf("call %s not found", guid))
 			return c.JSON(
 				http.StatusNotFound,
 				"",

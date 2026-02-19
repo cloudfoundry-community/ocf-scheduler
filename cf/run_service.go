@@ -70,6 +70,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 			execution, err = services.Executions.UpdateTaskGUID(execution, task.GUID)
 			for err != nil {
 				// We literally can't continue until the execution has a task GUID
+				services.Logger.Warn(tag, fmt.Sprintf("retrying UpdateTaskGUID for execution %s: %v", execution.GUID, err))
 				execution, err = services.Executions.UpdateTaskGUID(execution, task.GUID)
 			}
 

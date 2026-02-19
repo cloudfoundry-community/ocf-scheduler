@@ -31,7 +31,7 @@ func AllCallExecutions(e *echo.Echo, services *core.Services) {
 
 		executions := services.Executions.ByCall(call)
 
-		services.Logger.Info(tag, fmt.Sprintf("got %d executions", len(executions)))
+		services.Logger.Debug(tag, fmt.Sprintf("got %d executions", len(executions)))
 
 		output := &callExecutionCollection{
 			Resources: presenters.AsCallExecutionCollection(executions),
