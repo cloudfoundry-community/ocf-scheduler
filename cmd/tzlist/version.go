@@ -27,7 +27,7 @@ func createSemVer(major, minor, patch, prerelease, build string) string {
 	p4 := strings.TrimSpace(prerelease)
 	p5 := strings.TrimSpace(build)
 	if p1 == "" || p2 == "" || p3 == "" {
-		panic(fmt.Sprintf("Semanic version is missing one of its parts: %s.%s.%s", p1, p2, p3))
+		panic(fmt.Sprintf("Semantic version is missing one of its parts: %s.%s.%s", p1, p2, p3))
 	}
 
 	sv := strings.Join([]string{p1, p2, p3}, ".")
