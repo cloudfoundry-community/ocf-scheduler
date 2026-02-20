@@ -1,7 +1,6 @@
 package tzposix
 
 import (
-	_ "fmt"
 	"strings"
 	"testing"
 )
@@ -148,7 +147,7 @@ func TestHumanReadableTZ(t *testing.T) {
 		{tz: "IST-2IDT,M3.4.4/26,M10.5.0",
 			expectSst:   "Standard Time: IST (UTC +02:00)",
 			expectDst:   "Daylight Time: IDT (UTC +03:00)",
-			expectRules: "Rules: Starts on the Friday on or after March 23rd at 02:00:00, Ends on the last Sunday of October at 02:00:00",
+			expectRules: "Rules: Starts on the fourth Thursday of March at 02:00:00 of the following day, Ends on the last Sunday of October at 02:00:00",
 			expectError: nil,
 		},
 		{tz: "EET-2EEST,M3.4.4/50,M10.4.4/50",
