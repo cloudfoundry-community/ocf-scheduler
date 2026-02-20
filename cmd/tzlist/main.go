@@ -9,7 +9,6 @@ import (
 	"github.com/cloudfoundry-community/ocf-scheduler/cmd/tzlist/tzposix"
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 	"github.com/spf13/pflag"
-	"io/ioutil"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -190,7 +189,7 @@ func GenerateJson(zones []string) {
 			}
 
 		} else {
-			fmt.Printf("Missing zone %s\n", name)
+			slog.Warn("Missing zone", "name", name)
 		}
 	}
 	var jsonData []byte
@@ -208,11 +207,11 @@ func GenerateJson(zones []string) {
 	}
 
 	// 4. Write the JSON data to a file
-	err = ioutil.WriteFile(SchedulerFilename, jsonData, 0644)
+	err = os.WriteFile(SchedulerFilename, jsonData, 0644)
 	if err != nil {
 		Fatal("Error writing to file", "error", err)
 	}
-	fmt.Printf("Successfully wrote JSON data to %s\n", SchedulerFilename)
+	slog.Info("Successfully wrote JSON data", "file", SchedulerFilename)
 }
 
 func main() {
@@ -284,7 +283,7 @@ func main() {
 				fmt.Println(description)
 			}
 		} else {
-			fmt.Printf("Missing zone %s\n", name)
+			slog.Warn("Missing zone", "name", name)
 		}
 		numAliases += len(zone.Aliases)
 	}
@@ -314,18 +313,18 @@ func UsesDST(timezone string) (bool, string, string, int, error) {
 func GetOsTimeZones() ([]string, int) {
 	var zoneDirs = []string{
 		// Update path according to your OS
-		"/usr/share/zoneinfo/",
-		"/usr/share/lib/zoneinfo/",
-		"/usr/lib/locale/TZ/",
+		"/usr/share/zoneinfo",
+		"/usr/share/lib/zoneinfo",
+		"/usr/lib/locale/TZ",
 	}
 
 	for _, zd := range zoneDirs {
-		walkTzDir(zd)
+		walkTzDir(zd, zd)
 	}
 
 	zones := make([]string, 0, len(TzInfos))
 	keylen := 0
-	for key, _ := range TzInfos {
+	for key := range TzInfos {
 		zones = append(zones, key)
 		if len(key) > keylen {
 			keylen = len(key)
@@ -336,7 +335,7 @@ func GetOsTimeZones() ([]string, int) {
 	return zones, keylen
 }
 
-func walkTzDir(path string) {
+func walkTzDir(root, path string) {
 	dirInfos, err := os.ReadDir(path)
 	if err != nil {
 		Trace("zoneinfo directory is not available", "path", path)
@@ -354,17 +353,18 @@ func walkTzDir(path string) {
 			continue
 		}
 
-		newPath := path + "/" + info.Name()
+		newPath := filepath.Join(path, info.Name())
 
 		if info.IsDir() {
-			walkTzDir(newPath)
+			walkTzDir(root, newPath)
 		} else {
-			parts := strings.Split(newPath, "//")
-			if len(parts) != 2 {
+			relPath, err := filepath.Rel(root, newPath)
+			if err != nil {
+				slog.Error("Could not determine relative path", "root", root, "path", newPath, "error", err)
 				continue
 			}
-			if zoneInfo, err := rfc9636.LoadLocation(parts[1], []string{parts[0]}); err == nil {
-				slog.Debug("dump of zoneinfo", "timezone", parts[1])
+			if zoneInfo, err := rfc9636.LoadLocation(relPath, []string{root}); err == nil {
+				slog.Debug("dump of zoneinfo", "timezone", relPath)
 				if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 					rfc9636.DumpLocation(zoneInfo)
 				}
@@ -381,15 +381,15 @@ func walkTzDir(path string) {
 						slog.Error("Could not evaluate symlink", "symlink", newPath, "error", err)
 						continue
 					}
-					atz, found := strings.CutPrefix(resolvedPath, parts[0]+"/")
+					atz, found := strings.CutPrefix(resolvedPath, root+"/")
 					if !found {
 						slog.Error("Could not extract timezone alias", "path", resolvedPath)
 						continue
 					}
-					slog.Debug("Timezone has alias", "timezone", atz, "alias", parts[1])
-					TzInfos.AddZoneAlias(atz, parts[1])
+					slog.Debug("Timezone has alias", "timezone", atz, "alias", relPath)
+					TzInfos.AddZoneAlias(atz, relPath)
 				} else {
-					TzInfos.Add(parts[1], zoneInfo)
+					TzInfos.Add(relPath, zoneInfo)
 				}
 
 			} else {
@@ -398,5 +398,4 @@ func walkTzDir(path string) {
 
 		}
 	}
-	return
 }
