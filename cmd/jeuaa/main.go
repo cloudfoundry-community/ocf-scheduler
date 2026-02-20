@@ -95,7 +95,7 @@ func main() {
 
 	fmt.Printf("listening for connections on %s\n", server.Addr)
 
-	quit := make(chan os.Signal)
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 
 	<-quit

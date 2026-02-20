@@ -16,7 +16,7 @@ func DeletingASchedule(services *core.Services, schedule *core.Schedule, executa
 		if err != nil {
 			doh := "got a call that isn't a call"
 			services.Logger.Error(tag, doh)
-			return fmt.Errorf(doh)
+			return fmt.Errorf("%s", doh)
 		}
 
 		run = core.NewCallRun(call, schedule, services)
@@ -25,7 +25,7 @@ func DeletingASchedule(services *core.Services, schedule *core.Schedule, executa
 		if err != nil {
 			doh := "got a job that isn't a job"
 			services.Logger.Error(tag, doh)
-			return fmt.Errorf(doh)
+			return fmt.Errorf("%s", doh)
 		}
 
 		run = core.NewJobRun(job, schedule, services)
@@ -34,13 +34,13 @@ func DeletingASchedule(services *core.Services, schedule *core.Schedule, executa
 	if services.Cron.Delete(run) != nil {
 		doh := fmt.Sprintf("could not unschedule the run for %s", schedule.GUID)
 		services.Logger.Error(tag, doh)
-		return fmt.Errorf(doh)
+		return fmt.Errorf("%s", doh)
 	}
 
 	if services.Schedules.Delete(schedule) != nil {
 		doh := fmt.Sprintf("could not delete schedule with GUID %s", schedule.GUID)
 		services.Logger.Error(tag, doh)
-		return fmt.Errorf(doh)
+		return fmt.Errorf("%s", doh)
 	}
 
 	return nil
