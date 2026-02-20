@@ -3,7 +3,6 @@ package logger
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -15,38 +14,22 @@ type LogService struct {
 func New() *LogService {
 	log := logrus.New()
 	log.Formatter = &Formatter{}
-
 	log.Out = os.Stdout
 
-	// Set log level from environment variable
-	level, exists := os.LookupEnv("LOG_LEVEL")
-	if !exists {
-		log.WithField("context", "log-service").Info("No LOG_LEVEL provided. defaulting to info level")
+	level := os.Getenv("LOG_LEVEL")
+	if level == "" {
 		level = "info"
-		log.SetLevel(logrus.InfoLevel)
-	} else {
-		switch strings.ToLower(level) {
-		case "trace":
-			log.SetLevel(logrus.TraceLevel)
-		case "debug":
-			log.SetLevel(logrus.DebugLevel)
-		case "info":
-			log.SetLevel(logrus.InfoLevel)
-		case "warn", "warning":
-			log.SetLevel(logrus.WarnLevel)
-		case "error":
-			log.SetLevel(logrus.ErrorLevel)
-		case "fatal":
-			log.SetLevel(logrus.FatalLevel)
-		case "panic":
-			log.SetLevel(logrus.PanicLevel)
-		default:
-			log.WithField("context", "log-service").Warn(fmt.Sprintf("Invalid LOG_LEVEL value '%s' , defaulting to info level", level))
-			level = "info"
-			log.SetLevel(logrus.InfoLevel) // Default to Info level
-		}
+		log.WithField("context", "log-service").Info("No LOG_LEVEL provided, defaulting to info level")
 	}
-	log.WithField("context", "log-service").Info(fmt.Sprintf("Logging at %s level", level))
+
+	parsed, err := logrus.ParseLevel(level)
+	if err != nil {
+		parsed = logrus.InfoLevel
+		log.WithField("context", "log-service").Warn(fmt.Sprintf("Invalid LOG_LEVEL value '%s', defaulting to info level", level))
+	}
+	log.SetLevel(parsed)
+
+	log.WithField("context", "log-service").Info(fmt.Sprintf("Logging at %s level", parsed))
 
 	return &LogService{log: log}
 }
