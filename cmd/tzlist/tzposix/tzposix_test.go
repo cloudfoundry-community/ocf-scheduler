@@ -224,6 +224,103 @@ func TestHumanReadableTZ(t *testing.T) {
 	}
 }
 
+func TestDecodeTZ(t *testing.T) {
+	var tests = []struct {
+		tz          string
+		expectStd   string
+		expectDst   string
+		expectRules string
+		expectErr   bool
+	}{
+		// DST zone with rules
+		{tz: "PST8PDT,M3.2.0,M11.1.0",
+			expectStd:   "PST (UTC -08:00)",
+			expectDst:   "PDT (UTC -07:00)",
+			expectRules: "Starts on the second Sunday of March at 02:00:00, Ends on the first Sunday of November at 02:00:00",
+		},
+		// No DST
+		{tz: "GMT0",
+			expectStd: "GMT (UTC +00:00)",
+			expectDst: "",
+		},
+		// DST with explicit offset
+		{tz: "NST3:30NDT2:30,M3.2.0,M11.1.0",
+			expectStd:   "NST (UTC -03:30)",
+			expectDst:   "NDT (UTC -02:30)",
+			expectRules: "Starts on the second Sunday of March at 02:00:00, Ends on the first Sunday of November at 02:00:00",
+		},
+		// DST name present but no rules
+		{tz: "CET-1CEST",
+			expectStd:   "CET (UTC +01:00)",
+			expectDst:   "CEST (UTC +02:00)",
+			expectRules: "",
+		},
+		// Explicit + prefix on offset
+		{tz: "ABC+5DEF,M3.2.0,M11.1.0",
+			expectStd:   "ABC (UTC -05:00)",
+			expectDst:   "DEF (UTC -04:00)",
+			expectRules: "Starts on the second Sunday of March at 02:00:00, Ends on the first Sunday of November at 02:00:00",
+		},
+		// Invalid format
+		{tz: "!!!invalid!!!",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.tz, func(t *testing.T) {
+			std, dst, rules, err := DecodeTZ(tt.tz)
+			if tt.expectErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if std != tt.expectStd {
+				t.Errorf("std: got %q, want %q", std, tt.expectStd)
+			}
+			if dst != tt.expectDst {
+				t.Errorf("dst: got %q, want %q", dst, tt.expectDst)
+			}
+			if rules != tt.expectRules {
+				t.Errorf("rules: got %q, want %q", rules, tt.expectRules)
+			}
+		})
+	}
+}
+
+func TestHumanReadableTZInvalid(t *testing.T) {
+	_, err := HumanReadableTZ("!!!invalid!!!")
+	if err == nil {
+		t.Errorf("expected error for invalid TZ string, got nil")
+	}
+}
+
+func TestParseRule(t *testing.T) {
+	var tests = []struct {
+		rule   string
+		expect string
+	}{
+		// Julian day (J prefix, non-special)
+		{rule: "J100", expect: "on Julian Day 100"},
+		// Zero-based Julian day (no prefix, non-special)
+		{rule: "200", expect: "on Julian Day 200"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.rule, func(t *testing.T) {
+			result := parseRule(tt.rule)
+			if result != tt.expect {
+				t.Errorf("got %q, want %q", result, tt.expect)
+			}
+		})
+	}
+}
+
 func TestHumanReadableTZNoDst(t *testing.T) {
 	var tests = []struct {
 		tz          string
