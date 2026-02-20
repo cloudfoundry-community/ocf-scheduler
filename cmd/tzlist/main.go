@@ -71,17 +71,9 @@ type TzInfoType struct {
 	Extend           string
 }
 
-var SchedulerZoneSlices []core.Timezone = make([]core.Timezone, 0, 800)
-
-type SchedulerZoneMap map[string]core.Timezone
-
-var SchedulerZoneObjects = make(SchedulerZoneMap)
-
 var SchedulerFilename string
 
 type TzInfoMap map[string]TzInfoType
-
-var jsonFileFormat string = "slices"
 
 var TzInfos = make(TzInfoMap)
 
@@ -175,39 +167,25 @@ func NewSchedulerJson(name, std, dst string, dstFlag bool, aliases []string, rul
 }
 
 func GenerateJson(zones []string) {
+	schedulerZones := make([]core.Timezone, 0, len(zones))
 	for _, name := range zones {
 		if zone, exist := TzInfos[name]; exist {
 			std, dst, rules, err := tzposix.DecodeTZ(zone.Extend)
 			if err != nil {
 				slog.Error("DecodeTZ failure", "TZ", zone.Extend, "error", err)
 			}
-			if jsonFileFormat == "slices" {
-				zj := NewSchedulerJson(name, std, dst, len(zone.Offsets) > 1, zone.Aliases, rules, zone.IsServerTimeZone)
-				SchedulerZoneSlices = append(SchedulerZoneSlices, zj)
-			} else if jsonFileFormat == "objects" {
-				zj := NewSchedulerJson("", std, dst, len(zone.Offsets) > 1, zone.Aliases, rules, zone.IsServerTimeZone)
-				SchedulerZoneObjects[name] = zj
-			}
-
+			zj := NewSchedulerJson(name, std, dst, len(zone.Offsets) > 1, zone.Aliases, rules, zone.IsServerTimeZone)
+			schedulerZones = append(schedulerZones, zj)
 		} else {
 			slog.Warn("Missing zone", "name", name)
 		}
 	}
-	var jsonData []byte
-	var err error
-	if jsonFileFormat == "slices" {
-		jsonData, err = json.MarshalIndent(SchedulerZoneSlices, "", "  ") // Use MarshalIndent for pretty print
-		if err != nil {
-			Fatal("Error marshaling to JSON ", "error", err)
-		}
-	} else if jsonFileFormat == "objects" {
-		jsonData, err = json.MarshalIndent(SchedulerZoneObjects, "", "  ") // Use MarshalIndent for pretty print
-		if err != nil {
-			Fatal("Error marshaling to JSON ", "error", err)
-		}
+
+	jsonData, err := json.MarshalIndent(schedulerZones, "", "  ")
+	if err != nil {
+		Fatal("Error marshaling to JSON ", "error", err)
 	}
 
-	// 4. Write the JSON data to a file
 	err = os.WriteFile(SchedulerFilename, jsonData, 0644)
 	if err != nil {
 		Fatal("Error writing to file", "error", err)
@@ -290,26 +268,6 @@ func main() {
 		numAliases += len(zone.Aliases)
 	}
 	slog.Info("Statistics", "zoneinfos", len(zones), "aliases", numAliases, "total", len(zones)+numAliases)
-}
-
-// UsesDST checks if a given location observes Daylight Saving Time by comparing offsets.
-
-func UsesDST(timezone string) (bool, string, string, int, error) {
-	year := time.Now().Year()
-	loc, err := time.LoadLocation(timezone)
-	if err != nil {
-		return false, "", "", year, err
-	}
-
-	// Check offset on a winter date (Jan 1) and a summer date (Jul 1)
-	winterTime := time.Date(year, time.January, 1, 0, 0, 0, 0, loc)
-	summerTime := time.Date(year, time.July, 1, 0, 0, 0, 0, loc)
-
-	xst, winterOffset := winterTime.Zone()
-	xdt, summerOffset := summerTime.Zone()
-
-	// If the offsets are different, the timezone uses DST rules.
-	return winterOffset != summerOffset, xst, xdt, year, nil
 }
 
 func GetOsTimeZones() ([]string, int) {
