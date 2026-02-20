@@ -9,66 +9,85 @@ import (
 	"time"
 )
 
-func getTZRegex() string {
-	// A basic regex to capture the main parts:
-	// 1. Standard Time Abbr (STD)
-	// 2. STD Offset
-	// 3. Optional DST Abbr (DST)
-	// 4. Optional DST Offset (assumed +1 hour if absent)
-	// 5. Optional DST Start Rule
-	// 6. Optional DST End Rules
-	rstr := `^(?<StdName>[[:alpha:]]{3,}|<[[:alnum:]+-]+>)` +
+// tzRegex is compiled once at package level for POSIX TZ string parsing.
+// Captures: StdName, StdOffset, DstName (optional), DstOffset (optional),
+// StartRule (optional), EndRule (optional)
+var tzRegex = regexp.MustCompile(
+	`^(?<StdName>[[:alpha:]]{3,}|<[[:alnum:]+-]+>)` +
 		`(?<StdOffset>[-+]?[0-9]+(?::[0-9]+){0,2})` +
 		`(?<DstName>[[:alpha:]]{3,}|<[[:alnum:]+-]+>)?` +
 		`(?<DstOffset>[-+]?[0-9]+(?::[0-9]+){0,2})?` +
 		`,?(?<StartRule>(?:J?[0-9]+|M[0-9]+(?:\.[0-9]+){0,2})(?:/[+-]?[0-9]+(?::[0-9]+){0,2})?)?` +
-		`,?(?<EndRule>(?:J?[0-9]+|M[0-9]+(?:\.[0-9]+){0,2})(?:/[+-]?[0-9]+(?::[0-9]+){0,2})?)?$`
-	return rstr
+		`,?(?<EndRule>(?:J?[0-9]+|M[0-9]+(?:\.[0-9]+){0,2})(?:/[+-]?[0-9]+(?::[0-9]+){0,2})?)?$`)
+
+// parsedTZ holds the parsed components of a POSIX TZ string.
+type parsedTZ struct {
+	stdAbbr   string
+	stdOffset int
+	dstAbbr   string
+	dstOffset int
+	startRule string
+	endRule   string
+	hasDST    bool
 }
 
-func DecodeTZ(posixTZ string) (string, string, string, error) {
-	regex := getTZRegex()
-	re := regexp.MustCompile(regex)
-
-	matches := re.FindStringSubmatch(posixTZ)
-
+// parseTZ parses a POSIX TZ string into its components.
+func parseTZ(posixTZ string) (*parsedTZ, error) {
+	matches := tzRegex.FindStringSubmatch(posixTZ)
 	if matches == nil {
-		return "", "", "", fmt.Errorf("invalid POSIX TZ string format: %s", posixTZ)
+		return nil, fmt.Errorf("invalid POSIX TZ string format: %s", posixTZ)
 	}
 
-	stdAbbr := matches[1]
 	stdOffsetStr := matches[2]
-	dstAbbr := matches[3]
 	dstOffsetStr := matches[4]
-	startRule := matches[5]
-	endRule := matches[6]
 
 	stdOffset, err := parseOffset(stdOffsetStr)
 	if err != nil {
-		return "", "", "", fmt.Errorf("invalid standard offset: %w", err)
-	}
-	stdDesc := fmt.Sprintf("%s (UTC%s)", stdAbbr, formatOffset(stdOffset))
-	dstDesc := ""
-	rulesDesc := ""
-
-	if dstAbbr == "" {
-		return stdDesc, dstDesc, rulesDesc, nil
+		return nil, fmt.Errorf("invalid standard offset: %w", err)
 	}
 
-	// Calculate DST offset if not explicitly provided (POSIX default is 1 hour ahead)
-	dstOffset := stdOffset - 3600 // DST is typically 1 hour *ahead* (west) of standard time, so offset is smaller in POSIX
+	result := &parsedTZ{
+		stdAbbr:   matches[1],
+		stdOffset: stdOffset,
+		dstAbbr:   matches[3],
+		startRule: matches[5],
+		endRule:   matches[6],
+		hasDST:    matches[3] != "",
+	}
 
+	if !result.hasDST {
+		return result, nil
+	}
+
+	// POSIX default: DST is 1 hour ahead of standard time
+	result.dstOffset = stdOffset - 3600
 	if dstOffsetStr != "" {
 		parsedDstOffset, err := parseOffset(dstOffsetStr)
 		if err != nil {
-			return "", "", "", fmt.Errorf("invalid daylight offset: %w", err)
+			return nil, fmt.Errorf("invalid daylight offset: %w", err)
 		}
-		dstOffset = parsedDstOffset
+		result.dstOffset = parsedDstOffset
 	}
-	dstDesc = fmt.Sprintf("%s (UTC%s)", dstAbbr, formatOffset(dstOffset))
 
-	if startRule != "" && endRule != "" {
-		rulesDesc = fmt.Sprintf("Starts %s, Ends %s", parseRule(startRule), parseRule(endRule))
+	return result, nil
+}
+
+func DecodeTZ(posixTZ string) (string, string, string, error) {
+	tz, err := parseTZ(posixTZ)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	stdDesc := fmt.Sprintf("%s (UTC%s)", tz.stdAbbr, formatOffset(tz.stdOffset))
+	if !tz.hasDST {
+		return stdDesc, "", "", nil
+	}
+
+	dstDesc := fmt.Sprintf("%s (UTC%s)", tz.dstAbbr, formatOffset(tz.dstOffset))
+
+	rulesDesc := ""
+	if tz.startRule != "" && tz.endRule != "" {
+		rulesDesc = fmt.Sprintf("Starts %s, Ends %s", parseRule(tz.startRule), parseRule(tz.endRule))
 	}
 
 	return stdDesc, dstDesc, rulesDesc, nil
@@ -77,62 +96,26 @@ func DecodeTZ(posixTZ string) (string, string, string, error) {
 // HumanReadableTZ parses a POSIX TZ string and returns a human-readable description.
 // It handles a common format like "EST5EDT,M3.2.0/02:00:00,M11.1.0/02:00:00"
 func HumanReadableTZ(posixTZ string) (string, error) {
-	regex := getTZRegex()
-	re := regexp.MustCompile(regex)
-
-	matches := re.FindStringSubmatch(posixTZ)
-
-	if matches == nil {
-		return "", fmt.Errorf("invalid POSIX TZ string format: %s", posixTZ)
-	}
-	// for debugging when changing regex expression
-	// if len(matches) != 7 { // 6 named and 1 complete matches
-	//    fmt.Printf("unexpected potential matches - expect 7 but got %d\n", len(matches))
-	// }
-	// for i, name := range re.SubexpNames() {
-	//    fmt.Printf("'%s'\t %d -> %s\n", name, i, matches[i])
-	// }
-	// for i := range matches {
-	//    fmt.Printf("''\t %d -> %s\n", i, matches[i])
-	// }
-
-	stdAbbr := matches[1]
-	stdOffsetStr := matches[2]
-	dstAbbr := matches[3]
-	dstOffsetStr := matches[4]
-	startRule := matches[5]
-	endRule := matches[6]
-
-	if !((startRule == "" && endRule == "") || (startRule != "" && endRule != "")) {
-		fmt.Fprintln(os.Stderr, "Warning Stand alone TZ rule exists", posixTZ)
-	}
-
-	// Convert offset to human-friendly format (UTC+/-H:M)
-	stdOffset, err := parseOffset(stdOffsetStr)
+	tz, err := parseTZ(posixTZ)
 	if err != nil {
-		return "", fmt.Errorf("invalid standard offset: %w", err)
+		return "", err
 	}
-	stdDesc := fmt.Sprintf("Standard Time: %s (UTC%s)", stdAbbr, formatOffset(stdOffset))
 
-	if dstAbbr == "" {
+	stdDesc := fmt.Sprintf("Standard Time: %s (UTC%s)", tz.stdAbbr, formatOffset(tz.stdOffset))
+
+	if !tz.hasDST {
 		return stdDesc + "\n(No Daylight Saving Time rules)", nil
 	}
 
-	// Calculate DST offset if not explicitly provided (POSIX default is 1 hour ahead)
-	dstOffset := stdOffset - 3600 // DST is typically 1 hour *ahead* (west) of standard time, so offset is smaller in POSIX
-
-	if dstOffsetStr != "" {
-		parsedDstOffset, err := parseOffset(dstOffsetStr)
-		if err != nil {
-			return "", fmt.Errorf("invalid daylight offset: %w", err)
-		}
-		dstOffset = parsedDstOffset
+	if !((tz.startRule == "" && tz.endRule == "") || (tz.startRule != "" && tz.endRule != "")) {
+		fmt.Fprintln(os.Stderr, "Warning Stand alone TZ rule exists", posixTZ)
 	}
-	dstDesc := fmt.Sprintf("Daylight Time: %s (UTC%s)", dstAbbr, formatOffset(dstOffset))
+
+	dstDesc := fmt.Sprintf("Daylight Time: %s (UTC%s)", tz.dstAbbr, formatOffset(tz.dstOffset))
 
 	rulesDesc := ""
-	if startRule != "" && endRule != "" {
-		rulesDesc = fmt.Sprintf("\nRules: Starts %s, Ends %s", parseRule(startRule), parseRule(endRule))
+	if tz.startRule != "" && tz.endRule != "" {
+		rulesDesc = fmt.Sprintf("\nRules: Starts %s, Ends %s", parseRule(tz.startRule), parseRule(tz.endRule))
 	}
 
 	return fmt.Sprintf("%s\n%s%s", stdDesc, dstDesc, rulesDesc), nil
@@ -278,25 +261,3 @@ func atoi(s string) int {
 	}
 	return 0
 }
-
-/*
-func main() {
-	tzPOSIX := "EST5EDT4,M3.2.0/02:00:00,M11.1.0/02:00:00"
-	description, err := HumanReadableTZ(tzPOSIX)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Printf("POSIX TZ Variable: %s\nDescription:\n%s\n", tzPOSIX, description)
-
-    fmt.Println(strings.Repeat("-", 20))
-
-    tzStatic := "UTC0"
-	descriptionStatic, errStatic := HumanReadableTZ(tzStatic)
-	if errStatic != nil {
-		fmt.Println("Error:", errStatic)
-		return
-	}
-    fmt.Printf("POSIX TZ Variable: %s\nDescription:\n%s\n", tzStatic, descriptionStatic)
-}
-*/
