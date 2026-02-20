@@ -40,6 +40,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 
 		request := cf.TaskRequest{
 			Command:          job.Command,
+			Name:             job.Name,
 			MemoryInMegabyte: job.MemoryInMb,
 			DiskInMegabyte:   job.DiskInMb,
 			DropletGUID:      job.AppGUID,

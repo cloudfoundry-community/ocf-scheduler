@@ -63,7 +63,7 @@ BUILD_VCS_URL     :=$(shell git config --get remote.origin.url)
 BUILD_VCS_ID      :=$(shell git log -n 1 --date=iso-strict-local --format="%h")
 BUILD_VCS_ID_DATE :=$(shell TZ=UTC0 git log -n 1 --date=iso-strict-local --format='%ad')
 
-build: SEMVER_PRERELEASE := dev
+build: SEMVER_PRERELEASE := $(or $(SEMVER_PRERELEASE),dev)
 
 GO_LDFLAGS = -X '$(GOMODULECMD).SemVerMajor=$(SEMVER_MAJOR)' \
 	         -X '$(GOMODULECMD).SemVerMinor=$(SEMVER_MINOR)' \

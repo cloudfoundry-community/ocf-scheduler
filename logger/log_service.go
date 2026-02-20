@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -18,25 +19,34 @@ func New() *LogService {
 	log.Out = os.Stdout
 
 	// Set log level from environment variable
-	level := os.Getenv("LOG_LEVEL")
-	switch strings.ToLower(level) {
-	case "trace":
-		log.SetLevel(logrus.TraceLevel)
-	case "debug":
-		log.SetLevel(logrus.DebugLevel)
-	case "info":
+	level, exists := os.LookupEnv("LOG_LEVEL")
+	if !exists {
+		log.WithField("context", "log-service").Info("No LOG_LEVEL provided. defaulting to info level")
+		level = "info"
 		log.SetLevel(logrus.InfoLevel)
-	case "warn", "warning":
-		log.SetLevel(logrus.WarnLevel)
-	case "error":
-		log.SetLevel(logrus.ErrorLevel)
-	case "fatal":
-		log.SetLevel(logrus.FatalLevel)
-	case "panic":
-		log.SetLevel(logrus.PanicLevel)
-	default:
-		log.SetLevel(logrus.InfoLevel) // Default to Info level
+	} else {
+		switch strings.ToLower(level) {
+		case "trace":
+			log.SetLevel(logrus.TraceLevel)
+		case "debug":
+			log.SetLevel(logrus.DebugLevel)
+		case "info":
+			log.SetLevel(logrus.InfoLevel)
+		case "warn", "warning":
+			log.SetLevel(logrus.WarnLevel)
+		case "error":
+			log.SetLevel(logrus.ErrorLevel)
+		case "fatal":
+			log.SetLevel(logrus.FatalLevel)
+		case "panic":
+			log.SetLevel(logrus.PanicLevel)
+		default:
+			log.WithField("context", "log-service").Warn(fmt.Sprintf("Invalid LOG_LEVEL value '%s' , defaulting to info level", level))
+			level = "info"
+			log.SetLevel(logrus.InfoLevel) // Default to Info level
+		}
 	}
+	log.WithField("context", "log-service").Info(fmt.Sprintf("Logging at %s level", level))
 
 	return &LogService{log: log}
 }
