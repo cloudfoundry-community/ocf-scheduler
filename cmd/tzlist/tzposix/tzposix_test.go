@@ -321,6 +321,62 @@ func TestParseRule(t *testing.T) {
 	}
 }
 
+func TestParseOffset(t *testing.T) {
+	var tests = []struct {
+		input     string
+		expect    int
+		expectErr bool
+	}{
+		{input: "5", expect: 5 * 3600},
+		{input: "-5", expect: -5 * 3600},
+		{input: "+5", expect: 5 * 3600},
+		{input: "5:30", expect: 5*3600 + 30*60},
+		{input: "5:30:15", expect: 5*3600 + 30*60 + 15},
+		{input: "abc", expectErr: true},
+		{input: "5:abc", expectErr: true},
+		{input: "5:30:abc", expectErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result, err := parseOffset(tt.input)
+			if tt.expectErr {
+				if err == nil {
+					t.Errorf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if result != tt.expect {
+				t.Errorf("got %d, want %d", result, tt.expect)
+			}
+		})
+	}
+}
+
+func TestAtoi(t *testing.T) {
+	if v := atoi("42"); v != 42 {
+		t.Errorf("atoi(\"42\") = %d, want 42", v)
+	}
+	if v := atoi("abc"); v != 0 {
+		t.Errorf("atoi(\"abc\") = %d, want 0", v)
+	}
+}
+
+func TestParseRuleInvalidMonth(t *testing.T) {
+	result := parseRule("M0.2.0")
+	if !strings.Contains(result, "invalid month") {
+		t.Errorf("expected invalid month message, got %q", result)
+	}
+	result = parseRule("M13.2.0")
+	if !strings.Contains(result, "invalid month") {
+		t.Errorf("expected invalid month message, got %q", result)
+	}
+}
+
 func TestHumanReadableTZNoDst(t *testing.T) {
 	var tests = []struct {
 		tz          string
