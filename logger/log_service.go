@@ -26,7 +26,7 @@ func New() *LogService {
 		log.SetLevel(logrus.DebugLevel)
 	case "info":
 		log.SetLevel(logrus.InfoLevel)
-	case "warn":
+	case "warn", "warning":
 		log.SetLevel(logrus.WarnLevel)
 	case "error":
 		log.SetLevel(logrus.ErrorLevel)
