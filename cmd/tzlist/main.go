@@ -18,15 +18,16 @@ import (
 	"time"
 )
 
-type SchedulerJson struct {
-	Name             string   `json:"Name,omitempty"`
-	IsServerTimeZone string   `json:"IsServerTimeZone ,omitempty"`
-	HasDst           bool     `json:"HasDst"`
-	Std              string   `json:"Std"`
-	Dst              string   `json:"Dst,omitempty"`
-	Aliases          []string `json:"Aliases,omitempty"`
-	Rules            string   `json:"Rules,omitempty"`
-}
+// SchedulerJson is reserved for potential future use as an alternative to core.Timezone
+// type SchedulerJson struct {
+// 	Name             string   `json:"Name,omitempty"`
+// 	IsServerTimeZone string   `json:"IsServerTimeZone,omitempty"`
+// 	HasDst           bool     `json:"HasDst"`
+// 	Std              string   `json:"Std"`
+// 	Dst              string   `json:"Dst,omitempty"`
+// 	Aliases          []string `json:"Aliases,omitempty"`
+// 	Rules            string   `json:"Rules,omitempty"`
+// }
 
 var SemVerMajor string
 var SemVerMinor string
@@ -284,6 +285,7 @@ func main() {
 			}
 		} else {
 			slog.Warn("Missing zone", "name", name)
+			continue
 		}
 		numAliases += len(zone.Aliases)
 	}
@@ -363,13 +365,22 @@ func walkTzDir(root, path string) {
 				slog.Error("Could not determine relative path", "root", root, "path", newPath, "error", err)
 				continue
 			}
+			// Use os.Lstat to reliably detect symlinks; os.ReadDir's DirEntry.Type()
+			// follows symlinks on most systems, so ModeSymlink is never set there.
+			fileInfo, lstatErr := os.Lstat(newPath)
+			if lstatErr != nil {
+				slog.Error("Could not lstat file", "path", newPath, "error", lstatErr)
+				continue
+			}
+			isSymlink := fileInfo.Mode()&os.ModeSymlink != 0
+
 			if zoneInfo, err := rfc9636.LoadLocation(relPath, []string{root}); err == nil {
 				slog.Debug("dump of zoneinfo", "timezone", relPath)
 				if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 					rfc9636.DumpLocation(zoneInfo)
 				}
 
-				if info.Type()&os.ModeSymlink != 0 {
+				if isSymlink {
 					symTarget, err := os.Readlink(newPath)
 					if err != nil {
 						slog.Error("Could not read link target", "path", newPath, "error", err)
