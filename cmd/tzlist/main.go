@@ -94,8 +94,6 @@ func (tzi TzInfoMap) AddZoneAlias(zone string, alias string) {
 		zoneInfo.Aliases = slices.Insert(zoneInfo.Aliases, index, alias)
 	}
 	tzi[zone] = zoneInfo
-	return
-
 }
 
 func (tzi TzInfoMap) Add(zone string, data *rfc9636.Location) {
@@ -117,17 +115,27 @@ func (tzi TzInfoMap) Add(zone string, data *rfc9636.Location) {
 		slog.Debug("IsServerTimeZone is set")
 	}
 
-	// Check offset on a winter date (Jan 1) and a summer date (Jul 1)
-	winterTime := time.Date(year, time.January, 1, 0, 0, 0, 0, loc)
-	summerTime := time.Date(year, time.July, 1, 0, 0, 0, 0, loc)
+	// Check offset on two dates six months apart to detect DST
+	janTime := time.Date(year, time.January, 1, 0, 0, 0, 0, loc)
+	julTime := time.Date(year, time.July, 1, 0, 0, 0, 0, loc)
 
-	xst, winterOffset := winterTime.Zone()
-	xdt, summerOffset := summerTime.Zone()
+	janName, janOffset := janTime.Zone()
+	julName, julOffset := julTime.Zone()
 
-	zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{xst, winterOffset})
-
-	if winterOffset != summerOffset {
-		zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{xdt, summerOffset})
+	// Use IsDST to ensure Offsets[0] is always standard time and
+	// Offsets[1] is DST, regardless of hemisphere
+	if janTime.IsDST() {
+		// Southern hemisphere: January is summer/DST
+		zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{julName, julOffset})
+		if janOffset != julOffset {
+			zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{janName, janOffset})
+		}
+	} else {
+		// Northern hemisphere or no DST: January is winter/standard
+		zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{janName, janOffset})
+		if janOffset != julOffset {
+			zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{julName, julOffset})
+		}
 	}
 
 	zoneInfo.Extend = data.Extend()
@@ -141,13 +149,6 @@ func NewTzInfo() TzInfoType {
 		Offsets:          make([]TzZoneType, 0, 2),
 		Extend:           "",
 	}
-}
-
-func SupportsDST(numOffsets int) string {
-	if numOffsets == 2 {
-		return "yes"
-	}
-	return "no"
 }
 
 func NewSchedulerJson(name, std, dst string, dstFlag bool, aliases []string, rules string, isServerTimeZone bool) core.Timezone {
@@ -205,24 +206,20 @@ func main() {
 		fmt.Fprintf(os.Stderr, "OPTIONS:\n")
 		pflag.PrintDefaults()
 	}
+	logLevels := map[string]slog.Level{
+		"t": LevelTrace, "trace": LevelTrace,
+		"d": slog.LevelDebug, "debug": slog.LevelDebug,
+		"i": slog.LevelInfo, "info": slog.LevelInfo,
+		"w": slog.LevelWarn, "warn": slog.LevelWarn, "warning": slog.LevelWarn,
+		"e": slog.LevelError, "error": slog.LevelError,
+		"f": LevelFatal, "fatal": LevelFatal,
+	}
 	pflag.FuncP("loglevel", "l", "Set loglevel to trace, debug, info, warning, error or fatal", func(value string) error {
-		lv := strings.ToLower(value)
-		if strings.HasPrefix("trace", lv) {
-			slog.SetLogLoggerLevel(LevelTrace)
-		} else if strings.HasPrefix("debug", lv) {
-			slog.SetLogLoggerLevel(slog.LevelDebug)
-		} else if strings.HasPrefix("info", lv) {
-			slog.SetLogLoggerLevel(slog.LevelInfo)
-		} else if strings.HasPrefix("warning", lv) {
-			slog.SetLogLoggerLevel(slog.LevelWarn)
-		} else if strings.HasPrefix("error", lv) {
-			slog.SetLogLoggerLevel(slog.LevelError)
-		} else if strings.HasPrefix("fatal", lv) {
-			slog.SetLogLoggerLevel(LevelFatal)
-		} else {
-			return errors.New("The loglevel parameter value must be a prefix of one of theses words, \"trace\", \"debug\", \"info\", \"warning\", \"error\" or \"fatal\".")
+		if level, ok := logLevels[strings.ToLower(value)]; ok {
+			slog.SetLogLoggerLevel(level)
+			return nil
 		}
-		return nil
+		return errors.New("The loglevel parameter value must be one of: trace (t), debug (d), info (i), warning (w), error (e), or fatal (f).")
 	})
 	pflag.StringVarP(&SchedulerFilename, "json", "j", "", "pathname to write the json file to")
 	jsonPath := filepath.Join(core.TimezoneJsonDir, core.TimezoneJsonBase)
@@ -257,7 +254,11 @@ func main() {
 				name = name + "*"
 			}
 
-			fmt.Printf("%-*s DST: %-3s %+v Extend %s\n", keylen, name, SupportsDST(len(zone.Offsets)), zone.Aliases, zone.Extend)
+			dstLabel := "no"
+			if len(zone.Offsets) > 1 {
+				dstLabel = "yes"
+			}
+			fmt.Printf("%-*s DST: %-3s %+v Extend %s\n", keylen, name, dstLabel, zone.Aliases, zone.Extend)
 			if len(description) != 0 {
 				fmt.Println(description)
 			}

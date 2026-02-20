@@ -2,6 +2,7 @@ package tzposix
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strconv"
@@ -178,6 +179,10 @@ func formatOffset(offsetSeconds int) string {
 	return fmt.Sprintf(" %s%02d:%02d", sign, hours, minutes)
 }
 
+var monthNames = []string{"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
+var weekOrdinals = map[string]string{"1": "first", "2": "second", "3": "third", "4": "fourth", "5": "last"}
+var dayNames = map[string]string{"0": "Sunday", "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday"}
+
 // parseRule converts a POSIX rule string (e.g., "M3.2.0/02:00:00") to a description
 func parseRule(rule string) string {
 	if after, ok := strings.CutPrefix(rule, "M"); ok {
@@ -213,30 +218,27 @@ func parseRule(rule string) string {
 					}
 				}
 			}
-			if hours == 26 {
-				// TODO Do we to support other versions of /26?  Not at this time
-
-				return "on the Friday on or after March 23rd at 02:00:00"
-				// /26: The time at which the change occurs, which is 26:00
-				// (equivalent to 02:00 on the first Friday on or after March 23).
-				// Clocks "spring forward" at this time.
-				// timezones Asia/Jerusalem M3.4.4/26
-				// March has 31 days the date cannot be expressed with the normal interpretation
-				// since it not consistently the 4th week or last week
-
-			} else if hours == 24 {
-				timeStr = "midnight of the next day"
+			if hours >= 24 {
+				// Hours >= 24 means the transition occurs on the following day.
+				// e.g., /26 = 02:00 the next day (Asia/Jerusalem M3.4.4/26)
+				// e.g., /24 = midnight of the next day
+				if hours == 24 && minutes == 0 && seconds == 0 {
+					timeStr = "midnight of the next day"
+				} else {
+					t := time.Date(0, 0, 0, hours-24, minutes, seconds, 0, time.UTC)
+					timeStr = t.Format("15:04:05") + " of the following day"
+				}
 			} else {
 				t := time.Date(0, 0, 0, hours, minutes, seconds, 0, time.UTC)
 				timeStr = t.Format("15:04:05")
 			}
 
-			// Mapping basic values to human terms
-			months := []string{"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"}
-			weekDesc := map[string]string{"1": "first", "2": "second", "3": "third", "4": "fourth", "5": "last"}
-			dayDesc := map[string]string{"0": "Sunday", "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday"}
+			monthIdx := atoi(month) - 1
+			if monthIdx < 0 || monthIdx >= len(monthNames) {
+				return fmt.Sprintf("Rule: %s (invalid month %s)", rule, month)
+			}
 
-			return fmt.Sprintf("on the %s %s of %s at %s", weekDesc[week], dayDesc[day], months[atoi(month)-1], timeStr)
+			return fmt.Sprintf("on the %s %s of %s at %s", weekOrdinals[week], dayNames[day], monthNames[monthIdx], timeStr)
 		}
 	} else if after, ok := strings.CutPrefix(rule, "J"); ok {
 		julianDay := after
@@ -256,8 +258,10 @@ func parseRule(rule string) string {
 }
 
 func atoi(s string) int {
-	if v, err := strconv.Atoi(s); err == nil {
-		return v
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		slog.Warn("failed to parse integer", "value", s, "error", err)
+		return 0
 	}
-	return 0
+	return v
 }
