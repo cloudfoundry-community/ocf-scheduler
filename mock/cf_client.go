@@ -1,16 +1,20 @@
 package mock
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
-	"net/url"
 	"sync"
-	"time"
 
-	cf "github.com/cloudfoundry-community/go-cfclient"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
+	"github.com/cloudfoundry/go-cfclient/v3/resource"
 
+	localcf "github.com/cloudfoundry-community/ocf-scheduler/cf"
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
+
+// Verify CFClient implements the interface at compile time.
+var _ localcf.CFClient = (*CFClient)(nil)
 
 const (
 	dummyGUID = "user-omg-123"
@@ -19,47 +23,48 @@ const (
 
 var MaxGetTaskRetries = 10
 
-var spaceManager = cf.V3Role{
-	GUID: "j4m3s-t-k1rk",
+var spaceManager = &resource.Role{
 	Type: "space_manager",
-	Relationships: map[string]cf.V3ToOneRelationship{
-		"user": cf.V3ToOneRelationship{
-			Data: cf.V3Relationship{
+	Relationships: resource.RoleSpaceUserOrganizationRelationships{
+		User: resource.ToOneRelationship{
+			Data: &resource.Relationship{
 				GUID: dummyGUID,
 			},
 		},
-
-		"space": cf.V3ToOneRelationship{
-			Data: cf.V3Relationship{
+		Space: resource.ToOneRelationship{
+			Data: &resource.Relationship{
 				GUID: spaceGUID,
 			},
 		},
 	},
+	Resource: resource.Resource{
+		GUID: "j4m3s-t-k1rk",
+	},
 }
 
-var spaceDeveloper = cf.V3Role{
-	GUID: "g30rg3-luc45",
+var spaceDeveloper = &resource.Role{
 	Type: "space_developer",
-	Relationships: map[string]cf.V3ToOneRelationship{
-		"user": cf.V3ToOneRelationship{
-			Data: cf.V3Relationship{
+	Relationships: resource.RoleSpaceUserOrganizationRelationships{
+		User: resource.ToOneRelationship{
+			Data: &resource.Relationship{
 				GUID: dummyGUID,
 			},
 		},
-
-		"space": cf.V3ToOneRelationship{
-			Data: cf.V3Relationship{
+		Space: resource.ToOneRelationship{
+			Data: &resource.Relationship{
 				GUID: spaceGUID,
 			},
 		},
 	},
+	Resource: resource.Resource{
+		GUID: "g30rg3-luc45",
+	},
 }
 
-// Client is a mock of a real *cf.Client instance that implements the
-// pieces of the upstream API that we care about as defined by cf.Client
+// CFClient is a mock of a real CF client that implements the CFClient interface.
 type CFClient struct {
-	apps       map[string]cf.App
-	tasks      map[string]cf.Task
+	apps       map[string]*resource.App
+	tasks      map[string]*resource.Task
 	retries    map[string]int
 	maxretries map[string]int
 	locker     sync.Mutex
@@ -72,25 +77,40 @@ func NewCFClient() (*CFClient, error) {
 	return client, nil
 }
 
-func (client *CFClient) AppByGuid(guid string) (cf.App, error) {
+func (client *CFClient) GetApp(_ context.Context, guid string) (*resource.App, error) {
 	client.locker.Lock()
 	defer client.locker.Unlock()
 
 	return client.prepareApp(guid, ""), nil
 }
 
-func (client *CFClient) CreateTask(request cf.TaskRequest) (cf.Task, error) {
+func (client *CFClient) CreateTask(_ context.Context, appGUID string, req *resource.TaskCreate) (*resource.Task, error) {
 	client.locker.Lock()
 	defer client.locker.Unlock()
 
 	guid, _ := core.GenGUID()
 
-	task := cf.Task{
-		GUID:       guid,
-		Command:    request.Command,
-		MemoryInMb: request.MemoryInMegabyte,
-		DiskInMb:   request.DiskInMegabyte,
+	cmd := ""
+	if req.Command != nil {
+		cmd = *req.Command
+	}
+	memMb := 0
+	if req.MemoryInMB != nil {
+		memMb = *req.MemoryInMB
+	}
+	diskMb := 0
+	if req.DiskInMB != nil {
+		diskMb = *req.DiskInMB
+	}
+
+	task := &resource.Task{
+		Command:    cmd,
+		MemoryInMB: memMb,
+		DiskInMB:   diskMb,
 		State:      "RUNNING",
+		Resource: resource.Resource{
+			GUID: guid,
+		},
 	}
 
 	client.tasks[guid] = task
@@ -100,33 +120,37 @@ func (client *CFClient) CreateTask(request cf.TaskRequest) (cf.Task, error) {
 	return task, nil
 }
 
-func (client *CFClient) succeed(task cf.Task) cf.Task {
-	return cf.Task{
-		GUID:       task.GUID,
+func (client *CFClient) succeed(task *resource.Task) *resource.Task {
+	return &resource.Task{
 		Command:    task.Command,
-		MemoryInMb: task.MemoryInMb,
-		DiskInMb:   task.DiskInMb,
+		MemoryInMB: task.MemoryInMB,
+		DiskInMB:   task.DiskInMB,
 		State:      "SUCCEEDED",
+		Resource: resource.Resource{
+			GUID: task.GUID,
+		},
 	}
 }
 
-func (client *CFClient) fail(task cf.Task) cf.Task {
-	return cf.Task{
-		GUID:       task.GUID,
+func (client *CFClient) fail(task *resource.Task) *resource.Task {
+	return &resource.Task{
 		Command:    task.Command,
-		MemoryInMb: task.MemoryInMb,
-		DiskInMb:   task.DiskInMb,
+		MemoryInMB: task.MemoryInMB,
+		DiskInMB:   task.DiskInMB,
 		State:      "FAILED",
+		Resource: resource.Resource{
+			GUID: task.GUID,
+		},
 	}
 }
 
-func (client *CFClient) GetTaskByGuid(guid string) (cf.Task, error) {
+func (client *CFClient) GetTask(_ context.Context, guid string) (*resource.Task, error) {
 	client.locker.Lock()
 	defer client.locker.Unlock()
 
 	original, found := client.tasks[guid]
 	if !found {
-		return cf.Task{}, fmt.Errorf("Task not found")
+		return nil, fmt.Errorf("Task not found")
 	}
 
 	retry, found := client.retries[guid]
@@ -153,40 +177,39 @@ func (client *CFClient) GetTaskByGuid(guid string) (cf.Task, error) {
 	return original, nil
 }
 
-func (client *CFClient) ListUsersByQuery(query url.Values) (cf.Users, error) {
-	if query.Get("username") != "dummy" {
-		return cf.Users{}, fmt.Errorf("no")
+func (client *CFClient) ListUsers(_ context.Context, opts *cfclient.UserListOptions) ([]*resource.User, error) {
+	username := ""
+	if opts != nil && len(opts.UserNames.Values) > 0 {
+		username = opts.UserNames.Values[0]
 	}
 
-	users := cf.Users{
-		cf.User{
-			Guid:             dummyGUID,
-			CreatedAt:        time.Now().UTC().String(),
-			UpdatedAt:        time.Now().UTC().String(),
-			Admin:            false,
-			Active:           true,
-			DefaultSpaceGUID: "space-f1n4l-fr0nt13r",
-			Username:         "dummy",
+	if username != "dummy" {
+		return nil, fmt.Errorf("no")
+	}
+
+	users := []*resource.User{
+		{
+			Username: "dummy",
+			Resource: resource.Resource{
+				GUID: dummyGUID,
+			},
 		},
 	}
 
 	return users, nil
 }
 
-func (client *CFClient) ListV3RolesByQuery(query url.Values) ([]cf.V3Role, error) {
-	output := make([]cf.V3Role, 0)
-
-	if query.Get("user_guids") != dummyGUID {
-		return output, fmt.Errorf("no such user")
+func (client *CFClient) ListRoles(_ context.Context, opts *cfclient.RoleListOptions) ([]*resource.Role, error) {
+	userGUID := ""
+	if opts != nil && len(opts.UserGUIDs.Values) > 0 {
+		userGUID = opts.UserGUIDs.Values[0]
 	}
 
-	//if query.Get("space_guids") != spaceGUID {
-	//return output, fmt.Errorf("no such space")
-	//}
+	if userGUID != dummyGUID {
+		return nil, fmt.Errorf("no such user")
+	}
 
-	output = append(output, spaceManager)
-	output = append(output, spaceDeveloper)
-
+	output := []*resource.Role{spaceManager, spaceDeveloper}
 	return output, nil
 }
 
@@ -194,37 +217,42 @@ func (client *CFClient) Reset() {
 	client.locker.Lock()
 	defer client.locker.Unlock()
 
-	client.apps = make(map[string]cf.App)
-	client.tasks = make(map[string]cf.Task)
+	client.apps = make(map[string]*resource.App)
+	client.tasks = make(map[string]*resource.Task)
 	client.retries = make(map[string]int)
 	client.maxretries = make(map[string]int)
 }
 
-func (client *CFClient) PrepareApp(appGUID string, spaceGUID string) cf.App {
+func (client *CFClient) PrepareApp(appGUID string, spaceGUID string) *resource.App {
 	client.locker.Lock()
 	defer client.locker.Unlock()
 
 	return client.prepareApp(appGUID, spaceGUID)
 }
 
-func (client *CFClient) prepareApp(appGUID string, spaceGUID string) cf.App {
-	// Always retrun the known app if we know it
+func (client *CFClient) prepareApp(appGUID string, spGUID string) *resource.App {
+	// Always return the known app if we know it
 	if candidate, found := client.apps[appGUID]; found {
 		return candidate
 	}
 
 	// Generate a space guid if we don't actually receive one
-	if len(spaceGUID) == 0 {
-		spaceGUID, _ = core.GenGUID()
+	if len(spGUID) == 0 {
+		spGUID, _ = core.GenGUID()
 	}
 
-	output := cf.App{Guid: appGUID, SpaceGuid: spaceGUID}
+	output := &resource.App{
+		Relationships: resource.SpaceRelationship{
+			Space: resource.ToOneRelationship{
+				Data: &resource.Relationship{GUID: spGUID},
+			},
+		},
+		Resource: resource.Resource{
+			GUID: appGUID,
+		},
+	}
 
 	client.apps[appGUID] = output
 
 	return output
-}
-
-func init() {
-	rand.Seed(time.Now().Unix())
 }

@@ -1,22 +1,27 @@
 package cf
 
 import (
-	cf "github.com/cloudfoundry-community/go-cfclient"
+	"context"
+	"fmt"
 )
 
 type InfoService struct {
-	client *cf.Client
+	client CFClient
 }
 
-func NewInfoService(client *cf.Client) *InfoService {
+func NewInfoService(client CFClient) *InfoService {
 	return &InfoService{client: client}
 }
 
 func (service *InfoService) GetSpaceGUIDForApp(guid string) (string, error) {
-	app, err := service.client.AppByGuid(guid)
+	app, err := service.client.GetApp(context.Background(), guid)
 	if err != nil {
 		return "", err
 	}
 
-	return app.SpaceGuid, nil
+	if app.Relationships.Space.Data == nil {
+		return "", fmt.Errorf("app has no space relationship")
+	}
+
+	return app.Relationships.Space.Data.GUID, nil
 }

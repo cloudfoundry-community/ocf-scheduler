@@ -1,15 +1,16 @@
 package cf
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"slices"
 	"strings"
 
-	cf "github.com/cloudfoundry-community/go-cfclient"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
+	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	uaa "github.com/cloudfoundry-community/go-uaa"
 	"golang.org/x/oauth2"
 )
@@ -21,11 +22,11 @@ type Logger interface {
 }
 
 type AuthService struct {
-	client *cf.Client
+	client CFClient
 	logger Logger
 }
 
-func NewAuthService(client *cf.Client, logger Logger) *AuthService {
+func NewAuthService(client CFClient, logger Logger) *AuthService {
 	return &AuthService{
 		client: client,
 		logger: logger,
@@ -85,33 +86,33 @@ func (service *AuthService) Verify(auth string) error {
 	return fmt.Errorf("insufficient permissions")
 }
 
-func (service *AuthService) getUser(username string) (cf.User, error) {
+func (service *AuthService) getUser(username string) (*resource.User, error) {
 	tag := "AuthService.getUser"
-	query := url.Values{}
-	query.Add("username", username)
+	opts := cfclient.NewUserListOptions()
+	opts.UserNames.EqualTo(username)
 
-	users, err := service.client.ListUsersByQuery(query)
+	users, err := service.client.ListUsers(context.Background(), opts)
 	if err != nil {
-		service.logger.Error(tag, fmt.Sprintf("Error listing users by query: %v", err))
-		return cf.User{}, err
+		service.logger.Error(tag, fmt.Sprintf("Error listing users: %v", err))
+		return nil, err
 	}
 
-	user := users.GetUserByUsername(username)
-	if len(user.Guid) == 0 {
+	if len(users) == 0 {
 		service.logger.Error(tag, "No such user found")
-		return cf.User{}, fmt.Errorf("no such user")
+		return nil, fmt.Errorf("no such user")
 	}
 
-	return user, nil
+	return users[0], nil
 }
 
-func (service *AuthService) getUserRoles(user cf.User) ([]cf.V3Role, error) {
+func (service *AuthService) getUserRoles(user *resource.User) ([]*resource.Role, error) {
 	tag := "AuthService.getUserRoles"
-	roleQuery := url.Values{}
-	roleQuery.Add("user_guids", user.Guid)
-	roles, err := service.client.ListV3RolesByQuery(roleQuery)
+	opts := cfclient.NewRoleListOptions()
+	opts.UserGUIDs.EqualTo(user.GUID)
+
+	roles, err := service.client.ListRoles(context.Background(), opts)
 	if err != nil {
-		service.logger.Error(tag, fmt.Sprintf("Error listing V3 roles by query: %v", err))
+		service.logger.Error(tag, fmt.Sprintf("Error listing roles: %v", err))
 		return nil, err
 	}
 
