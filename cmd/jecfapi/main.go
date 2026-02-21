@@ -4,40 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
 	"time"
 
-	cf "github.com/cloudfoundry-community/go-cfclient"
+	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/labstack/echo/v4"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/mock"
 )
-
-type pageref struct {
-	Href string `json:"href"`
-}
-
-type pagination struct {
-	First        *pageref `json:"first,omitempty"`
-	Last         *pageref `json:"last,omitempty"`
-	Next         *pageref `json:"next,omitempty"`
-	Previous     *pageref `json:"previous,omitempty"`
-	TotalPages   int      `json:"total_pages"`
-	TotalResults int      `json:"total_results"`
-}
-
-type userCollection struct {
-	Pagination *pagination `json:"pagination"`
-	Resources  []userResp  `json:"resources"`
-}
-
-type roleCollection struct {
-	Pagination *pagination `json:"pagination"`
-	Resources  []cf.V3Role `json:"resources"`
-}
 
 func Server(bind string, cfURL string, uaaURL string) *http.Server {
 	client, _ := mock.NewCFClient()
@@ -67,61 +43,66 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 		)
 	})
 
-	// AppByGuid
-	e.GET("/v2/apps/:guid", func(c echo.Context) error {
-		app := client.PrepareApp(c.Param("guid"), "")
-
-		fmt.Println("app space guid:", app.SpaceGuid)
-
-		wrapped := struct {
-			Meta   cf.Meta `json:"metadata"`
-			Entity cf.App  `json:"entity"`
-		}{
-			Meta: cf.Meta{
-				Guid:      app.Guid,
-				Url:       "",
-				CreatedAt: app.CreatedAt,
-				UpdatedAt: app.UpdatedAt,
-			},
-
-			Entity: app,
-		}
-
+	// Also serve the root endpoint for v3 client discovery
+	e.GET("/", func(c echo.Context) error {
 		return c.JSON(
 			http.StatusOK,
-			wrapped,
+			map[string]any{
+				"links": map[string]any{
+					"self":          map[string]string{"href": cfURL},
+					"cloud_controller_v3": map[string]string{"href": cfURL + "/v3"},
+					"uaa":           map[string]string{"href": uaaURL},
+					"login":         map[string]string{"href": uaaURL},
+				},
+			},
 		)
+	})
+
+	// GetApp (v3)
+	e.GET("/v3/apps/:guid", func(c echo.Context) error {
+		app := client.PrepareApp(c.Param("guid"), "")
+		return c.JSON(http.StatusOK, app)
 	})
 
 	// CreateTask
 	e.POST("/v3/apps/:guid/tasks", func(c echo.Context) error {
 		client.PrepareApp(c.Param("guid"), "")
-		input := make(map[string]string)
+		input := make(map[string]any)
 
 		if err := c.Bind(&input); err != nil {
 			fmt.Println("task request unmarshal error:", err)
 			return c.JSON(http.StatusUnprocessableEntity, []string{"lolwut"})
 		}
 
-		disk, err := strconv.Atoi(input["disk_in_mb"])
-		if err != nil {
-			fmt.Println("disk_in_mb doesn't convert to int")
-			return c.JSON(http.StatusUnprocessableEntity, []string{"lolwut"})
+		disk := 0
+		if v, ok := input["disk_in_mb"]; ok {
+			switch d := v.(type) {
+			case float64:
+				disk = int(d)
+			case string:
+				disk, _ = strconv.Atoi(d)
+			}
 		}
 
-		mem, err := strconv.Atoi(input["memory_in_mb"])
-		if err != nil {
-			fmt.Println("memory_in_mb  doesn't convert to int")
-			return c.JSON(http.StatusUnprocessableEntity, []string{"lolwut"})
+		mem := 0
+		if v, ok := input["memory_in_mb"]; ok {
+			switch m := v.(type) {
+			case float64:
+				mem = int(m)
+			case string:
+				mem, _ = strconv.Atoi(m)
+			}
 		}
 
-		realReq := cf.TaskRequest{
-			Command:          input["command"],
-			DiskInMegabyte:   disk,
-			MemoryInMegabyte: mem,
+		cmd := ""
+		if v, ok := input["command"].(string); ok {
+			cmd = v
 		}
 
-		task, err := client.CreateTask(realReq)
+		realReq := resource.NewTaskCreateWithCommand(cmd)
+		realReq.WithDiskInMB(disk).WithMemoryInMB(mem)
+
+		task, err := client.CreateTask(context.Background(), c.Param("guid"), realReq)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, "")
 		}
@@ -134,7 +115,7 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 
 	// GetTaskByGuid
 	e.GET("/v3/tasks/:guid", func(c echo.Context) error {
-		task, err := client.GetTaskByGuid(c.Param("guid"))
+		task, err := client.GetTask(context.Background(), c.Param("guid"))
 		if err != nil {
 			return c.JSON(http.StatusNotFound, "")
 		}
@@ -145,81 +126,62 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 		)
 	})
 
-	// ListUsersByQuery
-	e.GET("/v2/users", func(c echo.Context) error {
-		query := url.Values{}
-		if username := c.QueryParam("username"); len(username) > 0 {
-			query.Add("username", username)
+	// ListUsers (v3)
+	e.GET("/v3/users", func(c echo.Context) error {
+		username := c.QueryParam("usernames")
+
+		// Build a mock response in v3 format
+		users := make([]*resource.User, 0)
+
+		if len(username) > 0 {
+			// Use the mock client to get users
+			mockUsers, err := client.ListUsers(context.Background(), nil)
+			if err == nil {
+				for _, u := range mockUsers {
+					if u.Username == username {
+						users = append(users, u)
+					}
+				}
+			}
 		}
 
-		users, err := client.ListUsersByQuery(query)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, "")
-		}
-
-		wrappedUsers := make([]userResp, 0)
-		for _, user := range users {
-			wrappedUsers = append(
-				wrappedUsers,
-				userResp{
-					Meta: cf.Meta{
-						Guid:      user.Guid,
-						Url:       "",
-						CreatedAt: user.CreatedAt,
-						UpdatedAt: user.UpdatedAt,
-					},
-
-					Entity: user,
-				},
-			)
-		}
-
-		output := &userCollection{
-			Resources: wrappedUsers,
-			Pagination: &pagination{
+		output := &resource.UserList{
+			Pagination: resource.Pagination{
 				TotalPages:   1,
 				TotalResults: len(users),
-				First:        &pageref{Href: "first"},
-				Last:         &pageref{Href: "last"},
-				Next:         &pageref{Href: "next"},
-				Previous:     &pageref{Href: "previous"},
 			},
+			Resources: users,
 		}
 
-		return c.JSON(
-			http.StatusOK,
-			output,
-		)
+		return c.JSON(http.StatusOK, output)
 	})
 
-	// ListV3RolesByQuery
+	// ListRoles (v3)
 	e.GET("/v3/roles", func(c echo.Context) error {
-		query := url.Values{}
-		if userGUIDs := c.QueryParam("user_guids"); len(userGUIDs) > 0 {
-			query.Add("user_guids", userGUIDs)
+		userGUIDs := c.QueryParam("user_guids")
+
+		roles := make([]*resource.Role, 0)
+
+		if len(userGUIDs) > 0 {
+			mockRoles, err := client.ListRoles(context.Background(), nil)
+			if err == nil {
+				for _, r := range mockRoles {
+					if r.Relationships.User.Data != nil && r.Relationships.User.Data.GUID == userGUIDs {
+						roles = append(roles, r)
+					}
+				}
+			}
 		}
 
-		roles, err := client.ListV3RolesByQuery(query)
-		if err != nil {
-			return c.JSON(http.StatusInternalServerError, "")
-		}
-
-		output := &roleCollection{
-			Resources: roles,
-			Pagination: &pagination{
+		output := &resource.RoleList{
+			Pagination: resource.Pagination{
 				TotalPages:   1,
 				TotalResults: len(roles),
-				First:        nil,
-				Last:         nil,
-				Next:         nil,
-				Previous:     nil,
 			},
+			Resources: roles,
 		}
 
-		return c.JSON(
-			http.StatusOK,
-			output,
-		)
+		return c.JSON(http.StatusOK, output)
 	})
 
 	e.GET("*", func(c echo.Context) error {
@@ -276,15 +238,4 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(2)
 	}
-}
-
-type userResp struct {
-	Meta   cf.Meta `json:"metadata"`
-	Entity cf.User `json:"entity"`
-}
-
-type taskReq struct {
-	Command string `json:"command"`
-	Disk    int    `json:"disk_in_mb"`
-	Mem     int    `json:"memory_in_mb"`
 }

@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	realcf "github.com/cloudfoundry-community/go-cfclient"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
+	cfconfig "github.com/cloudfoundry/go-cfclient/v3/config"
 	"github.com/gammazero/workerpool"
 	migrate "github.com/rubenv/sql-migrate"
 
@@ -100,20 +101,23 @@ func main() {
 		log.Fatal(tag, fmt.Sprintf("could not update database schema: %s", err.Error()))
 	}
 
-	//cfclient, err := mock.NewCFClient()
-	cfg := &realcf.Config{
-		ClientID:          clientID,
-		ClientSecret:      clientSecret,
-		ApiAddress:        cfEndpoint,
-		SkipSslValidation: true,
-	}
-
 	log.Info(tag, "trying to instantiate a cf client")
 
-	cfclient, err := realcf.NewClient(cfg)
+	cfg, err := cfconfig.New(
+		cfEndpoint,
+		cfconfig.ClientCredentials(clientID, clientSecret),
+		cfconfig.SkipTLSValidation(),
+	)
+	if err != nil {
+		log.Fatal(tag, fmt.Sprintf("could not create cf config: %s", err.Error()))
+	}
+
+	rawClient, err := cfclient.New(cfg)
 	if err != nil {
 		log.Fatal(tag, fmt.Sprintf("could not instantiate cf client: %s", err.Error()))
 	}
+
+	cfClient := cf.NewRealCFClient(rawClient)
 
 	log.Info(tag, "got the cf client set up")
 
@@ -143,11 +147,11 @@ func main() {
 		log.Info(tag, fmt.Sprintf("Timezone file loaded successfully with %d entries", len(cron.TimezonesSlice)))
 	}
 
-	auth := cf.NewAuthService(cfclient, log)
+	auth := cf.NewAuthService(cfClient, log)
 	jobs := postgres.NewJobService(db)
 	calls := postgres.NewCallService(db)
-	info := cf.NewInfoService(cfclient)
-	jobRunner := cf.NewRunService(cfclient)
+	info := cf.NewInfoService(cfClient)
+	jobRunner := cf.NewRunService(cfClient)
 	schedules := postgres.NewScheduleService(db)
 	executions := postgres.NewExecutionService(db)
 	runner := combined.NewRunService(

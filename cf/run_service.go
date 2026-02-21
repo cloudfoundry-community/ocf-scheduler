@@ -1,18 +1,19 @@
 package cf
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	cf "github.com/cloudfoundry-community/go-cfclient"
+	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 type RunService struct {
-	client *cf.Client
+	client CFClient
 }
 
-func NewRunService(client *cf.Client) *RunService {
+func NewRunService(client CFClient) *RunService {
 	return &RunService{client}
 }
 
@@ -38,15 +39,10 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 		startmsg := fmt.Sprintf("Starting job %s (%s)", job.Name, job.GUID)
 		services.Logger.Info(tag, startmsg)
 
-		request := cf.TaskRequest{
-			Command:          job.Command,
-			Name:             job.Name,
-			MemoryInMegabyte: job.MemoryInMb,
-			DiskInMegabyte:   job.DiskInMb,
-			DropletGUID:      job.AppGUID,
-		}
+		request := resource.NewTaskCreateWithCommand(job.Command)
+		request.WithName(job.Name).WithMemoryInMB(job.MemoryInMb).WithDiskInMB(job.DiskInMb)
 
-		task, err := service.client.CreateTask(request)
+		task, err := service.client.CreateTask(context.Background(), job.AppGUID, request)
 		if err != nil {
 			// The cf api said "nope" when we tried to create the task, so let's
 			// cry about it
@@ -96,7 +92,7 @@ func (service *RunService) qq(services *core.Services, execution *core.Execution
 	services.Executions.Fail(execution)
 }
 
-func (service *RunService) waitForTask(services *core.Services, task cf.Task) (cf.Task, error) {
+func (service *RunService) waitForTask(services *core.Services, task *resource.Task) (*resource.Task, error) {
 	count := 0
 
 	for task.State == "RUNNING" {
@@ -106,7 +102,7 @@ func (service *RunService) waitForTask(services *core.Services, task cf.Task) (c
 		services.Logger.Info("wait-for-task", fmt.Sprintf("waiting for task %s, iteration %d", task.GUID, count))
 		time.Sleep(5 * time.Second)
 
-		updatedTask, err := service.client.GetTaskByGuid(task.GUID)
+		updatedTask, err := service.client.GetTask(context.Background(), task.GUID)
 		if err != nil {
 			// Even though the task was created, the API now says that we don't
 			// get to know about it, so let's cry about it
@@ -122,7 +118,7 @@ func (service *RunService) waitForTask(services *core.Services, task cf.Task) (c
 	return task, nil
 }
 
-func (service *RunService) handleTaskFailure(services *core.Services, execution *core.Execution, job *core.Job, task cf.Task, err error) error {
+func (service *RunService) handleTaskFailure(services *core.Services, execution *core.Execution, job *core.Job, task *resource.Task, err error) error {
 	tag := "cf-run-service"
 
 	if err == nil {
@@ -144,7 +140,7 @@ func (service *RunService) handleTaskFailure(services *core.Services, execution 
 
 }
 
-func (service *RunService) finalizeTask(services *core.Services, execution *core.Execution, job *core.Job, task cf.Task) {
+func (service *RunService) finalizeTask(services *core.Services, execution *core.Execution, job *core.Job, task *resource.Task) {
 	tag := "cf-run-service"
 
 	if task.State == "FAILED" {
@@ -157,7 +153,11 @@ func (service *RunService) finalizeTask(services *core.Services, execution *core
 			),
 		)
 
-		services.Executions.UpdateMessage(execution, task.Result.FailureReason)
+		failureReason := ""
+		if task.Result.FailureReason != nil {
+			failureReason = *task.Result.FailureReason
+		}
+		services.Executions.UpdateMessage(execution, failureReason)
 		services.Executions.Fail(execution)
 
 		return
