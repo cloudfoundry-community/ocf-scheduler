@@ -40,7 +40,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 		services.Logger.Info(tag, startmsg)
 
 		request := resource.NewTaskCreateWithCommand(job.Command)
-		request.WithName(job.Name).WithMemoryInMB(job.MemoryInMb).WithDiskInMB(job.DiskInMb)
+		request.WithName(job.Name).WithMemoryInMB(job.MemoryInMb).WithDiskInMB(job.DiskInMb).WithLogRateLimitInBytesPerSecond(job.LogRateInBps)
 
 		task, err := service.client.CreateTask(context.Background(), job.AppGUID, request)
 		if err != nil {
