@@ -49,10 +49,10 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 			http.StatusOK,
 			map[string]any{
 				"links": map[string]any{
-					"self":          map[string]string{"href": cfURL},
+					"self":                map[string]string{"href": cfURL},
 					"cloud_controller_v3": map[string]string{"href": cfURL + "/v3"},
-					"uaa":           map[string]string{"href": uaaURL},
-					"login":         map[string]string{"href": uaaURL},
+					"uaa":                 map[string]string{"href": uaaURL},
+					"login":               map[string]string{"href": uaaURL},
 				},
 			},
 		)

@@ -6,13 +6,13 @@ import (
 )
 
 type Job struct {
-	GUID       string `json:"guid"`
-	Name       string `json:"name"`
-	Command    string `json:"command"`
-	DiskInMb   int    `json:"disk_in_mb"`
-	MemoryInMb int    `json:"memory_in_mb"`
-	LogRateInBps int  `json:"log_rate_in_bps"`
-	State      string `json:"state"`
+	GUID         string `json:"guid"`
+	Name         string `json:"name"`
+	Command      string `json:"command"`
+	DiskInMb     int    `json:"disk_in_mb"`
+	MemoryInMb   int    `json:"memory_in_mb"`
+	LogRateInBps int    `json:"log_rate_in_bps"`
+	State        string `json:"state"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
