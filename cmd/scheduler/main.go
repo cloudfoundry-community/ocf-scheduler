@@ -96,10 +96,20 @@ func main() {
 	}
 	defer db.Close()
 
-	_, err = migrate.Exec(db, "postgres", migrations.Collection, migrate.Up)
+	log.Debug(tag, fmt.Sprintf("migration collection size %d", len(migrations.Collection.Migrations)))
+
+	n, err := migrate.Exec(db, "postgres", migrations.Collection, migrate.Up)
 	if err != nil {
 		log.Fatal(tag, fmt.Sprintf("could not update database schema: %s", err.Error()))
 	}
+
+	log.Info(tag, fmt.Sprintf("Applied %s databasse migrations", func(n int) string {
+		if n == 0 {
+			return "no"
+		}
+		return strconv.Itoa(n)
+	}(n)))
+
 
 	log.Info(tag, "trying to instantiate a cf client")
 
