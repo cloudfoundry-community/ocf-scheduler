@@ -9,9 +9,9 @@ import (
 	"slices"
 	"strings"
 
+	uaa "github.com/cloudfoundry-community/go-uaa"
 	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
-	uaa "github.com/cloudfoundry-community/go-uaa"
 	"golang.org/x/oauth2"
 )
 

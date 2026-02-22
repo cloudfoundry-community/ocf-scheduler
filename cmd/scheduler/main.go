@@ -42,7 +42,7 @@ var BuildVcsIdDate string
 
 var callRunner = http.NewRunService()
 
-func ErrorString (err error) string {
+func ErrorString(err error) string {
 	if err == nil {
 		return ""
 	}
@@ -106,18 +106,17 @@ func main() {
 	log.Info(tag, func(n int) string {
 		phrase, plural := "database migration", "s"
 		var count string
-		
+
 		if n == 0 {
-			 count = "no"
+			count = "no"
 		} else {
 			count = strconv.Itoa(n)
 			if n == 1 {
-			plural = ""
+				plural = ""
 			}
 		}
-		return fmt.Sprintf( "Applied %s %s%s", count, phrase, plural)
+		return fmt.Sprintf("Applied %s %s%s", count, phrase, plural)
 	}(n))
-
 
 	log.Info(tag, "trying to instantiate a cf client")
 

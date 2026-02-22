@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/cloudfoundry/go-cfclient/v3/resource"
 )
 
 type RunService struct {
