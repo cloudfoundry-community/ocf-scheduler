@@ -312,7 +312,7 @@ Requests without a valid token receive a `401 Unauthorized` response.
 }
 ```
 
-Optional fields: `disk_in_mb`, `memory_in_mb`.
+Optional fields: `disk_in_mb`, `memory_in_mb`, `log_rate_in_bps`.
 
 **Create Call** (`POST /calls?app_guid=`):
 

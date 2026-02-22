@@ -94,13 +94,23 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 			}
 		}
 
+		log_rate := 0
+		if v, ok := input["log_rate_in_bps"]; ok {
+			switch d := v.(type) {
+			case float64:
+				log_rate = int(d)
+			case string:
+				log_rate, _ = strconv.Atoi(d)
+			}
+		}
+
 		cmd := ""
 		if v, ok := input["command"].(string); ok {
 			cmd = v
 		}
 
 		realReq := resource.NewTaskCreateWithCommand(cmd)
-		realReq.WithDiskInMB(disk).WithMemoryInMB(mem)
+		realReq.WithDiskInMB(disk).WithMemoryInMB(mem).WithLogRateLimitInBytesPerSecond(log_rate)
 
 		task, err := client.CreateTask(context.Background(), c.Param("guid"), realReq)
 		if err != nil {

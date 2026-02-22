@@ -11,6 +11,7 @@ type Job struct {
 	Command    string `json:"command"`
 	DiskInMb   int    `json:"disk_in_mb"`
 	MemoryInMb int    `json:"memory_in_mb"`
+	LogRateInBps int  `json:"log_rate_in_bps"`
 	State      string `json:"state"`
 
 	CreatedAt time.Time `json:"created_at"`

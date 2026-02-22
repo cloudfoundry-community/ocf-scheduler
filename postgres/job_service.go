@@ -95,12 +95,13 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 
 	err = WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"INSERT INTO jobs (guid, name, command, disk_in_mb, memory_in_mb, state, app_guid, space_guid, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+			"INSERT INTO jobs (guid, name, command, disk_in_mb, memory_in_mb, log_rate_in_bps, state, app_guid, space_guid, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
 			candidate.GUID,
 			candidate.Name,
 			candidate.Command,
 			candidate.DiskInMb,
 			candidate.MemoryInMb,
+			candidate.LogRateInBps,
 			candidate.State,
 			candidate.AppGUID,
 			candidate.SpaceGUID,

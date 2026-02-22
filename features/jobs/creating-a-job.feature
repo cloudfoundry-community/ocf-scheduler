@@ -24,6 +24,7 @@ Feature: Creating a Job
     And the Job's command is "gold"
     And the Job's disk quota is 0
     And the Job's memory quota is 0
+    And the Job's log rate quota is 0
     #And the Job can use up to 1024MB of memory
     #And the Job can use up to 1024MB of disk space
     And the Job has an app GUID
@@ -46,6 +47,14 @@ Feature: Creating a Job
     Then the response code is 201
     And I receive a Job object in the response body
     And the Job can use up to 13MB of memory
+
+  # Note: if we don't get a log rate quota, we don't pass one to cfapi
+  Scenario: Specifying job log rate quota
+    Given my payload has a log_rate_in_bps int of 16384
+    When I POST my payload with authentication to /jobs?app_guid=123
+    Then the response code is 201
+    And I receive a Job object in the response body
+    And the Job can use up to 16K for log rate
 
   @failure
   Scenario: User does not provide auth info
