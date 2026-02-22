@@ -3,13 +3,31 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 type JobService struct {
-	db *sql.DB
+	db                *sql.DB
+	queryByPrimaryKey string
+	queryByName       string
+	queryBySpace      string
+}
+
+var jobColumns = []string{
+	"guid",            // CHAR(36) PRIMARY KEY,
+	"name",            // TEXT NOT NULL,
+	"command",         // TEXT NOT NULL,
+	"disk_in_mb",      // INT NOT NULL DEFAULT 1024,
+	"memory_in_mb",    // INT NOT NULL DEFAULT 1024,
+	"log_rate_in_bps", // INT NOT NULL DEFAULT 0,
+	"state",           // TEXT NOT NULL,
+	"app_guid",        // CHAR(36) NOT NULL,
+	"space_guid",      // CHAR(36) NOT NULL,
+	"created_at",      // TIMESTAMP WITH TIME ZONE NOT NULL,
+	"updated_at",      // TIMESTAMP WITH TIME ZONE NOT NULL
 }
 
 const (
@@ -19,12 +37,19 @@ const (
 )
 
 func NewJobService(db *sql.DB) *JobService {
-	return &JobService{db}
+	qbpk := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE guid = $1"
+	qbn := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE name = $1"
+	qbs := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE space_guid = $1 ORDER BY name ASC"
+	return &JobService{db: db,
+		queryByPrimaryKey: qbpk,
+		queryByName:       qbn,
+		queryBySpace:      qbs,
+	}
 }
 
 func (service *JobService) Get(guid string) (*core.Job, error) {
 	candidates, err := service.getCollection(
-		"SELECT * FROM jobs WHERE guid = $1",
+		service.queryByPrimaryKey, // "SELECT * FROM jobs WHERE guid = $1"
 		guid,
 	)
 	if err != nil {
@@ -58,7 +83,7 @@ func (service *JobService) Delete(job *core.Job) error {
 
 func (service *JobService) Named(name string) (*core.Job, error) {
 	candidates, err := service.getCollection(
-		"SELECT * FROM jobs WHERE name = $1",
+		service.queryByName, // "SELECT * FROM jobs WHERE name = $1"
 		name,
 	)
 	if err != nil {
@@ -154,7 +179,7 @@ func (service *JobService) update(candidate *core.Job) (*core.Job, error) {
 
 func (service *JobService) InSpace(guid string) ([]*core.Job, error) {
 	candidates, err := service.getCollection(
-		"SELECT * FROM jobs WHERE space_guid = $1 ORDER BY name ASC",
+		service.queryBySpace, // "SELECT * FROM jobs WHERE space_guid = $1 ORDER BY name ASC",
 		guid,
 	)
 	if err != nil {
@@ -165,7 +190,7 @@ func (service *JobService) InSpace(guid string) ([]*core.Job, error) {
 
 func (service *JobService) scanJob(rows *sql.Rows) (*core.Job, error) {
 	var job core.Job
-	err := rows.Scan(&job.GUID, &job.Name, &job.Command, &job.DiskInMb, &job.MemoryInMb, &job.State, &job.AppGUID, &job.SpaceGUID, &job.CreatedAt, &job.UpdatedAt)
+	err := rows.Scan(&job.GUID, &job.Name, &job.Command, &job.DiskInMb, &job.MemoryInMb, &job.LogRateInBps, &job.State, &job.AppGUID, &job.SpaceGUID, &job.CreatedAt, &job.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
