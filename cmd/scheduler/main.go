@@ -103,12 +103,20 @@ func main() {
 		log.Fatal(tag, fmt.Sprintf("could not update database schema: %s", err.Error()))
 	}
 
-	log.Info(tag, fmt.Sprintf("Applied %s databasse migrations", func(n int) string {
+	log.Info(tag, func(n int) string {
+		phrase, plural := "database migration", "s"
+		var count string
+		
 		if n == 0 {
-			return "no"
+			 count = "no"
+		} else {
+			count = strconv.Itoa(n)
+			if n == 1 {
+			plural = ""
+			}
 		}
-		return strconv.Itoa(n)
-	}(n)))
+		return fmt.Sprintf( "Applied %s %s%s", count, phrase, plural)
+	}(n))
 
 
 	log.Info(tag, "trying to instantiate a cf client")
