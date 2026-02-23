@@ -172,3 +172,74 @@ package-$(1)/$(2)-$(PROJECT):
 endef
 
 $(foreach target,$(TARGETS), $(eval $(call package-target,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target))))))
+
+# Build all platforms with -work flag, capture WORK directories for later re-linking
+release-workdir: distclean
+	@WORKDIR_BASE=$$(mktemp -d) && \
+	for target in $(TARGETS); do \
+		os=$${target%%/*} && \
+		arch=$${target##*/} && \
+		outdir=$(RELEASE_ROOT)/$$os-$$arch-$(SEMVER_VERSION) && \
+		mkdir -p $$outdir && \
+		for cmd in scheduler tzlist; do \
+			echo "Building $$cmd for $$os/$$arch with -work..." && \
+			build_out=$$(CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch \
+				go build -work -ldflags="$(GO_LDFLAGS)" \
+				-o $$outdir/$$cmd ./cmd/$$cmd/... 2>&1) && \
+			workpath=$$(echo "$$build_out" | grep "^WORK=" | cut -d= -f2) && \
+			test -n "$$workpath" || { echo "Failed to capture WORK directory"; exit 1; } && \
+			echo "  WORK=$$workpath" && \
+			platdir=$$WORKDIR_BASE/$$os-$$arch/$$cmd && \
+			mkdir -p $$platdir/archives && \
+			icl=$$(find $$workpath -name importcfg.link | head -1) && \
+			test -n "$$icl" || { echo "No importcfg.link found in $$workpath"; exit 1; } && \
+			n=0 && > $$platdir/importcfg.link && \
+			while IFS= read -r line; do \
+				case "$$line" in \
+				"packagefile "*) \
+					pkg="$${line%%=*}" && \
+					apath="$${line#*=}" && \
+					n=$$((n + 1)) && \
+					cp "$$apath" "$$platdir/archives/$$n.a" && \
+					echo "$$pkg=archives/$$n.a" >> $$platdir/importcfg.link ;; \
+				*) \
+					echo "$$line" >> $$platdir/importcfg.link ;; \
+				esac; \
+			done < "$$icl" && \
+			grep "cmd/$$cmd=" $$platdir/importcfg.link | head -1 | cut -d= -f2 > $$platdir/main_archive && \
+			rm -rf "$$workpath"; \
+		done && \
+		scripts/shait "$$outdir" sha1 sha256 && \
+		(cd $(RELEASE_ROOT) && tar -czf "$(APP_NAME)-$$os-$$arch-$(SEMVER_VERSION).tar.gz" "$$os-$$arch-$(SEMVER_VERSION)"); \
+	done && \
+	echo "Archiving workdir..." && \
+	tar -czf $(RELEASE_ROOT)/$(APP_NAME)-workdir-$(SEMVER_VERSION).tar.gz -C $$WORKDIR_BASE . && \
+	rm -rf $$WORKDIR_BASE
+
+# Extract workdir archive and re-link with new ldflags using go tool link directly
+relink:
+	@test -n "$(WORKDIR_ARCHIVE)" || { echo "WORKDIR_ARCHIVE must be set"; exit 1; }
+	@WORKDIR_BASE=$$(mktemp -d) && \
+	echo "Extracting workdir archive from $(WORKDIR_ARCHIVE)..." && \
+	tar -xzf $(WORKDIR_ARCHIVE) -C $$WORKDIR_BASE && \
+	rm -rf $(RELEASE_ROOT) && mkdir -p $(RELEASE_ROOT) && \
+	for target in $(TARGETS); do \
+		os=$${target%%/*} && \
+		arch=$${target##*/} && \
+		outdir=$(CURDIR)/$(RELEASE_ROOT)/$$os-$$arch-$(SEMVER_VERSION) && \
+		mkdir -p $$outdir && \
+		for cmd in scheduler tzlist; do \
+			platdir=$$WORKDIR_BASE/$$os-$$arch/$$cmd && \
+			main_a=$$(cat $$platdir/main_archive) && \
+			echo "Re-linking $$cmd for $$os/$$arch..." && \
+			(cd $$platdir && GOOS=$$os GOARCH=$$arch go tool link \
+				-importcfg importcfg.link \
+				$(GO_LDFLAGS) \
+				-buildmode=exe \
+				-o $$outdir/$$cmd \
+				$$main_a); \
+		done && \
+		scripts/shait "$$outdir" sha1 sha256 && \
+		(cd $(RELEASE_ROOT) && tar -czf "$(APP_NAME)-$$os-$$arch-$(SEMVER_VERSION).tar.gz" "$$os-$$arch-$(SEMVER_VERSION)"); \
+	done && \
+	rm -rf $$WORKDIR_BASE

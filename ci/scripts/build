@@ -40,8 +40,8 @@ go version;
 header "Building $APP_NAME v$VERSION..."
 
 cd $REPO_ROOT
-make release VERSION=$VERSION APP_NAME=$APP_NAME CGO_ENABLED=$CGO_ENABLED
-cp ${APP_NAME}-${VERSION}.tar.gz  $BUILD_ROOT/
+make release-workdir VERSION=$VERSION APP_NAME=$APP_NAME CGO_ENABLED=$CGO_ENABLED
+cp ${RELEASE_ROOT}/${APP_NAME}-*.tar.gz ${BUILD_ROOT}/
 
 echo
 echo "================================================================================"

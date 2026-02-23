@@ -4,7 +4,7 @@ platform: linux
 image_resource:
   type: registry-image
   source:
-    repository: registry.ops.scalecf.net/genesis-community/genesis
+    repository: registry.ops.scalecf.net/genesis-community/concourse-go
     tag: latest
 
 inputs:
@@ -12,7 +12,7 @@ inputs:
 - name: git
 - name: git-ci
 - name: git-main
-- name: build
+- name: build-workdir
 - name: release-notes
 
 outputs:

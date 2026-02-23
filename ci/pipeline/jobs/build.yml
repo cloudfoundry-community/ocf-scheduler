@@ -14,10 +14,27 @@ jobs:
       MODULE:        (( grab meta.go.module ))
       CMD_PATH:      (( grab meta.go.cmd_path ))
       STATIC_BINARY: (( grab meta.go.force_static_binary ))
-  - put: build
-    params:
-      file: build/*.tar.gz
-      acl: public-read
+  - in_parallel:
+    - put: build-linux-amd64
+      params:
+        file: build/*-linux-amd64-*.tar.gz
+        acl: public-read
+    - put: build-linux-arm64
+      params:
+        file: build/*-linux-arm64-*.tar.gz
+        acl: public-read
+    - put: build-darwin-amd64
+      params:
+        file: build/*-darwin-amd64-*.tar.gz
+        acl: public-read
+    - put: build-darwin-arm64
+      params:
+        file: build/*-darwin-arm64-*.tar.gz
+        acl: public-read
+    - put: build-workdir
+      params:
+        file: build/*-workdir-*.tar.gz
+        acl: public-read
   - put: version
     params: {file: version/number}
 

@@ -5,7 +5,10 @@ jobs:
   plan:
   - do:
     - in_parallel:
-      - { get: build,   passed: [build]}
+      - { get: build-linux-amd64,  passed: [build]}
+      - { get: build-linux-arm64,  passed: [build]}
+      - { get: build-darwin-amd64, passed: [build]}
+      - { get: build-darwin-arm64, passed: [build]}
       - { get: version, passed: [build]}
       - { get: git,     passed: [build]}
       - { get: git-ci }
@@ -38,12 +41,3 @@ jobs:
         username: (( grab meta.slack.username ))
         icon_url: (( grab meta.slack.icon ))
         text:    '(( concat meta.slack.fail_url " " meta.pipeline ": ship prerelease job failed" ))'
-
-# Shout-based notification - currently not available 
-#    on_failure:
-#      put: notify
-#      params:
-#        topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
-#        message: tests job '$BUILD_JOB_NAME' failed.
-#        ok:      no
-#        link:    (( grab meta.shout.links.build ))
