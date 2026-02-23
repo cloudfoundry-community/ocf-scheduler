@@ -172,3 +172,22 @@ package-$(1)/$(2)-$(PROJECT):
 endef
 
 $(foreach target,$(TARGETS), $(eval $(call package-target,$(word 1, $(subst /, ,$(target))),$(word 2, $(subst /, ,$(target))))))
+
+# Build all platforms with a clean GOCACHE, then archive the cache for later re-linking
+release-cached:
+	@GOCACHE_DIR=$$(mktemp -d) && \
+	echo "Using temporary GOCACHE: $$GOCACHE_DIR" && \
+	GOCACHE=$$GOCACHE_DIR $(MAKE) release && \
+	echo "Archiving Go build cache..." && \
+	tar -czf $(RELEASE_ROOT)/$(APP_NAME)-cache-$(SEMVER_VERSION).tar.gz -C $$GOCACHE_DIR . && \
+	rm -rf $$GOCACHE_DIR
+
+# Restore GOCACHE from archive and rebuild with new ldflags (Go skips compilation, only re-links)
+relink:
+	@test -n "$(CACHE_ARCHIVE)" || { echo "CACHE_ARCHIVE must be set"; exit 1; }
+	@GOCACHE_DIR=$$(mktemp -d) && \
+	echo "Restoring build cache from $(CACHE_ARCHIVE)..." && \
+	tar -xzf $(CACHE_ARCHIVE) -C $$GOCACHE_DIR && \
+	echo "Re-linking with GOCACHE=$$GOCACHE_DIR..." && \
+	GOCACHE=$$GOCACHE_DIR $(MAKE) release && \
+	rm -rf $$GOCACHE_DIR

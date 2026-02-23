@@ -24,7 +24,6 @@ bail() {
 	exit 2
 }
 export REPO_ROOT="git"
-export BUILD_ROOT="build"
 export RELEASE_NOTES_ROOT="release-notes"
 export VERSION_FROM="version/number"
 [[ "${PRERELEASE:-0}" =~ (0|f|false|n|no) ]] && PRERELEASE=""
@@ -43,7 +42,7 @@ if [[ -n "${PRERELEASE}" ]] ; then
 <!--- Release Notes for v${VERSION} -- Do not move --->
 This is a prerelease - please see commit messages for changes
 EOF
-else 
+else
   test -n "${GIT_EMAIL:-}"      || bail "GIT_EMAIL must be set to an email address to use for Git commits."
   test -n "${GIT_NAME:-}"       || bail "GIT_NAME must be set to something; it will be used for Git commits."
   test -n "${RELEASE_ROOT:-}"   || bail "RELEASE_ROOT must be set to the output directory where release artifacts should go."
@@ -58,6 +57,13 @@ test -n "${GITHUB_OWNER:-}" || bail "GITHUB_OWNER must be set to the name of the
 echo "Environment OK"
 
 ###############################################################
+
+if [[ -z "${PRERELEASE}" ]] ; then
+  header "Re-linking binaries with release version..."
+  (cd ${REPO_ROOT} && make relink VERSION=${VERSION} APP_NAME=${APP_NAME} \
+    CACHE_ARCHIVE="$(pwd)/../build-cache/${APP_NAME}-cache-"*.tar.gz)
+fi
+
 header "Assembling Github Release Artifacts..."
 mkdir -p "${RELEASE_ROOT}/artifacts"
 echo "v${VERSION}"           "-> ${RELEASE_ROOT}/tag"
@@ -67,8 +73,16 @@ echo "v${VERSION}"            > "${RELEASE_ROOT}/name"
 if [[ -n "$PRERELEASE" ]] ; then
   echo "$(cat git/.git/ref)" "-> ${RELEASE_ROOT}/commit (pre-release)"
   cp    git/.git/ref            "${RELEASE_ROOT}/commit"
+  for dir in build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64; do
+    for f in "${dir}"/*.tar.gz; do
+      [[ -f "$f" ]] && tar -zxvf "$f" -C "${RELEASE_ROOT}/artifacts"
+    done
+  done
+else
+  for f in ${REPO_ROOT}/builds/${APP_NAME}-*.tar.gz; do
+    [[ -f "$f" ]] && tar -zxvf "$f" -C "${RELEASE_ROOT}/artifacts"
+  done
 fi
-tar -zxvf "${BUILD_ROOT}/${APP_NAME}-${VERSION}".tar.gz -C "${RELEASE_ROOT}/artifacts"
 
 header "Release Notes for v${VERSION}"
 header="$(sed -i -e '1{w /dev/stdout' -e 'd}' "${RELEASE_NOTES_PATH}")"
