@@ -148,7 +148,7 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 			mockUsers, err := client.ListUsers(context.Background(), nil)
 			if err == nil {
 				for _, u := range mockUsers {
-					if u.Username == username {
+					if u.Username != nil && *u.Username == username {
 						users = append(users, u)
 					}
 				}

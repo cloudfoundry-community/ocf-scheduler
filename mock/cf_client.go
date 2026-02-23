@@ -187,9 +187,10 @@ func (client *CFClient) ListUsers(_ context.Context, opts *cfclient.UserListOpti
 		return nil, fmt.Errorf("no")
 	}
 
+	dummyUsername := "dummy"
 	users := []*resource.User{
 		{
-			Username: "dummy",
+			Username: &dummyUsername,
 			Resource: resource.Resource{
 				GUID: dummyGUID,
 			},
@@ -242,7 +243,7 @@ func (client *CFClient) prepareApp(appGUID string, spGUID string) *resource.App 
 	}
 
 	output := &resource.App{
-		Relationships: resource.SpaceRelationship{
+		Relationships: resource.AppRelationships{
 			Space: resource.ToOneRelationship{
 				Data: &resource.Relationship{GUID: spGUID},
 			},

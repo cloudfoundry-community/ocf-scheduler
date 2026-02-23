@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/cloudfoundry-community/go-uaa v0.3.6
-	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.9
+	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.18
 	github.com/ess/hype v1.1.5
 	github.com/ess/testscope v1.0.0
 	github.com/gammazero/workerpool v1.1.3
