@@ -19,31 +19,7 @@ func Server(bind string, cfURL string, uaaURL string) *http.Server {
 	client, _ := mock.NewCFClient()
 	e := echo.New()
 
-	e.GET("/v2/info", func(c echo.Context) error {
-		return c.JSON(
-			http.StatusOK,
-			map[string]any{
-				"authorization_endpoint":       uaaURL,
-				"token_endpoint":               uaaURL,
-				"logging_endpoint":             cfURL,
-				"name":                         "",
-				"build":                        "",
-				"support":                      "https://support.example.com",
-				"version":                      0,
-				"description":                  "",
-				"min_cli_version":              "6.23.0",
-				"min_recommended_cli_version":  "6.23.0",
-				"api_version":                  "2.103.0",
-				"app_ssh_endpoint":             "ssh.example.com:2222",
-				"app_ssh_host_key_fingerprint": "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:01",
-				"app_ssh_oauth_client":         "ssh-proxy",
-				"doppler_logging_endpoint":     "wss://doppler.example.com:443",
-				"routing_endpoint":             "https://api.example.com/routing",
-			},
-		)
-	})
-
-	// Also serve the root endpoint for v3 client discovery
+	// Root endpoint for v3 client discovery
 	e.GET("/", func(c echo.Context) error {
 		return c.JSON(
 			http.StatusOK,
