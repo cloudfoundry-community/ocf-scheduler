@@ -3,22 +3,52 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
+var scheduleColumns = []string{
+	"guid",            // CHAR(36) PRIMARY KEY,
+	"enabled",         // BOOL,
+	"expression",      // TEXT NOT NULL,
+	"expression_type", // TEXT NOT NULL,
+	"ref_guid",        // CHAR(36) NOT NULL,
+	"ref_type",        // TEXT NOT NULL,
+	"created_at",      // TIMESTAMP WITH TIME ZONE NOT NULL,
+	"updated_at",      // TIMESTAMP WITH TIME ZONE NOT NULL
+}
+
 type ScheduleService struct {
-	db *sql.DB
+	db                  *sql.DB
+	queryByPrimaryKey   string
+	queryByEnabled      string
+	queryByCall         string
+	queryByJob          string
+	insertIntoSchedules string
 }
 
 func NewScheduleService(db *sql.DB) *ScheduleService {
-	return &ScheduleService{db}
+	qbpk := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE guid = $1"
+	qbc := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE ref_type = 'call' AND ref_guid = $1"
+	qbe := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE enabled"
+	qbj := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE ref_type = 'job' AND ref_guid = $1"
+
+	is := generateInsert("schedules", scheduleColumns)
+	return &ScheduleService{
+		db:                  db,
+		queryByPrimaryKey:   qbpk,
+		queryByEnabled:      qbe,
+		queryByCall:         qbc,
+		queryByJob:          qbj,
+		insertIntoSchedules: is,
+	}
 }
 
 func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
 	candidates := service.getCollection(
-		"select * from schedules where guid = $1",
+		service.queryByPrimaryKey, // "select * from schedules where guid = $1"
 		guid,
 	)
 
@@ -31,20 +61,20 @@ func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
 
 func (service *ScheduleService) ByCall(call *core.Call) []*core.Schedule {
 	return service.getCollection(
-		"select * from schedules where ref_type = 'call' and ref_guid = $1",
+		service.queryByCall, // "select * from schedules where ref_type = 'call' and ref_guid = $1"
 		call.GUID,
 	)
 }
 
 func (service *ScheduleService) Enabled() []*core.Schedule {
 	return service.getCollection(
-		"select * from schedules where enabled",
+		service.queryByEnabled, // "select * from schedules where enabled"
 	)
 }
 
 func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
 	return service.getCollection(
-		"select * from schedules where ref_type = 'job' and ref_guid = $1",
+		service.queryByJob, // "select * from schedules where ref_type = 'job' and ref_guid = $1",
 		job.GUID,
 	)
 }
@@ -81,7 +111,7 @@ func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedul
 
 	err = WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"INSERT INTO schedules VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
+			service.insertIntoSchedules, // "INSERT INTO schedules VALUES($1, $2, $3, $4, $5, $6, $7, $8)"
 			candidate.GUID,
 			candidate.Enabled,
 			candidate.Expression,

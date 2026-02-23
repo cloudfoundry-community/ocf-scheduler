@@ -14,6 +14,7 @@ type JobService struct {
 	queryByPrimaryKey string
 	queryByName       string
 	queryBySpace      string
+	insertIntoJobs    string
 }
 
 var jobColumns = []string{
@@ -40,10 +41,13 @@ func NewJobService(db *sql.DB) *JobService {
 	qbpk := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE guid = $1"
 	qbn := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE name = $1"
 	qbs := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE space_guid = $1 ORDER BY name ASC"
+	is := generateInsert("jobs", jobColumns)
+
 	return &JobService{db: db,
 		queryByPrimaryKey: qbpk,
 		queryByName:       qbn,
 		queryBySpace:      qbs,
+		insertIntoJobs:    is,
 	}
 }
 
@@ -120,7 +124,7 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 
 	err = WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"INSERT INTO jobs (guid, name, command, disk_in_mb, memory_in_mb, log_rate_in_bps, state, app_guid, space_guid, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+			service.insertIntoJobs,
 			candidate.GUID,
 			candidate.Name,
 			candidate.Command,

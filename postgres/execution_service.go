@@ -3,22 +3,53 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
+var executionColumns = []string{
+	"guid",                 // CHAR(36) PRIMARY KEY,
+	"ref_guid",             // CHAR(36) NOT NULL,
+	"ref_type",             // TEXT NOT NULL,
+	"task_guid",            // CHAR(36) DEFAULT NULL,
+	"schedule_guid",        // CHAR(36) DEFAULT NULL,
+	"scheduled_time",       // TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+	"message",              // TEXT,
+	"state",                // TEXT,
+	"execution_start_time", // TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+	"execution_end_time",   // TIMESTAMP WITH TIME ZONE DEFAULT NULL
+}
+
 type ExecutionService struct {
-	db *sql.DB
+	db                   *sql.DB
+	queryByPrimaryKey    string
+	queryByCall          string
+	queryByJob           string
+	queryBySchedule      string
+	insertIntoExecutions string
 }
 
 func NewExecutionService(db *sql.DB) *ExecutionService {
-	return &ExecutionService{db}
+	qbpk := "SELECT " + strings.Join(executionColumns, ", ") + " FROM executions WHERE guid = $1"
+	qbc := "SELECT " + strings.Join(executionColumns, ", ") + " FROM executions WHERE ref_type = 'call' AND ref_guid = $1"
+	qbj := "SELECT " + strings.Join(executionColumns, ", ") + " FROM executions WHERE ref_type = 'job' AND ref_guid = $1"
+	qbs := "SELECT " + strings.Join(executionColumns, ", ") + " FROM executions WHERE schedule_guid = $1"
+	is := generateInsert("executions", executionColumns)
+	return &ExecutionService{
+		db:                   db,
+		queryByPrimaryKey:    qbpk,
+		queryByCall:          qbc,
+		queryByJob:           qbj,
+		queryBySchedule:      qbs,
+		insertIntoExecutions: is,
+	}
 }
 
 func (service *ExecutionService) Get(guid string) (*core.Execution, error) {
 	candidates := service.getCollection(
-		"select * from executions where guid = $1",
+		service.queryByPrimaryKey, // select * from executions where guid = $1",
 		guid,
 	)
 
@@ -31,23 +62,21 @@ func (service *ExecutionService) Get(guid string) (*core.Execution, error) {
 
 func (service *ExecutionService) ByCall(call *core.Call) []*core.Execution {
 	return service.getCollection(
-		"select * from executions where ref_guid = $1 and ref_type = $2",
+		service.queryByCall, // select * from executions where ref_guid = $1 and ref_type = $2
 		call.GUID,
-		"call",
 	)
 }
 
 func (service *ExecutionService) ByJob(job *core.Job) []*core.Execution {
 	return service.getCollection(
-		"select * from executions where ref_type = $1 and ref_guid = $2",
-		"job",
+		service.queryByJob, // select * from executions where ref_type = $1 and ref_guid = $2
 		job.GUID,
 	)
 }
 
 func (service *ExecutionService) BySchedule(schedule *core.Schedule) []*core.Execution {
 	return service.getCollection(
-		"select * from executions where schedule_guid = $1",
+		service.queryBySchedule, // select * from executions where schedule_guid = $1
 		schedule.GUID,
 	)
 }
@@ -152,7 +181,7 @@ func (service *ExecutionService) getCollection(query string, args ...any) []*cor
 func (service *ExecutionService) insert(candidate *core.Execution) (*core.Execution, error) {
 	err := WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"insert into executions values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+			service.insertIntoExecutions, // insert into executions values($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			candidate.GUID,
 			candidate.RefGUID,
 			candidate.RefType,

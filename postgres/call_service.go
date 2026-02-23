@@ -3,23 +3,48 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
+var callColumns = []string{
+	"guid",        // CHAR(36) PRIMARY KEY,
+	"name",        // TEXT NOT NULL,
+	"url",         // TEXT NOT NULL,
+	"auth_header", // TEXT NOT NULL,
+	"app_guid",    // CHAR(36) NOT NULL,
+	"space_guid",  // CHAR(36) NOT NULL,
+	"created_at",  // TIMESTAMP WITH TIME ZONE NOT NULL,
+	"updated_at",  // TIMESTAMP WITH TIME ZONE NOT NULL
+}
+
 type CallService struct {
-	db *sql.DB
+	db                *sql.DB
+	queryByPrimaryKey string
+	queryByName       string
+	queryBySpace      string
+	insertIntoCalls   string
 }
 
 func NewCallService(db *sql.DB) *CallService {
-	return &CallService{db}
+	qbpk := "SELECT " + strings.Join(callColumns, ", ") + " FROM calls WHERE guid = $1"
+	qbn := "SELECT " + strings.Join(callColumns, ", ") + " FROM calls WHERE name = $1"
+	qbs := "SELECT " + strings.Join(callColumns, ", ") + " FROM calls WHERE space_guid = $1 ORDER BY name ASC"
+	is := generateInsert("calls", callColumns)
+	return &CallService{db: db,
+		queryByPrimaryKey: qbpk,
+		queryByName:       qbn,
+		queryBySpace:      qbs,
+		insertIntoCalls:   is,
+	}
 }
 
 // toasted
 func (service *CallService) Get(guid string) (*core.Call, error) {
 	candidates := service.getCollection(
-		"select * from calls where guid = $1",
+		service.queryByPrimaryKey, // "select * from calls where guid = $1",
 		guid,
 	)
 
@@ -51,7 +76,7 @@ func (service *CallService) Delete(call *core.Call) error {
 // toasted
 func (service *CallService) Named(name string) (*core.Call, error) {
 	candidates := service.getCollection(
-		"select * from calls where name = $1",
+		service.queryByName, // "select * from calls where name = $1",
 		name,
 	)
 
@@ -76,7 +101,7 @@ func (service *CallService) Persist(candidate *core.Call) (*core.Call, error) {
 
 	err = WithTransaction(service.db, func(tx Transaction) error {
 		_, aErr := tx.Exec(
-			"INSERT INTO calls VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
+			service.insertIntoCalls, // "INSERT INTO calls VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
 			candidate.GUID,
 			candidate.Name,
 			candidate.URL,
@@ -100,7 +125,7 @@ func (service *CallService) Persist(candidate *core.Call) (*core.Call, error) {
 // toasted
 func (service *CallService) InSpace(guid string) []*core.Call {
 	return service.getCollection(
-		"select * from calls where space_guid = $1 ORDER BY name ASC",
+		service.queryBySpace, // "select * from calls where space_guid = $1 ORDER BY name ASC",
 		guid,
 	)
 }
