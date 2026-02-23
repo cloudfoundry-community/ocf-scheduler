@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 // Transaction is an interface that models the standard transaction in
@@ -57,4 +58,16 @@ func expectingOne(count int) error {
 	}
 
 	return nil
+}
+
+func generateInsert(tableName string, columns []string) string {
+	colString := strings.Join(columns, ", ")
+
+	placeholders := make([]string, len(columns))
+	for i := range columns {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+	}
+	valString := strings.Join(placeholders, ", ")
+
+	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, colString, valString)
 }
