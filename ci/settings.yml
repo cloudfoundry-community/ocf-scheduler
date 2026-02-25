@@ -1,6 +1,6 @@
 ---
 meta:
-  name:    ocf-scheduler
+  name:    gocache-ocf-scheduler
   release: OCF Scheduler
   target:  pipes/cloudfoundry-community
   url:     https://pipes.scalecf.net
@@ -22,7 +22,7 @@ meta:
   github:
     owner:           cloudfoundry-community
     repo:            ocf-scheduler
-    branch:          develop
+    branch:          norm/concourse-cache-build
     main-branch:     main
     private_key:     ((github.private_key))
     access_token:    ((github.access_token))
