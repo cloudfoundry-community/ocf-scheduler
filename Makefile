@@ -185,7 +185,7 @@ release-workdir: distclean
 			echo "Building $$cmd for $$os/$$arch with -work..." && \
 			build_out=$$(CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch \
 				go build -work -ldflags="$(GO_LDFLAGS)" \
-				-o $$outdir/$$cmd ./cmd/$$cmd/... 2>&1) && \
+				-o $$outdir/ ./cmd/$$cmd/... 2>&1) && \
 			workpath=$$(echo "$$build_out" | grep "^WORK=" | cut -d= -f2) && \
 			test -n "$$workpath" || { echo "Failed to capture WORK directory"; exit 1; } && \
 			echo "  WORK=$$workpath" && \
