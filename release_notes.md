@@ -66,6 +66,31 @@ Cyclic ranges also work in step expressions
 |:---------|:-------: |-----------|
 |20-2/2    |hours     | every 2 hours from 8 pm(20) to 2 am|
 
+## Timezones
+
+A schedule may declare its own timezone by prefixing the cron expression with `TZ=` or
+`CRON_TZ=`:
+
+```
+CRON_TZ=America/New_York 0 30 9 * * MON-FRI
+TZ="Europe/Berlin" 0 0 3 * * *
+```
+
+The expression is evaluated in the declared zone, and the resulting fire time is then
+converted to the scheduler's own timezone. An expression with no prefix is evaluated
+directly in the scheduler's timezone.
+
+The prefix itself is not new, but two things around it are:
+
+* Matching single or double quotes around the zone name are now accepted —
+  `TZ="Europe/Berlin"` and `TZ='UTC'` both work. Previously the quotes were passed through
+  to the zone lookup and the schedule was rejected.
+* An unknown zone is rejected when the schedule is created rather than failing later.
+
+The zones the scheduler recognises can now be listed through the new authenticated
+`GET /scheduler-time-zones` endpoint. The server's own zone is flagged in that listing and
+reported in the startup log.
+
 ## Scheduling and Jobs
 
 * Added a **log rate** parameter.
