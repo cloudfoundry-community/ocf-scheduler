@@ -60,7 +60,11 @@ echo "Environment OK"
 
 if [[ -z "${PRERELEASE}" ]] ; then
   header "Re-linking binaries with release version..."
-  (cd ${REPO_ROOT} && make relink VERSION=${VERSION} APP_NAME=${APP_NAME} \
+  # RELEASE_ROOT is set to the Github staging dir for this task, but the
+  # Makefile uses it as the build output dir.  Pass it explicitly so make
+  # does not inherit it and write the tarballs somewhere the glob below
+  # will not find them.
+  (cd ${REPO_ROOT} && make relink RELEASE_ROOT=builds VERSION=${VERSION} APP_NAME=${APP_NAME} \
     WORKDIR_ARCHIVE="$(pwd)/../build-workdir/${APP_NAME}-workdir-"*.tar.gz)
 fi
 
