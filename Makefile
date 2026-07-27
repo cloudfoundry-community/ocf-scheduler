@@ -222,6 +222,11 @@ relink:
 	@WORKDIR_BASE=$$(mktemp -d) && \
 	echo "Extracting workdir archive from $(WORKDIR_ARCHIVE)..." && \
 	tar -xzf $(WORKDIR_ARCHIVE) -C $$WORKDIR_BASE && \
+	GOTOOLCHAIN=$$(grep -a -m1 -o 'go object [a-z0-9]* [a-z0-9]* go1[0-9.]*' \
+		$$(find $$WORKDIR_BASE -name '*.a' | head -1) | awk '{print $$5}') && \
+	{ test -n "$$GOTOOLCHAIN" || { echo "Cannot determine Go toolchain from workdir archives" >&2; exit 1; }; } && \
+	export GOTOOLCHAIN && \
+	echo "Re-linking with toolchain $$GOTOOLCHAIN" && \
 	rm -rf $(RELEASE_ROOT) && mkdir -p $(RELEASE_ROOT) && \
 	for target in $(TARGETS); do \
 		os=$${target%%/*} && \
