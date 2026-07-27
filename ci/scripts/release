@@ -75,12 +75,12 @@ if [[ -n "$PRERELEASE" ]] ; then
   cp    git/.git/ref            "${RELEASE_ROOT}/commit"
   for dir in build-linux-amd64 build-linux-arm64 build-darwin-amd64 build-darwin-arm64; do
     for f in "${dir}"/*.tar.gz; do
-      [[ -f "$f" ]] && tar -zxvf "$f" -C "${RELEASE_ROOT}/artifacts"
+      [[ -f "$f" ]] && cp "$f" "${RELEASE_ROOT}/artifacts/"
     done
   done
 else
   for f in ${REPO_ROOT}/builds/${APP_NAME}-*.tar.gz; do
-    [[ -f "$f" ]] && tar -zxvf "$f" -C "${RELEASE_ROOT}/artifacts"
+    [[ -f "$f" ]] && cp "$f" "${RELEASE_ROOT}/artifacts/"
   done
 fi
 
