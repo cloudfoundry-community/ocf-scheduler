@@ -43,4 +43,4 @@ jobs:
     params:
       username: (( grab meta.slack.username ))
       icon_url: (( grab meta.slack.icon ))
-      text:    '(( concat meta.slack.fail_url " " meta.pipeline ": test job failed" ))'
+      text:    '(( concat meta.slack.fail_url " " meta.pipeline ": build job failed" ))'
