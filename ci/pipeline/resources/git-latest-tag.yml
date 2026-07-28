@@ -7,6 +7,9 @@ resources:
     uri:         (( grab meta.github.uri ))
     branch:      (( grab meta.github.branch ))
     private_key: (( grab meta.github.private_key ))
-    tag_regex:   '^v[0-9\.]*$'
+    # 'v-' scheme only. Legacy bare 'vN.Y.Z' tags are deliberately excluded
+    # so this resource tracks the current naming and cannot regress onto a
+    # pre-2.0.2 tag. See the Makefile CLEAN_VERSION comment for why 'v-'.
+    tag_regex:   '^v-[0-9\.]*$'
     disable_ci_skip: true
 
