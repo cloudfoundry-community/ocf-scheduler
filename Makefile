@@ -17,7 +17,13 @@ define is_not_number
 $(shell echo ${1} | sed -e 's/[0123456789]//g')
 endef
 
-CLEAN_VERSION = $(patsubst v%,%,$(VERSION))
+# Accept both 'vX.Y.Z' (legacy) and 'v-X.Y.Z' (current). Go refuses to
+# resolve a 'vN.Y.Z' tag for N>=2 unless the module path carries a '/vN'
+# suffix; 'v-N.Y.Z' is not valid semver, so Go never version-parses it and
+# it stays usable as a `go get` revision. Strip 'v-' before 'v' — reversed,
+# the 'v' rule leaves a leading '-' that HAS_PRERELEASE below then reads as
+# a prerelease separator, marking a GA release as a prerelease.
+CLEAN_VERSION = $(patsubst v%,%,$(patsubst v-%,%,$(VERSION)))
 HAS_BUILDMETA := $(findstring +,$(CLEAN_VERSION))
 VERSION_BUILDMETA := $(if $(HAS_BUILDMETA),$(lastword $(subst +, ,$(CLEAN_VERSION))),)
 
@@ -36,7 +42,7 @@ VERSION_SPLIT:=$(subst ., ,$(VERSION_ONLY))
   endif
 else
 VERSION_TAG:=$(shell git describe --tags --abbrev=0 2>/dev/null || echo 0.0.0)
-CLEAN_VERSION_TAG = $(patsubst v%,%,$(VERSION_TAG))
+CLEAN_VERSION_TAG = $(patsubst v%,%,$(patsubst v-%,%,$(VERSION_TAG)))
 VERSION_SPLIT:=$(subst ., ,$(CLEAN_VERSION_TAG))
   ifneq ($(words $(VERSION_SPLIT)),3)
     $(error VERSION_TAG does not have 3 parts |$(words $(VERSION_SPLIT))|$(VERSION_TAG)|$(VERSION_SPLIT)|)
