@@ -26,6 +26,12 @@ bail() {
 export REPO_ROOT="git"
 export RELEASE_NOTES_ROOT="release-notes"
 export VERSION_FROM="version/number"
+# Prefix for the git tag this release cuts. 'v' is the historical default;
+# repos whose major version has outrun their Go module path set 'v-', which
+# Go never version-parses and so will resolve as a `go get` revision.
+# Applies to the tag only -- the release title and the release-notes header
+# marker stay 'v${VERSION}'.
+TAG_PREFIX="${TAG_PREFIX:-v}"
 [[ "${PRERELEASE:-0}" =~ (0|f|false|n|no) ]] && PRERELEASE=""
 
 
@@ -70,8 +76,8 @@ fi
 
 header "Assembling Github Release Artifacts..."
 mkdir -p "${RELEASE_ROOT}/artifacts"
-echo "v${VERSION}"           "-> ${RELEASE_ROOT}/tag"
-echo "v${VERSION}"            > "${RELEASE_ROOT}/tag"
+echo "${TAG_PREFIX}${VERSION}" "-> ${RELEASE_ROOT}/tag"
+echo "${TAG_PREFIX}${VERSION}" > "${RELEASE_ROOT}/tag"
 echo "v${VERSION}"           "-> ${RELEASE_ROOT}/name"
 echo "v${VERSION}"            > "${RELEASE_ROOT}/name"
 if [[ -n "$PRERELEASE" ]] ; then
@@ -119,7 +125,7 @@ if [[ -z "${PRERELEASE}" && "$DEVELOP_BRANCH" != "$RELEASE_BRANCH" ]] ; then
 fi
 
 cat > "${NOTIFICATION_OUT:-notifications}/message" <<EOS
-New ${APP_NAME} v${VERSION} released. <https://github.com/${GITHUB_OWNER}/${APP_NAME}/releases/tag/v${VERSION}|Release notes>.
+New ${APP_NAME} v${VERSION} released. <https://github.com/${GITHUB_OWNER}/${APP_NAME}/releases/tag/${TAG_PREFIX}${VERSION}|Release notes>.
 EOS
 
 echo
