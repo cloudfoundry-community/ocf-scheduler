@@ -23,6 +23,7 @@ outputs:
 params:
   PRERELEASE:       1
   RELEASE_ROOT:     gh
+  TAG_PREFIX:       v-
   NOTIFICATION_OUT: notifications
   DEVELOP_BRANCH:   develop
   RELEASE_BRANCH:   main

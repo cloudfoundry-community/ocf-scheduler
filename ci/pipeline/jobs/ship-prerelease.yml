@@ -21,6 +21,7 @@ jobs:
         DEVELOP_BRANCH:   (( grab meta.github.branch ))
         RELEASE_BRANCH:   (( grab meta.github.branch ))
         RELEASE_ROOT:     gh
+        TAG_PREFIX:       v-
         RELEASE_NOTES:    (( grab meta.github.release_notes.file ))
         NOTIFICATION_OUT: notifications
         GITHUB_OWNER:     (( grab meta.github.owner ))
