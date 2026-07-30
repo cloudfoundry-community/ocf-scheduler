@@ -26,12 +26,15 @@ bail() {
 export REPO_ROOT="git"
 export RELEASE_NOTES_ROOT="release-notes"
 export VERSION_FROM="version/number"
-# Prefix for the git tag this release cuts. 'v' is the historical default;
-# repos whose major version has outrun their Go module path set 'v-', which
-# Go never version-parses and so will resolve as a `go get` revision.
+# Prefix for the git tag this release cuts. 'v-' is this repo's scheme: Go
+# never version-parses a non-semver tag name, so a v- tag resolves as a
+# `go get` revision even though the major version has outrun the module
+# path. Every caller sets it explicitly; this default only matters if a
+# future task forgets to, and landing on the repo's actual convention is a
+# safer miss than silently reverting to the legacy 'v'.
 # Applies to the tag only -- the release title and the release-notes header
 # marker stay 'v${VERSION}'.
-TAG_PREFIX="${TAG_PREFIX:-v}"
+TAG_PREFIX="${TAG_PREFIX:-v-}"
 [[ "${PRERELEASE:-0}" =~ (0|f|false|n|no) ]] && PRERELEASE=""
 
 
