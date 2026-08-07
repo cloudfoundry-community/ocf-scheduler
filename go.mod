@@ -3,15 +3,15 @@ module github.com/cloudfoundry-community/ocf-scheduler
 go 1.26.0
 
 require (
-	github.com/cloudfoundry-community/go-uaa v0.3.6
+	github.com/cloudfoundry-community/go-uaa v0.4.2
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.20
 	github.com/ess/hype v1.1.5
 	github.com/ess/testscope v1.0.0
 	github.com/gammazero/workerpool v1.2.1
 	github.com/google/uuid v1.6.0
-	github.com/labstack/echo/v4 v4.15.2
+	github.com/labstack/echo/v4 v4.15.4
 	github.com/lib/pq v1.12.3
-	github.com/netresearch/go-cron v0.14.0
+	github.com/netresearch/go-cron v0.15.1
 	github.com/rubenv/sql-migrate v1.8.1
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
@@ -35,7 +35,7 @@ require (
 	github.com/khaiql/dbcleaner v2.3.0+incompatible // indirect
 	github.com/labstack/gommon v0.5.0 // indirect
 	github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
 	github.com/pelletier/go-toml/v2 v2.3.1 // indirect
@@ -50,10 +50,10 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.52.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
+	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
