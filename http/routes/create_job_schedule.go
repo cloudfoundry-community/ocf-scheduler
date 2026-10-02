@@ -43,9 +43,10 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 		input.RefGUID = guid
 		input.RefType = "job"
 
-		if err := services.Cron.Validate(input.Expression); err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("invalid cron expression '%s' for job %s: %v", input.Expression, guid, err))
-			return c.JSON(http.StatusUnprocessableEntity, err.Error())
+		analysis := services.Cron.Analyze(input.Expression, guid, 0, 0)
+		if len(analysis.Errors) > 0 {
+			services.Logger.Error(tag, fmt.Sprintf("invalid cron expression '%s' for job %s: %s", input.Expression, guid, analysis.Errors[0].Message))
+			return c.JSON(http.StatusUnprocessableEntity, core.Findings{Errors: analysis.Errors, Warnings: analysis.Warnings})
 		}
 
 		schedule, err := services.Schedules.Persist(input)
@@ -56,7 +57,7 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 
 		if err := services.Cron.Add(core.NewJobRun(job, schedule, services)); err != nil {
 			services.Logger.Error(tag, fmt.Sprintf("failed to add cron entry for job %s: %v", guid, err))
-			return c.JSON(http.StatusUnprocessableEntity, err.Error())
+			return c.JSON(http.StatusUnprocessableEntity, requestError("schedule_failed", "%v", err))
 		}
 
 		services.Logger.Info(tag, fmt.Sprintf("created schedule %s for job %s", schedule.GUID, guid))

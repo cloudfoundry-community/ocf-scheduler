@@ -26,7 +26,6 @@ type CronService interface {
 	Add(Runnable) error
 	Delete(Runnable) error
 	Count() int
-	Validate(string) error
 	Analyze(expression, key string, next, prev int) ScheduleAnalysis
 	GetTimezones() (*TimezoneSlice, error)
 }

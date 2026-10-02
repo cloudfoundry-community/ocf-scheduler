@@ -46,9 +46,10 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 
 		services.Logger.Debug(tag, fmt.Sprintf("expression == '%s', expression_type == '%s'", input.Expression, input.ExpressionType))
 
-		if err := services.Cron.Validate(input.Expression); err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("invalid cron expression '%s' for call %s: %v", input.Expression, guid, err))
-			return c.JSON(http.StatusUnprocessableEntity, err.Error())
+		analysis := services.Cron.Analyze(input.Expression, guid, 0, 0)
+		if len(analysis.Errors) > 0 {
+			services.Logger.Error(tag, fmt.Sprintf("invalid cron expression '%s' for call %s: %s", input.Expression, guid, analysis.Errors[0].Message))
+			return c.JSON(http.StatusUnprocessableEntity, core.Findings{Errors: analysis.Errors, Warnings: analysis.Warnings})
 		}
 
 		schedule, err := services.Schedules.Persist(input)
@@ -59,7 +60,7 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 
 		if err := services.Cron.Add(core.NewCallRun(call, schedule, services)); err != nil {
 			services.Logger.Error(tag, fmt.Sprintf("failed to add cron entry for call %s: %v", guid, err))
-			return c.JSON(http.StatusUnprocessableEntity, err.Error())
+			return c.JSON(http.StatusUnprocessableEntity, requestError("schedule_failed", "%v", err))
 		}
 
 		services.Logger.Info(tag, fmt.Sprintf("created schedule %s for call %s", schedule.GUID, guid))
