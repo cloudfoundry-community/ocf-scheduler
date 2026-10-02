@@ -134,6 +134,17 @@ func TestAnalyzeHash(t *testing.T) {
 	}
 }
 
+func TestAnalyzeDescriptionNote(t *testing.T) {
+	r := Analyze("H/15 * * * *", "", 1, 0, Rules{}, now).Result
+	if r.Description != "every 15 minutes from a hashed start" ||
+		r.DescriptionNote != "at minutes h, h+15, h+30 and h+45 of every hour, where h is a hashed minute from 0 to 14" {
+		t.Errorf("got %q / %q", r.Description, r.DescriptionNote)
+	}
+	if r := Analyze("*/15 * * * *", "", 1, 0, Rules{}, now).Result; r.DescriptionNote != "" {
+		t.Errorf("no hashed step, got note %q", r.DescriptionNote)
+	}
+}
+
 func TestAnalyzeRuns(t *testing.T) {
 	r := Analyze("CRON_TZ=UTC 0 9 * * *", "", 5, 2, Rules{}, now).Result
 	if len(r.NextRuns) != 5 || len(r.PrevRuns) != 2 {

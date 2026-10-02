@@ -29,19 +29,20 @@ type Ref struct {
 
 // ScheduleAnalysis is what the scheduler would do with one cron expression.
 type ScheduleAnalysis struct {
-	Expression   string        `json:"expression"`
-	Ref          *Ref          `json:"ref,omitempty"`
-	ScheduleGUID string        `json:"schedule_guid,omitempty"`
-	Enabled      *bool         `json:"enabled,omitempty"`
-	Valid        bool          `json:"valid"`
-	Description  string        `json:"description"`
-	Location     string        `json:"location,omitempty"`
-	Illustrative bool          `json:"illustrative"`
-	HashedFields []HashedField `json:"hashed_fields"`
-	NextRuns     []time.Time   `json:"next_runs"`
-	PrevRuns     []time.Time   `json:"prev_runs"`
-	Errors       []Finding     `json:"errors"`
-	Warnings     []Finding     `json:"warnings"`
+	Expression      string        `json:"expression"`
+	Ref             *Ref          `json:"ref,omitempty"`
+	ScheduleGUID    string        `json:"schedule_guid,omitempty"`
+	Enabled         *bool         `json:"enabled,omitempty"`
+	Valid           bool          `json:"valid"`
+	Description     string        `json:"description"`
+	DescriptionNote string        `json:"description_note,omitempty"`
+	Location        string        `json:"location,omitempty"`
+	Illustrative    bool          `json:"illustrative"`
+	HashedFields    []HashedField `json:"hashed_fields"`
+	NextRuns        []time.Time   `json:"next_runs"`
+	PrevRuns        []time.Time   `json:"prev_runs"`
+	Errors          []Finding     `json:"errors"`
+	Warnings        []Finding     `json:"warnings"`
 }
 
 // ValidateRequest is the body of POST /schedules/validate.
