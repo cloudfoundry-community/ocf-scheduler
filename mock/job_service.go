@@ -123,7 +123,7 @@ func (service *JobService) Persist(candidate *core.Job) (*core.Job, error) {
 	return candidate, nil
 }
 
-func (service *JobService) InSpace(guid string) []*core.Job {
+func (service *JobService) InSpace(guid string) ([]*core.Job, error) {
 	service.locker.Lock()
 	defer service.locker.Unlock()
 
@@ -135,7 +135,23 @@ func (service *JobService) InSpace(guid string) []*core.Job {
 		}
 	}
 
-	return spaced
+	return spaced, nil
+}
+
+func (service *JobService) Success(job *core.Job) (*core.Job, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	job.State = "SUCCEEDED"
+	return job, nil
+}
+
+func (service *JobService) Fail(job *core.Job) (*core.Job, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	job.State = "FAILED"
+	return job, nil
 }
 
 func NewJobService() *JobService {
