@@ -62,6 +62,23 @@ func Describe(expression string) (string, error) {
 	return d + zone, nil
 }
 
+// DescribeNote spells out a hashed step's values in terms of its hashed
+// start ("at minutes h, h+15, h+30 and h+45 of every hour, where h is a
+// hashed minute from 0 to 14"), so Describe can keep the short "every 15
+// minutes from a hashed start". It returns "" when no time field has a
+// hashed step or the expression has no description.
+func DescribeNote(expression string) string {
+	s, err := Fields(expression)
+	if err != nil || s.Descriptor != "" {
+		return ""
+	}
+	t, hashed, err := describeTime(s, true)
+	if err != nil || !hashed {
+		return ""
+	}
+	return t
+}
+
 func literal(s Spec) string {
 	parts := make([]string, 0, len(s.Fields)+1)
 	for _, f := range s.Fields {
@@ -75,7 +92,7 @@ func literal(s Spec) string {
 
 func describeFields(s Spec) (string, error) {
 	clauses := []string{}
-	t, err := describeTime(s)
+	t, _, err := describeTime(s, false)
 	if err != nil {
 		return "", err
 	}
@@ -134,10 +151,13 @@ type unitPhrase struct {
 	text     string
 	kind     string // "values", "hashed", "step", "every"
 	note     string // interval note for a list cut short
+	where    string // what a hashed step's variable stands for
 	hourStep bool   // hours from a step: "of every day" when days are free
 }
 
-func describeTime(s Spec) (string, error) {
+// describeTime renders the time clause. With expand, hashed steps render as
+// their values in terms of the hashed start, and hashed reports whether any did.
+func describeTime(s Spec, expand bool) (text string, hashed bool, err error) {
 	sec, hasSec := s.Field(Second)
 	min, _ := s.Field(Minute)
 	hour, _ := s.Field(Hour)
@@ -159,7 +179,7 @@ func describeTime(s Spec) (string, error) {
 					clocks = append(clocks, c)
 				}
 			}
-			return "at " + andList(clocks), nil
+			return "at " + andList(clocks), false, nil
 		}
 	}
 
@@ -168,11 +188,16 @@ func describeTime(s Spec) (string, error) {
 		fields = []Field{sec, min, hour}
 	}
 	var phrases []unitPhrase
-	var notes []string
+	var notes, wheres []string
+	vars := "hkj" // one variable per hashed step
 	for _, f := range fields {
-		p, err := timeUnit(f)
+		v := ""
+		if expand {
+			v = vars[len(wheres) : len(wheres)+1]
+		}
+		p, err := timeUnit(f, v)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		if p.kind == "every" && len(phrases) > 0 {
 			prev := phrases[len(phrases)-1].kind
@@ -183,6 +208,9 @@ func describeTime(s Spec) (string, error) {
 		phrases = append(phrases, p)
 		if p.note != "" {
 			notes = append(notes, p.note)
+		}
+		if p.where != "" {
+			wheres = append(wheres, p.where)
 		}
 	}
 	parts := make([]string, len(phrases))
@@ -198,10 +226,13 @@ func describeTime(s Spec) (string, error) {
 			out += " of every day"
 		}
 	}
+	if len(wheres) > 0 {
+		out += ", where " + strings.Join(wheres, " and ")
+	}
 	if len(notes) > 0 {
 		out += " (" + strings.Join(notes, "; ") + ")"
 	}
-	return out, nil
+	return out, len(wheres) > 0, nil
 }
 
 func single(f Field) (int, bool) {
@@ -220,7 +251,9 @@ var listLimit = map[string]int{Second: 6, Minute: 6, Hour: 12, DayOfMonth: 6}
 // container is the unit a field starts over in.
 var container = map[string]string{Second: "minute", Minute: "hour", Hour: "day", DayOfMonth: "month"}
 
-func timeUnit(f Field) (unitPhrase, error) {
+// timeUnit renders one time field. v names a hashed step's start; "" keeps
+// the short "every N <units> from a hashed start".
+func timeUnit(f Field, v string) (unitPhrase, error) {
 	b := fieldBounds[f.Name]
 	sg, pl := f.Name, f.Name+"s"
 	els := elements(f.Text)
@@ -238,7 +271,14 @@ func timeUnit(f Field) (unitPhrase, error) {
 		case kHash:
 			return unitPhrase{text: "a hashed " + sg + between(it), kind: "hashed"}, nil
 		case kHashStep:
-			return unitPhrase{text: fmt.Sprintf("every %d %s from a hashed start%s", it.step, pl, between(it)), kind: "step"}, nil
+			if v == "" {
+				return unitPhrase{text: fmt.Sprintf("every %d %s from a hashed start%s", it.step, pl, between(it)), kind: "step"}, nil
+			}
+			if it.lo > it.hi {
+				return unitPhrase{}, errUndescribed // wrapped hashed range
+			}
+			text, where, note := hashStepValues(it, f.Name, sg, pl, v)
+			return unitPhrase{text: text, kind: "values", where: where, note: note, hourStep: f.Name == Hour}, nil
 		}
 	}
 	items, err := simpleItems(f)
@@ -279,6 +319,43 @@ func stepValues(it item, field, sg, pl string) (text, note string) {
 		note += ", starting over each " + container[field]
 	}
 	return text, note
+}
+
+// hashStepValues renders H/N as values in terms of the job's hashed first
+// value v, which go-cron picks as lo + hash mod N: "minutes h, h+15, h+30
+// and h+45", where "h is a hashed minute from 0 to 14". When N does not
+// divide the range, the run count depends on v, so the list ends
+// "… up to <last allowed value>".
+func hashStepValues(it item, field, sg, pl, v string) (text, where, note string) {
+	span, vmax := it.hi-it.lo+1, min(it.lo+it.step-1, it.hi)
+	where = fmt.Sprintf("%s is a hashed %s from %d to %d", v, sg, it.lo, vmax)
+	term := func(k int) string {
+		if k == 0 {
+			return v
+		}
+		return fmt.Sprintf("%s+%d", v, k*it.step)
+	}
+	if it.step >= span {
+		return sg + " " + v, where, ""
+	}
+	if span%it.step != 0 {
+		var words []string
+		for k := 0; k < 3 && vmax+k*it.step <= it.hi; k++ {
+			words = append(words, term(k))
+		}
+		note = fmt.Sprintf("every %d %s, starting over each %s", it.step, pl, container[field])
+		return pl + " " + strings.Join(words, ", ") + fmt.Sprintf(", … up to %d", it.hi), where, note
+	}
+	n := span / it.step
+	words := make([]string, n)
+	for k := range words {
+		words[k] = term(k)
+	}
+	if n <= listLimit[field] {
+		return pl + " " + andList(words), where, ""
+	}
+	note = fmt.Sprintf("every %d %s", it.step, pl)
+	return pl + " " + strings.Join(words[:3], ", ") + ", … " + words[n-1], where, note
 }
 
 // runs lists the values an element fires on, in firing order. A wrapped
