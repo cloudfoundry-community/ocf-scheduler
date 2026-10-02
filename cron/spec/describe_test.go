@@ -41,6 +41,7 @@ var golden = []struct{ expr, want string }{
 	{"H(15-45) 2 * * *", "at a hashed minute between 15 and 45 of hour 2"},
 	{"H H * * *", "at a hashed minute of a hashed hour"},
 	{"H/15 * * * *", "every 15 minutes from a hashed start"},
+	{"H(15-45)/10 2 * * *", "every 10 minutes from a hashed start between 15 and 45 of hour 2"},
 	{"0 0 13 * FRI", "at 00:00, on day 13 of the month when it falls on Friday"},
 	{"0 0 1,15 * *", "at 00:00, on days 1 and 15 of the month"},
 	{"0 0 1/10 * *", "at 00:00, on days 1, 11, 21 and 31 of every month"},
@@ -81,6 +82,35 @@ func TestDescribe(t *testing.T) {
 		got, err := Describe(tt.expr)
 		if err != nil || got != tt.want {
 			t.Errorf("Describe(%q) = %q, %v; want %q", tt.expr, got, err, tt.want)
+		}
+	}
+}
+
+// A hashed step's description stays short ("every 15 minutes from a hashed
+// start"); its note spells out the values in terms of the hashed start.
+var noteGolden = []struct{ expr, want string }{
+	{"H/15 * * * *", "at minutes h, h+15, h+30 and h+45 of every hour, where h is a hashed minute from 0 to 14"},
+	{"H/5 * * * *", "at minutes h, h+5, h+10, … h+55 of every hour, where h is a hashed minute from 0 to 4 (every 5 minutes)"},
+	{"H/7 * * * *", "at minutes h, h+7, h+14, … up to 59 of every hour, where h is a hashed minute from 0 to 6 (every 7 minutes, starting over each hour)"},
+	{"H(15-45)/10 2 * * MON", "at minutes h, h+10, h+20, … up to 45 of hour 2, where h is a hashed minute from 15 to 24 (every 10 minutes, starting over each hour)"},
+	{"H(10-20)/30 * * * *", "at minute h of every hour, where h is a hashed minute from 10 to 20"},
+	{"0 H/6 * * *", "at minute 0 of hours h, h+6, h+12 and h+18 of every day, where h is a hashed hour from 0 to 5"},
+	{"H/30 H/12 * * *", "at minutes h and h+30 of hours k and k+12 of every day, where h is a hashed minute from 0 to 29 and k is a hashed hour from 0 to 11"},
+	{"CRON_TZ=UTC H/15 * * * *", "at minutes h, h+15, h+30 and h+45 of every hour, where h is a hashed minute from 0 to 14"},
+	{"*/15 * * * *", ""},
+	{"H 2 * * *", ""},
+	{"@daily", ""},
+	{"0 5-10/2,22 * * *", ""},
+}
+
+func TestDescribeNote(t *testing.T) {
+	for _, tt := range noteGolden {
+		if _, err := cron.FullParser().WithHashKey("k").Parse(tt.expr); err != nil {
+			t.Errorf("%q is not valid go-cron: %v", tt.expr, err)
+			continue
+		}
+		if got := DescribeNote(tt.expr); got != tt.want {
+			t.Errorf("DescribeNote(%q) = %q; want %q", tt.expr, got, tt.want)
 		}
 	}
 }
