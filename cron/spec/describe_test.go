@@ -63,6 +63,9 @@ var golden = []struct{ expr, want string }{
 	{"0 0 1 2/3 *", "at 00:00, on day 1 of the month, in February, May, August and November"},
 	{"0 0 1 2-8/3 *", "at 00:00, on day 1 of the month, in February, May and August"},
 	{"0 0 1 JAN-MAR *", "at 00:00, on day 1 of the month, in January to March"},
+	{"0 30 2 * 3,11 SUN#1,SUN#2", "at 02:30, on the first Sunday and the second Sunday, in March and November"},
+	{"0 9 * * MON,FRI#L", "at 09:00, on Monday and the last Friday"},
+	{"0 9 * * MON-WED,FRI#3", "at 09:00, on Monday to Wednesday and the third Friday"},
 	{"@daily", "at 00:00"},
 	{"@hourly", "at minute 0 of every hour"},
 	{"@weekly", "at 00:00, on Sunday"},
@@ -160,8 +163,8 @@ func grammar() *regexp.Regexp {
 		"a hashed day of the month"+between,
 		alt("day", "days")+" "+vlist(num)+" of every month"+opt(note),
 	)
-	dow := alt(listOf(day), "the "+alt("first", "second", "third", "fourth", "fifth", "last")+" "+day,
-		"a hashed day of the week")
+	dowItem := alt(day+opt(" to "+day), "the "+alt("first", "second", "third", "fourth", "fifth", "last")+" "+day)
+	dow := alt(dowItem+opt("(?:, "+dowItem+")* and "+dowItem), "a hashed day of the week")
 	dayc := alt("on "+dom+opt(" when it falls on "+dow), "on "+dow)
 	monthc := alt("in "+listOf(month), "in a hashed month")
 	year := "in " + listOf(num)

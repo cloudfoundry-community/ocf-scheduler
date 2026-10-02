@@ -480,22 +480,8 @@ func domPhrase(text string) (string, error) {
 }
 
 func dowPhrase(text string) (string, error) {
-	if day, n, ok := strings.Cut(text, "#"); ok && !strings.Contains(text, ",") {
-		d, perr := parseNum(day, fieldBounds[DayOfWeek])
-		if perr != nil {
-			return "", errUndescribed
-		}
-		if strings.EqualFold(n, "L") {
-			return "the last " + dayNames[d], nil
-		}
-		k, err := strconv.Atoi(n)
-		if err != nil || k < 1 || k > 5 {
-			return "", errUndescribed
-		}
-		return "the " + nth[k] + " " + dayNames[d], nil
-	}
-	f := Field{Name: DayOfWeek, Text: text}
-	if els := elements(text); len(els) == 1 {
+	els := elements(text)
+	if len(els) == 1 {
 		it, perr := parseItem(els[0], fieldBounds[DayOfWeek])
 		if perr == nil && it.kind == kHash && !it.ranged {
 			return "a hashed day of the week", nil
@@ -511,11 +497,43 @@ func dowPhrase(text string) (string, error) {
 			return andList(days), nil
 		}
 	}
-	items, err := simpleItems(f)
-	if err != nil {
-		return "", err
+	words := make([]string, len(els))
+	for i, e := range els {
+		w, err := dowItem(e)
+		if err != nil {
+			return "", err
+		}
+		words[i] = w
 	}
-	return list(items, func(n int) string { return dayNames[n] }), nil
+	return andList(words), nil
+}
+
+// dowItem renders one day-of-week list element: a day, a range of days,
+// or an nth day of the month ("the second Sunday", "the last Friday").
+func dowItem(e string) (string, error) {
+	b := fieldBounds[DayOfWeek]
+	if day, n, ok := strings.Cut(e, "#"); ok {
+		d, perr := parseNum(day, b)
+		if perr != nil {
+			return "", errUndescribed
+		}
+		if strings.EqualFold(n, "L") {
+			return "the last " + dayNames[d], nil
+		}
+		k, err := strconv.Atoi(n)
+		if err != nil || k < 1 || k > 5 {
+			return "", errUndescribed
+		}
+		return "the " + nth[k] + " " + dayNames[d], nil
+	}
+	it, perr := parseItem(e, b)
+	if perr != nil || (it.kind != kValue && it.kind != kRange) {
+		return "", errUndescribed
+	}
+	if it.kind == kRange {
+		return dayNames[it.lo] + " to " + dayNames[it.hi], nil
+	}
+	return dayNames[it.lo], nil
 }
 
 // ---- month ----
