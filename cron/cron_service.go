@@ -171,12 +171,6 @@ func (service *CronService) Count() int {
 	return len(service.Entries())
 }
 
-func (service *CronService) Validate(expression string) error {
-	_, err := cron.FullParser().Parse(expression)
-
-	return err
-}
-
 // Analyze applies this service's rules to expression, keyed by key (the job
 // or call GUID; empty for a bare expression).
 func (service *CronService) Analyze(expression, key string, next, prev int) core.ScheduleAnalysis {
