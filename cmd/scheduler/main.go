@@ -237,7 +237,9 @@ func main() {
 					),
 				)
 
-				cronService.Add(core.NewJobRun(job, schedule, services))
+				if err := cronService.Add(core.NewJobRun(job, schedule, services)); err != nil {
+					log.Error(tag, fmt.Sprintf("not loading schedule %s for job %s: %v", schedule.GUID, job.Name, err))
+				}
 			} else {
 				log.Warn(tag, fmt.Sprintf("skipping schedule %s: job %s not found", schedule.GUID, schedule.RefGUID))
 			}
@@ -252,7 +254,9 @@ func main() {
 					),
 				)
 
-				cronService.Add(core.NewCallRun(call, schedule, services))
+				if err := cronService.Add(core.NewCallRun(call, schedule, services)); err != nil {
+					log.Error(tag, fmt.Sprintf("not loading schedule %s for call %s: %v", schedule.GUID, call.Name, err))
+				}
 			} else {
 				log.Warn(tag, fmt.Sprintf("skipping schedule %s: call %s not found", schedule.GUID, schedule.RefGUID))
 			}
