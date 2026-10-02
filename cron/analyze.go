@@ -64,6 +64,7 @@ func Analyze(expression, key string, next, prev int, rules Rules, now time.Time)
 		return Analysis{Result: r}
 	}
 	r.Description, _ = spec.Describe(expression)
+	r.DescriptionNote = spec.DescribeNote(expression)
 	fields, _ := spec.Fields(expression)
 	ss, isSpec := sched.(*cron.SpecSchedule)
 
