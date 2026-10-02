@@ -9,24 +9,44 @@ import (
 )
 
 var golden = []struct{ expr, want string }{
-	{"*/15 * * * *", "every 15 minutes past the hour (0, 15, 30, 45)"},
+	{"*/15 * * * *", "at minutes 0, 15, 30 and 45 of every hour"},
 	{"* * * * *", "every minute"},
 	{"* * * * * *", "every second"},
-	{"*/10 * * * * *", "every 10 seconds past the minute (0, 10, 20, 30, 40, 50)"},
+	{"*/10 * * * * *", "at seconds 0, 10, 20, 30, 40 and 50 of every minute"},
+	{"*/2 * * * * *", "at seconds 0, 2, 4, … 58 of every minute (every 2 seconds)"},
 	{"0 30 2 * * MON-FRI", "at 02:30, on Monday to Friday"},
 	{"15 30 2 * * *", "at 02:30:15"},
 	{"0 9-17 * * MON-FRI", "at minute 0 of hours 9 to 17, on Monday to Friday"},
-	{"5,10,40 * * * *", "at minutes 5, 10 and 40 past the hour"},
+	{"5,10,40 * * * *", "at minutes 5, 10 and 40 of every hour"},
 	{"* 2 * * *", "every minute of hour 2"},
-	{"30 */2 * * *", "at minute 30 of every 2 hours of the day (0, 2, 4, … 22)"},
-	{"*/15 9-17 * * *", "every 15 minutes (0, 15, 30, 45) of hours 9 to 17"},
+	{"30 */2 * * *", "at minute 30 of hours 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 and 22 of every day"},
+	{"0 */2 * * MON", "at minute 0 of hours 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 and 22, on Monday"},
+	{"0 0-21/3 * * *", "at minute 0 of hours 0, 3, 6, 9, 12, 15, 18 and 21 of every day"},
+	{"*/15 9-17 * * *", "at minutes 0, 15, 30 and 45 of hours 9 to 17"},
 	{"0 22-2 * * *", "at 22:00, 23:00, 00:00, 01:00 and 02:00"},
-	{"5-50/15 * * * *", "every 15 minutes past the hour from 5 through 50 minutes (5, 20, 35, 50)"},
+	{"5-50/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour"},
+	{"5/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour"},
+	{"CRON_TZ=US/Pacific 5/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour, US/Pacific time"},
+	{"10-40/10 * * * *", "at minutes 10, 20, 30 and 40 of every hour"},
+	{"*/7 * * * *", "at minutes 0, 7, 14, … 56 of every hour (every 7 minutes, starting over each hour)"},
+	{"*/7 9-10 * * *", "at minutes 0, 7, 14, … 56 of hours 9 to 10 (every 7 minutes, starting over each hour)"},
+	{"5/15 2 * * *", "at 02:05, 02:20, 02:35 and 02:50"},
+	{"*/15 2 * * *", "at 02:00, 02:15, 02:30 and 02:45"},
+	{"*/20 30 * * * *", "at seconds 0, 20 and 40 of minute 30 of every hour"},
+	{"15 */4 * * * *", "at second 15 of minutes 0, 4, 8, … 56 of every hour (every 4 minutes)"},
+	{"0 1/6 * * *", "at 01:00, 07:00, 13:00 and 19:00"},
+	{"30 */6 * * *", "at 00:30, 06:30, 12:30 and 18:30"},
+	{"0 9,17 * * *", "at 09:00 and 17:00"},
+	{"15 0 1/6 * * *", "at 01:00:15, 07:00:15, 13:00:15 and 19:00:15"},
 	{"H(15-45) 2 * * *", "at a hashed minute between 15 and 45 of hour 2"},
 	{"H H * * *", "at a hashed minute of a hashed hour"},
 	{"H/15 * * * *", "every 15 minutes from a hashed start"},
 	{"0 0 13 * FRI", "at 00:00, on day 13 of the month when it falls on Friday"},
 	{"0 0 1,15 * *", "at 00:00, on days 1 and 15 of the month"},
+	{"0 0 1/10 * *", "at 00:00, on days 1, 11, 21 and 31 of every month"},
+	{"0 0 5/10 * *", "at 00:00, on days 5, 15 and 25 of every month"},
+	{"0 0 5-25/10 * *", "at 00:00, on days 5, 15 and 25 of every month"},
+	{"0 0 1/2 * *", "at 00:00, on days 1, 3, 5, … 31 of every month (every 2 days, starting over each month)"},
 	{"0 0 L * *", "at 00:00, on the last day of the month"},
 	{"0 0 L-3 * *", "at 00:00, on the 3rd day before the end of the month"},
 	{"0 0 LW * *", "at 00:00, on the last weekday of the month"},
@@ -34,30 +54,16 @@ var golden = []struct{ expr, want string }{
 	{"0 0 * * FRI#3", "at 00:00, on the third Friday"},
 	{"0 0 * * 5#L", "at 00:00, on the last Friday"},
 	{"0 0 * * 0,7", "at 00:00, on Sunday and Sunday"},
-	{"0 0 1 1 * 2027", "at 00:00, on day 1 of the month, in January, in 2027"},
-	{"0 0 1 */3 *", "at 00:00, on day 1 of the month, in every 3 months of the year (January, April, July, October)"},
-	{"0 0 1 JAN-MAR *", "at 00:00, on day 1 of the month, in January to March"},
-	{"5/15 * * * *", "every 15 minutes past the hour starting at 5 minutes (5, 20, 35, 50)"},
-	{"CRON_TZ=US/Pacific 5/15 * * * *", "every 15 minutes past the hour starting at 5 minutes (5, 20, 35, 50), US/Pacific time"},
-	{"10-40/10 * * * *", "every 10 minutes past the hour from 10 through 40 minutes (10, 20, 30, 40)"},
-	{"*/7 * * * *", "every 7 minutes past the hour (0, 7, 14, … 56)"},
-	{"5/15 2 * * *", "every 15 minutes starting at 5 minutes (5, 20, 35, 50) of hour 2"},
-	{"*/20 30 * * * *", "every 20 seconds (0, 20, 40) of minute 30 past the hour"},
-	{"15 */4 * * * *", "at second 15 of every 4 minutes past the hour (0, 4, 8, … 56)"},
-	{"0 1/6 * * *", "at 01:00, 07:00, 13:00 and 19:00"},
-	{"30 */6 * * *", "at 00:30, 06:30, 12:30 and 18:30"},
-	{"0 9,17 * * *", "at 09:00 and 17:00"},
-	{"15 0 1/6 * * *", "at 01:00:15, 07:00:15, 13:00:15 and 19:00:15"},
-	{"0 0 1/10 * *", "at 00:00, on every 10 days of the month (1, 11, 21, 31)"},
-	{"0 0 5/10 * *", "at 00:00, on every 10 days of the month starting on day 5 (5, 15, 25)"},
-	{"0 0 5-25/10 * *", "at 00:00, on every 10 days of the month from day 5 through 25 (5, 15, 25)"},
-	{"0 0 1 2/3 *", "at 00:00, on day 1 of the month, in every 3 months of the year starting in February (February, May, August, November)"},
-	{"0 0 1 2-8/3 *", "at 00:00, on day 1 of the month, in every 3 months of the year from February through August (February, May, August)"},
 	{"0 0 * * 1/2", "at 00:00, on Monday, Wednesday, Friday and Sunday"},
 	{"0 0 * * */2", "at 00:00, on Sunday, Tuesday, Thursday and Saturday"},
 	{"0 0 * * 0/1", "at 00:00, on Sunday, Monday, Tuesday, Wednesday, Thursday, Friday and Saturday"},
+	{"0 0 1 1 * 2027", "at 00:00, on day 1 of the month, in January, in 2027"},
+	{"0 0 1 */3 *", "at 00:00, on day 1 of the month, in January, April, July and October"},
+	{"0 0 1 2/3 *", "at 00:00, on day 1 of the month, in February, May, August and November"},
+	{"0 0 1 2-8/3 *", "at 00:00, on day 1 of the month, in February, May and August"},
+	{"0 0 1 JAN-MAR *", "at 00:00, on day 1 of the month, in January to March"},
 	{"@daily", "at 00:00"},
-	{"@hourly", "at minute 0 past the hour"},
+	{"@hourly", "at minute 0 of every hour"},
 	{"@weekly", "at 00:00, on Sunday"},
 	{"@yearly", "at 00:00, on day 1 of the month, in January"},
 	{"@every 1h30m", "every 1h30m from when the schedule starts"},
@@ -95,6 +101,8 @@ func grammar() *regexp.Regexp {
 		it := w + opt(" to "+w)
 		return it + opt("(?:, "+it+")* and "+it)
 	}
+	// a value list, or one cut short: "0, 7, 14, … 56"
+	vlist := func(w string) string { return alt(listOf(w), w+", "+w+", "+w+", … "+w) }
 	num := `\d+`
 	day := alt("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 	month := alt("January", "February", "March", "April", "May", "June", "July",
@@ -102,22 +110,17 @@ func grammar() *regexp.Regexp {
 	sg := alt("second", "minute", "hour")
 	pl := alt("seconds", "minutes", "hours")
 	between := opt(" between " + num + " and " + num)
-	contain := alt(" past the minute", " past the hour", " of the day")
-	runsOf := func(w string) string {
-		return " \\(" + alt(w+"(?:, "+w+")*", w+", "+w+", "+w+", … "+w) + "\\)"
-	}
-	values := alt(sg, pl) + " " + listOf(num) + opt(contain)
+	interval := "every " + alt(sg, "day", num+" "+alt(pl, "days")) +
+		opt(", starting over each "+alt("minute", "hour", "day", "month"))
+	note := " \\(" + interval + "(?:; " + interval + ")*\\)"
+	values := alt(sg, pl) + " " + vlist(num)
 	hashed := "a hashed " + sg + between
-	amount := alt(num+" "+alt(sg, pl), "hour "+num)
-	span := alt(" starting at "+amount, " from "+alt(num, "hour "+num)+" through "+num+opt(" "+pl))
-	step := alt(
-		alt("every "+sg, "every "+num+" "+pl)+opt(contain)+opt(span)+runsOf(num),
-		"every "+num+" "+pl+" from a hashed start"+between)
-	unit := alt(values, hashed, step, "every "+sg)
-	lead := alt("at "+values, "at "+hashed, step, "every "+sg)
+	hstep := "every " + num + " " + pl + " from a hashed start" + between
+	unit := alt(values, hashed, hstep, "every "+sg, "every day")
+	lead := alt("at "+values, "at "+hashed, hstep, "every "+sg)
 	clock := `\d\d:\d\d(?::\d\d)?`
 	clocks := clock + opt("(?:, "+clock+")* and "+clock)
-	tm := alt("at "+clocks, lead+"(?: of "+unit+")*")
+	tm := alt("at "+clocks, lead+"(?: of "+unit+")*"+opt(note))
 	dom := alt(
 		alt("day", "days")+" "+listOf(num)+" of the month",
 		"the last day of the month",
@@ -125,16 +128,12 @@ func grammar() *regexp.Regexp {
 		"the weekday nearest day "+num,
 		"the last weekday of the month",
 		"a hashed day of the month"+between,
-		alt("every day", "every "+num+" days")+" of the month"+
-			opt(alt(" starting on day "+num, " from day "+num+" through "+num))+runsOf(num),
+		alt("day", "days")+" "+vlist(num)+" of every month"+opt(note),
 	)
 	dow := alt(listOf(day), "the "+alt("first", "second", "third", "fourth", "fifth", "last")+" "+day,
 		"a hashed day of the week")
 	dayc := alt("on "+dom+opt(" when it falls on "+dow), "on "+dow)
-	monthc := alt("in "+listOf(month),
-		"in "+alt("every month", "every "+num+" months")+" of the year"+
-			opt(alt(" starting in "+month, " from "+month+" through "+month))+runsOf(month),
-		"in a hashed month")
+	monthc := alt("in "+listOf(month), "in a hashed month")
 	year := "in " + listOf(num)
 	zone := `[A-Za-z0-9_+\-/]+ time`
 	sched := alt("every [0-9a-zµ.]+ from when the schedule starts", "only when triggered",
