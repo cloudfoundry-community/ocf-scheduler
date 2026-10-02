@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -43,6 +44,8 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 
 		input.RefGUID = guid
 		input.RefType = "call"
+
+		input.Expression = strings.TrimSpace(input.Expression)
 
 		services.Logger.Debug(tag, fmt.Sprintf("expression == '%s', expression_type == '%s'", input.Expression, input.ExpressionType))
 
