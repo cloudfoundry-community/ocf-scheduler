@@ -82,25 +82,7 @@ func Analyze(expression, key string, next, prev int, rules Rules, now time.Time)
 
 	// Run lists follow go-cron's runner: a run is dropped only when it repeats
 	// the wall time of the run kept just before it (see isDSTFallbackDuplicate).
-	nextRuns := []time.Time{}
-	if isSpec && effectiveZone != nil {
-		// NextRuns: step through Schedule.Next, keeping only non-duplicates
-		var lastKept time.Time
-		t := now
-		for len(nextRuns) < clamp(next) {
-			t = sched.Next(t)
-			if t.IsZero() {
-				break
-			}
-			if !isDSTFallbackDuplicate(lastKept, t, effectiveZone) {
-				nextRuns = append(nextRuns, t)
-				lastKept = t
-			}
-		}
-	} else {
-		// No zone info, just use raw runs
-		nextRuns = cron.NextN(sched, now, clamp(next))
-	}
+	nextRuns := runnerRuns(sched, now, clamp(next), effectiveZone)
 
 	prevRuns := []time.Time{}
 	if isSpec && effectiveZone != nil {
@@ -143,7 +125,7 @@ func Analyze(expression, key string, next, prev int, rules Rules, now time.Time)
 		r.Errors = append(r.Errors, core.Finding{Code: "never_fires",
 			Message: "this schedule never runs"})
 	} else if rules.MinInterval > 0 {
-		if gap, ok := smallestGap(sched, now); ok && gap < rules.MinInterval {
+		if gap, ok := smallestGap(sched, now, effectiveZone); ok && gap < rules.MinInterval {
 			r.Errors = append(r.Errors, core.Finding{Code: "under_min_interval",
 				Message: fmt.Sprintf("runs as often as every %s; this scheduler's minimum is %s", gap, rules.MinInterval)})
 		}
@@ -221,15 +203,38 @@ func hashedFields(s spec.Spec, ss *cron.SpecSchedule) []core.HashedField {
 	return out
 }
 
+// runnerRuns returns the next n runs go-cron's runner would fire: it steps
+// through Schedule.Next and drops a run only when it repeats the wall time of
+// the run kept just before it (see isDSTFallbackDuplicate). A nil loc means no
+// zone to judge repeats by, so the raw runs are returned.
+func runnerRuns(sched cron.Schedule, now time.Time, n int, loc *time.Location) []time.Time {
+	if loc == nil {
+		return cron.NextN(sched, now, n)
+	}
+	runs := []time.Time{}
+	var lastKept time.Time
+	for t := now; len(runs) < n; {
+		t = sched.Next(t)
+		if t.IsZero() {
+			break
+		}
+		if !isDSTFallbackDuplicate(lastKept, t, loc) {
+			runs = append(runs, t)
+			lastKept = t
+		}
+	}
+	return runs
+}
+
 // smallestGap is the smallest time between consecutive runs among the next
-// 1000.
+// 1000 the runner fires.
 // NOTE: a sample, not a proof; fields are ANDed so the smallest gap shows up
 // early. Compute it from the field bitmasks if that ever falls short.
-func smallestGap(sched cron.Schedule, now time.Time) (time.Duration, bool) {
+func smallestGap(sched cron.Schedule, now time.Time, loc *time.Location) (time.Duration, bool) {
 	if cd, ok := sched.(cron.ConstantDelaySchedule); ok {
 		return cd.Delay, true
 	}
-	runs := cron.NextN(sched, now, 1000)
+	runs := runnerRuns(sched, now, 1000, loc)
 	if len(runs) < 2 {
 		return 0, false
 	}

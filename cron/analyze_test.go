@@ -380,3 +380,23 @@ func TestFallbackPrevSkipsDuplicate(t *testing.T) {
 	r := Analyze("CRON_TZ=America/Los_Angeles 30 1 * * *", "", 0, 1, Rules{}, prevNow).Result
 	checkRuns(t, "prev1", r.PrevRuns, []time.Time{time.Date(2026, 11, 1, 8, 30, 0, 0, time.UTC)})
 }
+
+// A repeated wall time that the runner drops is not a second run, so it must
+// not count toward the minimum interval.
+func TestMinIntervalIgnoresFallbackRepeats(t *testing.T) {
+	tests := []struct {
+		expr string
+		want string
+	}{
+		{"CRON_TZ=America/Los_Angeles 0 1 * * *", ""},
+		{"CRON_TZ=America/Los_Angeles 30 1 * * SUN", ""},
+		{"CRON_TZ=Europe/Berlin 30 2 * * *", ""},
+		{"CRON_TZ=America/Los_Angeles */30 * * * *", "under_min_interval"},
+	}
+	for _, tt := range tests {
+		r := Analyze(tt.expr, "", 5, 0, Rules{MinInterval: 2 * time.Hour}, now).Result
+		if got := codes(r.Errors); got != tt.want {
+			t.Errorf("%q: errors %q (%v), want %q", tt.expr, got, r.Errors, tt.want)
+		}
+	}
+}
