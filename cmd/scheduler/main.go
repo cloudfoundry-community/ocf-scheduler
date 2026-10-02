@@ -49,6 +49,22 @@ func ErrorString(err error) string {
 	return err.Error()
 }
 
+// parseMinInterval reads SCHEDULER_MIN_INTERVAL: a Go duration, "" or "0"
+// for off. An invalid or negative value is an error and means off.
+func parseMinInterval(raw string) (time.Duration, error) {
+	if raw == "" {
+		return 0, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, err
+	}
+	if d < 0 {
+		return 0, fmt.Errorf("negative duration %s", raw)
+	}
+	return d, nil
+}
+
 func main() {
 	log := logger.New()
 	tag := AppName
@@ -153,6 +169,12 @@ func main() {
 	}
 	log.Info(tag, fmt.Sprintf("SCHEDULER_WORKERS set to %d", workerNum))
 
+	minInterval, err := parseMinInterval(os.Getenv("SCHEDULER_MIN_INTERVAL"))
+	if err != nil {
+		log.Warn(tag, fmt.Sprintf("Invalid SCHEDULER_MIN_INTERVAL: %v, defaulting to 0 (off)", err))
+	}
+	log.Info(tag, fmt.Sprintf("SCHEDULER_MIN_INTERVAL set to %s", minInterval))
+
 	timezonePath := filepath.Join(core.TimezoneJsonDir, core.TimezoneJsonBase)
 	if err := cron.InitializeTimezones(timezonePath); err != nil {
 		log.Warn(tag, fmt.Sprintf("Cannot process timezone file: %v", err.Error()))
@@ -181,7 +203,7 @@ func main() {
 	workers := workerpool.New(workerNum)
 	defer workers.StopWait()
 
-	cronService := cron.NewCronService(log, cron.Rules{})
+	cronService := cron.NewCronService(log, cron.Rules{MinInterval: minInterval})
 	cronService.Start()
 	defer func() {
 		ctx := cronService.Stop()
