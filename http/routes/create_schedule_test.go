@@ -28,3 +28,17 @@ func TestCreateScheduleReturnsStructuredErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateScheduleStoresTrimmedExpression(t *testing.T) {
+	f := newFixture(t)
+	for _, path := range []string{"/jobs/" + f.job.GUID + "/schedules", "/calls/" + f.call.GUID + "/schedules"} {
+		rec := f.post(path, `{"enabled": true, "expression": "  CRON_TZ=UTC 0 2 * * *  ", "expression_type": "cron_expression"}`, "jeremy")
+		var got struct {
+			Expression string `json:"expression"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != http.StatusCreated ||
+			got.Expression != "CRON_TZ=UTC 0 2 * * *" {
+			t.Errorf("%s: status %d, expression %q, body %s", path, rec.Code, got.Expression, rec.Body)
+		}
+	}
+}

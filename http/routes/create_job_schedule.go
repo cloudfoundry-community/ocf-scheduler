@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -42,6 +43,8 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 
 		input.RefGUID = guid
 		input.RefType = "job"
+
+		input.Expression = strings.TrimSpace(input.Expression)
 
 		analysis := services.Cron.Analyze(input.Expression, guid, 0, 0)
 		if len(analysis.Errors) > 0 {
