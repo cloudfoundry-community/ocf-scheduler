@@ -46,6 +46,9 @@ func TestAddMatchesAnalyze(t *testing.T) {
 	now := time.Now()
 	want := service.Analyze(s.Expression, s.RefGUID, 5, 0).NextRuns
 	got := cron.NextN(service.Entry(service.mapping["s1"]).Schedule, now, 5)
+	if len(want) != 5 || len(got) != len(want) {
+		t.Fatalf("got %d registered and %d validated runs, want 5 of each", len(got), len(want))
+	}
 	for i := range want {
 		if !got[i].Equal(want[i]) {
 			t.Errorf("run %d: registered %v, validated %v", i, got[i], want[i])
