@@ -181,7 +181,7 @@ func main() {
 	workers := workerpool.New(workerNum)
 	defer workers.StopWait()
 
-	cronService := cron.NewCronService(log)
+	cronService := cron.NewCronService(log, cron.Rules{})
 	cronService.Start()
 	defer func() {
 		ctx := cronService.Stop()
