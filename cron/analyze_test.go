@@ -400,3 +400,14 @@ func TestMinIntervalIgnoresFallbackRepeats(t *testing.T) {
 		}
 	}
 }
+func TestNeverFiresSearchLimit(t *testing.T) {
+	r := Analyze("CRON_TZ=UTC 0 0 13 2 FRI", "", 5, 0, Rules{}, now).Result
+	want := "next run is on 2032-02-13, beyond the scheduler's 5-year search limit; it would not be scheduled"
+	if len(r.Errors) != 1 || r.Errors[0].Code != "never_fires" || r.Errors[0].Message != want {
+		t.Errorf("rare date: %+v, want never_fires %q", r.Errors, want)
+	}
+	r = Analyze("CRON_TZ=UTC 0 0 30 2 *", "", 5, 0, Rules{}, now).Result
+	if len(r.Errors) != 1 || r.Errors[0].Code != "never_fires" || r.Errors[0].Message != "this schedule never runs" {
+		t.Errorf("impossible date: %+v", r.Errors)
+	}
+}

@@ -123,7 +123,7 @@ func Analyze(expression, key string, next, prev int, rules Rules, now time.Time)
 
 	if sched.Next(now).IsZero() {
 		r.Errors = append(r.Errors, core.Finding{Code: "never_fires",
-			Message: "this schedule never runs"})
+			Message: neverFiresMessage(expression, key, now, effectiveZone)})
 	} else if rules.MinInterval > 0 {
 		if gap, ok := smallestGap(sched, now, effectiveZone); ok && gap < rules.MinInterval {
 			r.Errors = append(r.Errors, core.Finding{Code: "under_min_interval",
@@ -224,6 +224,26 @@ func runnerRuns(sched cron.Schedule, now time.Time, n int, loc *time.Location) [
 		}
 	}
 	return runs
+}
+
+// neverFiresMessage explains a schedule go-cron's 5-year search found no run
+// for. A rare date (Feb 29 on a Monday) can still have one further out; the
+// scheduler cannot register it, so it stays an error, but the message says so.
+func neverFiresMessage(expression, key string, now time.Time, loc *time.Location) string {
+	const never = "this schedule never runs"
+	sched, err := cron.FullParser().WithHashKey(key).WithMaxSearchYears(100).Parse(expression)
+	if err != nil {
+		return never
+	}
+	t := sched.Next(now)
+	if t.IsZero() {
+		return never
+	}
+	if loc == nil {
+		loc = now.Location()
+	}
+	return fmt.Sprintf("next run is on %s, beyond the scheduler's 5-year search limit; it would not be scheduled",
+		t.In(loc).Format("2006-01-02"))
 }
 
 // smallestGap is the smallest time between consecutive runs among the next
