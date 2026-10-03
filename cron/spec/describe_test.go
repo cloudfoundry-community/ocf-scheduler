@@ -16,20 +16,20 @@ var golden = []struct{ expr, want string }{
 	{"*/2 * * * * *", "at seconds 0, 2, 4, … 58 of every minute (every 2 seconds)"},
 	{"0 30 2 * * MON-FRI", "at 02:30, on Monday thru Friday"},
 	{"15 30 2 * * *", "at 02:30:15"},
-	{"0 9-17 * * MON-FRI", "at minute 0 of hours 9 to 17, on Monday thru Friday"},
+	{"0 9-17 * * MON-FRI", "at minute 0 of hours 9 thru 17, on Monday thru Friday"},
 	{"5,10,40 * * * *", "at minutes 5, 10 and 40 of every hour"},
 	{"* 2 * * *", "every minute of hour 2"},
 	{"30 */2 * * *", "at minute 30 of hours 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 and 22 of every day"},
 	{"0 */2 * * MON", "at minute 0 of hours 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 and 22, on Monday"},
 	{"0 0-21/3 * * *", "at minute 0 of hours 0, 3, 6, 9, 12, 15, 18 and 21 of every day"},
-	{"*/15 9-17 * * *", "at minutes 0, 15, 30 and 45 of hours 9 to 17"},
+	{"*/15 9-17 * * *", "at minutes 0, 15, 30 and 45 of hours 9 thru 17"},
 	{"0 22-2 * * *", "at 22:00, 23:00, 00:00, 01:00 and 02:00"},
 	{"5-50/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour"},
 	{"5/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour"},
 	{"CRON_TZ=US/Pacific 5/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour"},
 	{"10-40/10 * * * *", "at minutes 10, 20, 30 and 40 of every hour"},
 	{"*/7 * * * *", "at minutes 0, 7, 14, … 56 of every hour (every 7 minutes, starting over each hour)"},
-	{"*/7 9-10 * * *", "at minutes 0, 7, 14, … 56 of hours 9 to 10 (every 7 minutes, starting over each hour)"},
+	{"*/7 9-10 * * *", "at minutes 0, 7, 14, … 56 of hours 9 and 10 (every 7 minutes, starting over each hour)"},
 	{"5/15 2 * * *", "at 02:05, 02:20, 02:35 and 02:50"},
 	{"*/15 2 * * *", "at 02:00, 02:15, 02:30 and 02:45"},
 	{"*/20 30 * * * *", "at seconds 0, 20 and 40 of minute 30 of every hour"},
@@ -62,13 +62,13 @@ var golden = []struct{ expr, want string }{
 	{"0 0 1 */3 *", "at 00:00, on day 1 of the month, in January, April, July and October"},
 	{"0 0 1 2/3 *", "at 00:00, on day 1 of the month, in February, May, August and November"},
 	{"0 0 1 2-8/3 *", "at 00:00, on day 1 of the month, in February, May and August"},
-	{"0 0 1 JAN-MAR *", "at 00:00, on day 1 of the month, in January to March"},
+	{"0 0 1 JAN-MAR *", "at 00:00, on day 1 of the month, in January thru March"},
 	{"0 30 2 * 3,11 SUN#1,SUN#2", "at 02:30, on the first Sunday and the second Sunday, in March and November"},
 	{"0 9 * * MON,FRI#L", "at 09:00, on Monday and the last Friday"},
 	{"0 9 * * MON-WED,FRI#3", "at 09:00, on Monday thru Wednesday and the third Friday"},
 	{"0 9 1,L * *", "at 09:00, on day 1 and the last day of the month"},
 	{"0 9 15W,L * *", "at 09:00, on the weekday nearest day 15 and the last day of the month"},
-	{"0 9 1-5,L * *", "at 09:00, on days 1 to 5 and the last day of the month"},
+	{"0 9 1-5,L * *", "at 09:00, on days 1 thru 5 and the last day of the month"},
 	{"0 9 LW,15 * *", "at 09:00, on the last weekday and day 15 of the month"},
 	{"0 9 1,15,L-2 * *", "at 09:00, on day 1, day 15 and the 2nd day before the end of the month"},
 	{"0 9 1W,LW * MON", "at 09:00, on the weekday nearest day 1 and the last weekday of the month when it falls on Monday"},
@@ -78,6 +78,13 @@ var golden = []struct{ expr, want string }{
 	{"0 9 * * 6-7", "at 09:00, on Saturday and Sunday"},
 	{"0 9 * * FRI-MON", "at 09:00, on Friday thru Monday"},
 	{"0 9 * * MON-TUE,FRI#3", "at 09:00, on Monday, Tuesday and the third Friday"},
+	{"5-10 * * * *", "at minutes 5 thru 10 of every hour"},
+	{"*/15 9-10 * * *", "at minutes 0, 15, 30 and 45 of hours 9 and 10"},
+	{"0 0 1-2 * *", "at 00:00, on days 1 and 2 of the month"},
+	{"0 9 1-2,L * *", "at 09:00, on day 1, day 2 and the last day of the month"},
+	{"0 0 1 JAN-FEB *", "at 00:00, on day 1 of the month, in January and February"},
+	{"0 0 1 1 * 2026-2028", "at 00:00, on day 1 of the month, in January, in 2026 thru 2028"},
+	{"0 0 1 1 * 2026-2027", "at 00:00, on day 1 of the month, in January, in 2026 and 2027"},
 	{"@daily", "at 00:00"},
 	{"@hourly", "at minute 0 of every hour"},
 	{"@weekly", "at 00:00, on Sunday"},
@@ -143,7 +150,7 @@ func grammar() *regexp.Regexp {
 	alt := func(xs ...string) string { return "(?:" + strings.Join(xs, "|") + ")" }
 	opt := func(x string) string { return "(?:" + x + ")?" }
 	listOf := func(w string) string {
-		it := w + opt(" to "+w)
+		it := w + opt(" thru "+w)
 		return it + opt("(?:, "+it+")* and "+it)
 	}
 	// a value list, or one cut short: "0, 7, 14, … 56"
@@ -167,7 +174,7 @@ func grammar() *regexp.Regexp {
 	clocks := clock + opt("(?:, "+clock+")* and "+clock)
 	tm := alt("at "+clocks, lead+"(?: of "+unit+")*"+opt(note))
 	// one element of a day-of-month list that holds L or W forms
-	domEl := alt("day "+num, "days "+num+" to "+num, "the last day", "the last weekday",
+	domEl := alt("day "+num, "days "+num+" thru "+num, "the last day", "the last weekday",
 		"the "+num+alt("st", "nd", "rd", "th")+" day before the end", "the weekday nearest day "+num)
 	dom := alt(
 		alt("day", "days")+" "+listOf(num)+" of the month",

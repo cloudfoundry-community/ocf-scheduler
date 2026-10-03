@@ -108,7 +108,7 @@ func describeFields(s Spec) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		clauses = append(clauses, "in "+list(items, strconv.Itoa))
+		clauses = append(clauses, "in "+list(items, strconv.Itoa, fieldBounds[Year]))
 	}
 	return strings.Join(clauses, ", "), nil
 }
@@ -126,12 +126,18 @@ func simpleItems(f Field) ([]item, error) {
 	return out, nil
 }
 
-func list(items []item, name func(int) string) string {
-	words := make([]string, len(items))
-	for i, it := range items {
-		words[i] = name(it.lo)
-		if it.kind == kRange {
-			words[i] += " to " + name(it.hi)
+// list names values and ranges ("9 thru 17"); a range of two adjacent
+// values names both ("9 and 10"), as day-of-week ranges do.
+func list(items []item, name func(int) string, b bounds) string {
+	var words []string
+	for _, it := range items {
+		switch {
+		case it.kind != kRange:
+			words = append(words, name(it.lo))
+		case it.hi == it.lo+1 || (it.lo == b.max && it.hi == b.min):
+			words = append(words, name(it.lo), name(it.hi))
+		default:
+			words = append(words, name(it.lo)+" thru "+name(it.hi))
 		}
 	}
 	return andList(words)
@@ -283,7 +289,7 @@ func timeUnit(f Field, v string) (unitPhrase, error) {
 	if plural(items) {
 		unit = pl
 	}
-	return unitPhrase{text: unit + " " + list(items, strconv.Itoa), kind: "values"}, nil
+	return unitPhrase{text: unit + " " + list(items, strconv.Itoa, b), kind: "values"}, nil
 }
 
 // stepValues renders a step as the values it fires on ("minutes 0, 15, 30
@@ -463,13 +469,13 @@ func domPhrase(text string) (string, error) {
 		}
 	}
 	if els := elements(text); len(els) > 1 && strings.ContainsAny(up, "LW") {
-		words := make([]string, len(els))
-		for i, e := range els {
+		var words []string
+		for _, e := range els {
 			w, err := domItem(e)
 			if err != nil {
 				return "", err
 			}
-			words[i] = w
+			words = append(words, w...)
 		}
 		return andList(words) + " of the month", nil
 	}
@@ -481,41 +487,44 @@ func domPhrase(text string) (string, error) {
 	if plural(items) {
 		unit = "days"
 	}
-	return unit + " " + list(items, strconv.Itoa) + " of the month", nil
+	return unit + " " + list(items, strconv.Itoa, fieldBounds[DayOfMonth]) + " of the month", nil
 }
 
 // domItem renders one element of a day-of-month list that holds L or W
-// forms; the caller adds "of the month".
-func domItem(e string) (string, error) {
+// forms; the caller adds "of the month". A range of two adjacent days is
+// two entries ("day 1", "day 2").
+func domItem(e string) ([]string, error) {
 	up := strings.ToUpper(e)
 	switch {
 	case up == "L":
-		return "the last day", nil
+		return []string{"the last day"}, nil
 	case up == "LW":
-		return "the last weekday", nil
+		return []string{"the last weekday"}, nil
 	case strings.HasPrefix(up, "L-"):
 		n, err := strconv.Atoi(up[2:])
 		if err != nil {
-			return "", errUndescribed
+			return nil, errUndescribed
 		}
-		return "the " + ordinal(n) + " day before the end", nil
+		return []string{"the " + ordinal(n) + " day before the end"}, nil
 	case strings.HasSuffix(up, "W"):
 		n, err := strconv.Atoi(up[:len(up)-1])
 		if err != nil {
-			return "", errUndescribed
+			return nil, errUndescribed
 		}
-		return fmt.Sprintf("the weekday nearest day %d", n), nil
+		return []string{fmt.Sprintf("the weekday nearest day %d", n)}, nil
 	}
 	it, perr := parseItem(e, fieldBounds[DayOfMonth])
 	switch {
 	case perr != nil:
-		return "", errUndescribed
+		return nil, errUndescribed
 	case it.kind == kValue:
-		return fmt.Sprintf("day %d", it.lo), nil
+		return []string{fmt.Sprintf("day %d", it.lo)}, nil
+	case it.kind == kRange && it.hi == it.lo+1:
+		return []string{fmt.Sprintf("day %d", it.lo), fmt.Sprintf("day %d", it.hi)}, nil
 	case it.kind == kRange:
-		return fmt.Sprintf("days %d to %d", it.lo, it.hi), nil
+		return []string{fmt.Sprintf("days %d thru %d", it.lo, it.hi)}, nil
 	}
-	return "", errUndescribed
+	return nil, errUndescribed
 }
 
 func dowPhrase(text string) (string, error) {
@@ -608,7 +617,7 @@ func describeMonth(text string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return "in " + list(items, name), nil
+	return "in " + list(items, name, fieldBounds[Month]), nil
 }
 
 func ordinal(n int) string {
