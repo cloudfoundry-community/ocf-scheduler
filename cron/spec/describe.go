@@ -60,7 +60,7 @@ func Describe(expression string) (string, error) {
 }
 
 // DescribeNote spells out a hashed step's values in terms of its hashed
-// start ("at minutes h, h+15, h+30 and h+45 of every hour, where h is a
+// start ("at h, h+15, h+30 and h+45 minutes past the hour, where h is a
 // hashed minute from 0 to 14"), so Describe can keep the short "every 15
 // minutes from a hashed start". It returns "" when no time field has a
 // hashed step or the expression has no description.
@@ -150,6 +150,8 @@ func plural(items []item) bool { return len(items) > 1 || items[0].kind == kRang
 type unitPhrase struct {
 	text     string
 	kind     string // "values", "hashed", "step", "every"
+	field    string
+	nums     string // the values alone ("0, 15, 30 and 45"), for per-unit wording
 	note     string // interval note for a list cut short
 	where    string // what a hashed step's variable stands for
 	hourStep bool   // hours from a step: "of every day" when days are free
@@ -213,14 +215,7 @@ func describeTime(s Spec, expand bool) (text string, hashed bool, err error) {
 			wheres = append(wheres, p.where)
 		}
 	}
-	parts := make([]string, len(phrases))
-	for i, p := range phrases {
-		parts[i] = p.text
-	}
-	out := strings.Join(parts, " of ")
-	if phrases[0].kind == "values" || phrases[0].kind == "hashed" {
-		out = "at " + out
-	}
+	out := joinTime(phrases)
 	if dom, _ := s.Field(DayOfMonth); phrases[len(phrases)-1].hourStep && isStar(dom) {
 		if dow, _ := s.Field(DayOfWeek); isStar(dow) {
 			out += " of every day"
@@ -233,6 +228,45 @@ func describeTime(s Spec, expand bool) (text string, hashed bool, err error) {
 		out += " (" + strings.Join(notes, "; ") + ")"
 	}
 	return out, len(wheres) > 0, nil
+}
+
+// joinTime joins the time phrases, finest first. Seconds or minutes that
+// lead with values read per unit ("at 5 and 10 minutes past the hour");
+// minute 0 of every hour is "the hour". Other phrases join with "of".
+func joinTime(ps []unitPhrase) string {
+	join := func(ps []unitPhrase) string {
+		parts := make([]string, len(ps))
+		for i, p := range ps {
+			parts[i] = p.text
+		}
+		return strings.Join(parts, " of ")
+	}
+	theHour := func(ps []unitPhrase) bool {
+		return len(ps) == 2 && ps[0].field == Minute && ps[0].nums == "0" &&
+			ps[1].field == Hour && ps[1].kind == "every"
+	}
+	first, rest := ps[0], ps[1:]
+	if first.nums == "" || first.field == Hour {
+		if first.kind == "values" || first.kind == "hashed" {
+			return "at " + join(ps)
+		}
+		return join(ps)
+	}
+	if theHour(ps) {
+		return "on the hour"
+	}
+	unit := first.field + "s"
+	if first.nums == "1" {
+		unit = first.field
+	}
+	out := "at " + first.nums + " " + unit + " past "
+	switch {
+	case len(rest) == 1 && rest[0].kind == "every":
+		return out + "the " + rest[0].field
+	case theHour(rest):
+		return out + "the hour"
+	}
+	return out + join(rest)
 }
 
 func single(f Field) (int, bool) {
@@ -264,10 +298,14 @@ func timeUnit(f Field, v string) (unitPhrase, error) {
 		}
 		switch it.kind {
 		case kStar:
-			return unitPhrase{text: "every " + sg, kind: "every"}, nil
+			return unitPhrase{text: "every " + sg, kind: "every", field: f.Name}, nil
 		case kStep:
-			text, note := stepValues(it, f.Name, sg, pl)
-			return unitPhrase{text: text, kind: "values", note: note, hourStep: f.Name == Hour}, nil
+			nums, n, note := stepRuns(it, f.Name, sg, pl, strconv.Itoa)
+			unit := pl
+			if n == 1 {
+				unit = sg
+			}
+			return unitPhrase{text: unit + " " + nums, kind: "values", field: f.Name, nums: nums, note: note, hourStep: f.Name == Hour}, nil
 		case kHash:
 			return unitPhrase{text: "a hashed " + sg + between(it), kind: "hashed"}, nil
 		case kHashStep:
@@ -277,8 +315,8 @@ func timeUnit(f Field, v string) (unitPhrase, error) {
 			if it.lo > it.hi {
 				return unitPhrase{}, errUndescribed // wrapped hashed range
 			}
-			text, where, note := hashStepValues(it, f.Name, sg, pl, v)
-			return unitPhrase{text: text, kind: "values", where: where, note: note, hourStep: f.Name == Hour}, nil
+			unit, nums, where, note := hashStepValues(it, f.Name, sg, pl, v)
+			return unitPhrase{text: unit + " " + nums, kind: "values", field: f.Name, nums: nums, where: where, note: note, hourStep: f.Name == Hour}, nil
 		}
 	}
 	items, err := simpleItems(f)
@@ -289,28 +327,25 @@ func timeUnit(f Field, v string) (unitPhrase, error) {
 	if plural(items) {
 		unit = pl
 	}
-	return unitPhrase{text: unit + " " + list(items, strconv.Itoa, b), kind: "values"}, nil
+	nums := list(items, strconv.Itoa, b)
+	return unitPhrase{text: unit + " " + nums, kind: "values", field: f.Name, nums: nums}, nil
 }
 
-// stepValues renders a step as the values it fires on ("minutes 0, 15, 30
-// and 45"). A list cut short gets a note with the interval, and says where
-// it starts over when the gap across the boundary differs:
-// "every 7 minutes, starting over each hour".
-func stepValues(it item, field, sg, pl string) (text, note string) {
+// stepRuns renders a step as the values it fires on, each through word
+// ("0, 15, 30 and 45"), and how many there are. A list cut short gets a
+// note with the interval, and says where it starts over when the gap
+// across the boundary differs: "every 7 minutes, starting over each hour".
+func stepRuns(it item, field, sg, pl string, word func(int) string) (text string, n int, note string) {
 	b := fieldBounds[field]
 	vals := runs(it, b)
-	unit := pl
-	if len(vals) == 1 {
-		unit = sg
-	}
 	words := make([]string, len(vals))
 	for i, v := range vals {
-		words[i] = strconv.Itoa(v)
+		words[i] = word(v)
 	}
 	if len(vals) <= listLimit[field] {
-		return unit + " " + andList(words), ""
+		return andList(words), len(vals), ""
 	}
-	text = unit + " " + strings.Join(words[:3], ", ") + ", … " + words[len(words)-1]
+	text = strings.Join(words[:3], ", ") + ", … " + words[len(words)-1]
 	note = "every " + sg
 	if it.step > 1 {
 		note = fmt.Sprintf("every %d %s", it.step, pl)
@@ -318,7 +353,7 @@ func stepValues(it item, field, sg, pl string) (text, note string) {
 	if vals[0]+b.max-b.min+1-vals[len(vals)-1] != it.step {
 		note += ", starting over each " + container[field]
 	}
-	return text, note
+	return text, len(vals), note
 }
 
 // hashStepValues renders H/N as values in terms of the job's hashed first
@@ -326,7 +361,7 @@ func stepValues(it item, field, sg, pl string) (text, note string) {
 // and h+45", where "h is a hashed minute from 0 to 14". When N does not
 // divide the range, the run count depends on v, so the list ends
 // "… up to <last allowed value>".
-func hashStepValues(it item, field, sg, pl, v string) (text, where, note string) {
+func hashStepValues(it item, field, sg, pl, v string) (unit, nums, where, note string) {
 	span, vmax := it.hi-it.lo+1, min(it.lo+it.step-1, it.hi)
 	where = fmt.Sprintf("%s is a hashed %s from %d to %d", v, sg, it.lo, vmax)
 	term := func(k int) string {
@@ -336,7 +371,7 @@ func hashStepValues(it item, field, sg, pl, v string) (text, where, note string)
 		return fmt.Sprintf("%s+%d", v, k*it.step)
 	}
 	if it.step >= span {
-		return sg + " " + v, where, ""
+		return sg, v, where, ""
 	}
 	if span%it.step != 0 {
 		var words []string
@@ -344,7 +379,7 @@ func hashStepValues(it item, field, sg, pl, v string) (text, where, note string)
 			words = append(words, term(k))
 		}
 		note = fmt.Sprintf("every %d %s, starting over each %s", it.step, pl, container[field])
-		return pl + " " + strings.Join(words, ", ") + fmt.Sprintf(", … up to %d", it.hi), where, note
+		return pl, strings.Join(words, ", ") + fmt.Sprintf(", … up to %d", it.hi), where, note
 	}
 	n := span / it.step
 	words := make([]string, n)
@@ -352,10 +387,10 @@ func hashStepValues(it item, field, sg, pl, v string) (text, where, note string)
 		words[k] = term(k)
 	}
 	if n <= listLimit[field] {
-		return pl + " " + andList(words), where, ""
+		return pl, andList(words), where, ""
 	}
 	note = fmt.Sprintf("every %d %s", it.step, pl)
-	return pl + " " + strings.Join(words[:3], ", ") + ", … " + words[n-1], where, note
+	return pl, strings.Join(words[:3], ", ") + ", … " + words[n-1], where, note
 }
 
 // runs lists the values an element fires on, in firing order. A wrapped
@@ -446,7 +481,7 @@ func domPhrase(text string) (string, error) {
 		if err != nil {
 			return "", errUndescribed
 		}
-		return fmt.Sprintf("the weekday nearest day %d", n), nil
+		return "the weekday nearest the " + ordinal(n), nil
 	}
 	f := Field{Name: DayOfMonth, Text: text}
 	if els := elements(text); len(els) == 1 {
@@ -456,8 +491,8 @@ func domPhrase(text string) (string, error) {
 		}
 		switch it.kind {
 		case kStep:
-			text, note := stepValues(it, DayOfMonth, "day", "days")
-			text += " of every month"
+			days, _, note := stepRuns(it, DayOfMonth, "day", "days", ordinal)
+			text := "the " + days + " of every month"
 			if note != "" {
 				text += " (" + note + ")"
 			}
@@ -483,16 +518,12 @@ func domPhrase(text string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	unit := "day"
-	if plural(items) {
-		unit = "days"
-	}
-	return unit + " " + list(items, strconv.Itoa, fieldBounds[DayOfMonth]) + " of the month", nil
+	return "the " + list(items, ordinal, fieldBounds[DayOfMonth]) + " of the month", nil
 }
 
 // domItem renders one element of a day-of-month list that holds L or W
 // forms; the caller adds "of the month". A range of two adjacent days is
-// two entries ("day 1", "day 2").
+// two entries ("the 1st", "the 2nd").
 func domItem(e string) ([]string, error) {
 	up := strings.ToUpper(e)
 	switch {
@@ -511,18 +542,18 @@ func domItem(e string) ([]string, error) {
 		if err != nil {
 			return nil, errUndescribed
 		}
-		return []string{fmt.Sprintf("the weekday nearest day %d", n)}, nil
+		return []string{"the weekday nearest the " + ordinal(n)}, nil
 	}
 	it, perr := parseItem(e, fieldBounds[DayOfMonth])
 	switch {
 	case perr != nil:
 		return nil, errUndescribed
 	case it.kind == kValue:
-		return []string{fmt.Sprintf("day %d", it.lo)}, nil
+		return []string{"the " + ordinal(it.lo)}, nil
 	case it.kind == kRange && it.hi == it.lo+1:
-		return []string{fmt.Sprintf("day %d", it.lo), fmt.Sprintf("day %d", it.hi)}, nil
+		return []string{"the " + ordinal(it.lo), "the " + ordinal(it.hi)}, nil
 	case it.kind == kRange:
-		return []string{fmt.Sprintf("days %d thru %d", it.lo, it.hi)}, nil
+		return []string{"the " + ordinal(it.lo) + " thru " + ordinal(it.hi)}, nil
 	}
 	return nil, errUndescribed
 }
