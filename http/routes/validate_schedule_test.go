@@ -36,7 +36,8 @@ func TestValidateFrom(t *testing.T) {
 	}
 	want := []time.Time{time.Date(2030, 1, 1, 9, 0, 0, 0, time.UTC), time.Date(2030, 1, 2, 9, 0, 0, 0, time.UTC)}
 	if rec.Code != http.StatusOK || len(got.NextRuns) != 2 || !got.NextRuns[0].Equal(want[0]) || !got.NextRuns[1].Equal(want[1]) ||
-		len(got.PrevRuns) != 1 || !got.PrevRuns[0].Equal(time.Date(2029, 12, 31, 9, 0, 0, 0, time.UTC)) {
+		len(got.PrevRuns) != 1 || !got.PrevRuns[0].Equal(time.Date(2029, 12, 31, 9, 0, 0, 0, time.UTC)) ||
+		!got.From.Equal(time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("status %d, body %s", rec.Code, rec.Body)
 	}
 }

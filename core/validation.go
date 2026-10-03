@@ -39,6 +39,7 @@ type ScheduleAnalysis struct {
 	Location        string        `json:"location,omitempty"`
 	Illustrative    bool          `json:"illustrative"`
 	HashedFields    []HashedField `json:"hashed_fields"`
+	From            time.Time     `json:"from"`
 	NextRuns        []time.Time   `json:"next_runs"`
 	PrevRuns        []time.Time   `json:"prev_runs"`
 	Errors          []Finding     `json:"errors"`

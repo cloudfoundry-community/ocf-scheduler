@@ -148,6 +148,15 @@ func TestDSTWarningsCoverListedRuns(t *testing.T) {
 	}
 }
 
+// From echoes the reference time, also for an expression that does not parse.
+func TestAnalyzeEchoesFrom(t *testing.T) {
+	for _, expr := range []string{"0 9 * * *", "60 * * * *"} {
+		if r := Analyze(expr, "", 1, 0, Rules{}, now).Result; !r.From.Equal(now) {
+			t.Errorf("%q: From = %v, want %v", expr, r.From, now)
+		}
+	}
+}
+
 func TestAnalyzeDescriptionNote(t *testing.T) {
 	r := Analyze("H/15 * * * *", "", 1, 0, Rules{}, now).Result
 	if r.Description != "every 15 minutes from a hashed start" ||

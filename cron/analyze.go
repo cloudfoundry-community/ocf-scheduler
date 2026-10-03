@@ -45,6 +45,7 @@ func Analyze(expression, key string, next, prev int, rules Rules, now time.Time)
 	}
 	r := core.ScheduleAnalysis{
 		Expression:   expression,
+		From:         now,
 		HashedFields: []core.HashedField{},
 		NextRuns:     []time.Time{},
 		PrevRuns:     []time.Time{},
