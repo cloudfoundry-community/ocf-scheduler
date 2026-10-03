@@ -491,43 +491,47 @@ func dowPhrase(text string) (string, error) {
 			return andList(days), nil
 		}
 	}
-	words := make([]string, len(els))
-	for i, e := range els {
+	var words []string
+	for _, e := range els {
 		w, err := dowItem(e)
 		if err != nil {
 			return "", err
 		}
-		words[i] = w
+		words = append(words, w...)
 	}
 	return andList(words), nil
 }
 
-// dowItem renders one day-of-week list element: a day, a range of days,
-// or an nth day of the month ("the second Sunday", "the last Friday").
-func dowItem(e string) (string, error) {
+// dowItem renders one day-of-week list element: a day, a range of days
+// ("Monday thru Friday"; two adjacent days are two list entries, "Monday"
+// and "Tuesday"), or an nth day of the month ("the second Sunday").
+func dowItem(e string) ([]string, error) {
 	b := fieldBounds[DayOfWeek]
 	if day, n, ok := strings.Cut(e, "#"); ok {
 		d, perr := parseNum(day, b)
 		if perr != nil {
-			return "", errUndescribed
+			return nil, errUndescribed
 		}
 		if strings.EqualFold(n, "L") {
-			return "the last " + dayNames[d], nil
+			return []string{"the last " + dayNames[d]}, nil
 		}
 		k, err := strconv.Atoi(n)
 		if err != nil || k < 1 || k > 5 {
-			return "", errUndescribed
+			return nil, errUndescribed
 		}
-		return "the " + nth[k] + " " + dayNames[d], nil
+		return []string{"the " + nth[k] + " " + dayNames[d]}, nil
 	}
 	it, perr := parseItem(e, b)
 	if perr != nil || (it.kind != kValue && it.kind != kRange) {
-		return "", errUndescribed
+		return nil, errUndescribed
 	}
-	if it.kind == kRange {
-		return dayNames[it.lo] + " to " + dayNames[it.hi], nil
+	if it.kind == kValue {
+		return []string{dayNames[it.lo]}, nil
 	}
-	return dayNames[it.lo], nil
+	if (it.hi-it.lo+7)%7 == 1 { // adjacent, also across the week's end (SAT-SUN)
+		return []string{dayNames[it.lo], dayNames[it.hi]}, nil
+	}
+	return []string{dayNames[it.lo] + " thru " + dayNames[it.hi]}, nil
 }
 
 // ---- month ----
