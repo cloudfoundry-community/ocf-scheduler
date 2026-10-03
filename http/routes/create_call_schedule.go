@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -49,7 +50,7 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 
 		services.Logger.Debug(tag, fmt.Sprintf("expression == '%s', expression_type == '%s'", input.Expression, input.ExpressionType))
 
-		analysis := services.Cron.Analyze(input.Expression, guid, 0, 0)
+		analysis := services.Cron.Analyze(input.Expression, guid, 0, 0, time.Time{})
 		if len(analysis.Errors) > 0 {
 			services.Logger.Error(tag, fmt.Sprintf("invalid cron expression '%s' for call %s: %s", input.Expression, guid, analysis.Errors[0].Message))
 			return c.JSON(http.StatusUnprocessableEntity, core.Findings{Errors: analysis.Errors, Warnings: analysis.Warnings})

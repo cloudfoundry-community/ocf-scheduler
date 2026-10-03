@@ -172,9 +172,13 @@ func (service *CronService) Count() int {
 }
 
 // Analyze applies this service's rules to expression, keyed by key (the job
-// or call GUID; empty for a bare expression).
-func (service *CronService) Analyze(expression, key string, next, prev int) core.ScheduleAnalysis {
-	result := Analyze(expression, key, next, prev, service.rules, time.Now()).Result
+// or call GUID; empty for a bare expression). Runs are listed from from;
+// the zero time means now.
+func (service *CronService) Analyze(expression, key string, next, prev int, from time.Time) core.ScheduleAnalysis {
+	if from.IsZero() {
+		from = time.Now()
+	}
+	result := Analyze(expression, key, next, prev, service.rules, from).Result
 	if result.Location == "Local" {
 		if name, err := GetServerTimezone(); err == nil {
 			result.Location = name

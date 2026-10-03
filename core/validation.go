@@ -47,11 +47,12 @@ type ScheduleAnalysis struct {
 
 // ValidateRequest is the body of POST /schedules/validate.
 type ValidateRequest struct {
-	Expression string `json:"expression"`
-	RefType    string `json:"ref_type"`
-	RefGUID    string `json:"ref_guid"`
-	Next       *int   `json:"next"`
-	Prev       int    `json:"prev"`
+	Expression string     `json:"expression"`
+	RefType    string     `json:"ref_type"`
+	RefGUID    string     `json:"ref_guid"`
+	Next       *int       `json:"next"`
+	Prev       int        `json:"prev"`
+	From       *time.Time `json:"from"` // RFC 3339; runs are listed from here instead of now
 }
 
 // Findings is the body of a 4xx response about a cron expression or request.
