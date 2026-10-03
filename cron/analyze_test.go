@@ -213,7 +213,7 @@ func TestAnalyzeScheduleMatchesRuns(t *testing.T) {
 func TestReviewFocusEdges(t *testing.T) {
 	for _, tt := range []struct{ expr, desc, warn string }{
 		{"  CRON_TZ=UTC 0 2 * * *  ", "at 02:00", ""},
-		{"CRON_TZ=UTC 0 0 * * mon-fri", "at 00:00, on Monday to Friday", ""},
+		{"CRON_TZ=UTC 0 0 * * mon-fri", "at 00:00, on Monday thru Friday", ""},
 		{"CRON_TZ=UTC 0 0 ? * MON", "at 00:00, on Monday", ""},
 		{`CRON_TZ="America/New_York" 0 9 * * *`, "at 09:00", ""},
 		{"CRON_TZ=Australia/Lord_Howe 15 2 * * *", "at 02:15", "dst_skipped"},

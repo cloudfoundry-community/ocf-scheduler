@@ -14,9 +14,9 @@ var golden = []struct{ expr, want string }{
 	{"* * * * * *", "every second"},
 	{"*/10 * * * * *", "at seconds 0, 10, 20, 30, 40 and 50 of every minute"},
 	{"*/2 * * * * *", "at seconds 0, 2, 4, … 58 of every minute (every 2 seconds)"},
-	{"0 30 2 * * MON-FRI", "at 02:30, on Monday to Friday"},
+	{"0 30 2 * * MON-FRI", "at 02:30, on Monday thru Friday"},
 	{"15 30 2 * * *", "at 02:30:15"},
-	{"0 9-17 * * MON-FRI", "at minute 0 of hours 9 to 17, on Monday to Friday"},
+	{"0 9-17 * * MON-FRI", "at minute 0 of hours 9 to 17, on Monday thru Friday"},
 	{"5,10,40 * * * *", "at minutes 5, 10 and 40 of every hour"},
 	{"* 2 * * *", "every minute of hour 2"},
 	{"30 */2 * * *", "at minute 30 of hours 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20 and 22 of every day"},
@@ -65,7 +65,13 @@ var golden = []struct{ expr, want string }{
 	{"0 0 1 JAN-MAR *", "at 00:00, on day 1 of the month, in January to March"},
 	{"0 30 2 * 3,11 SUN#1,SUN#2", "at 02:30, on the first Sunday and the second Sunday, in March and November"},
 	{"0 9 * * MON,FRI#L", "at 09:00, on Monday and the last Friday"},
-	{"0 9 * * MON-WED,FRI#3", "at 09:00, on Monday to Wednesday and the third Friday"},
+	{"0 9 * * MON-WED,FRI#3", "at 09:00, on Monday thru Wednesday and the third Friday"},
+	{"0 9 * * MON-TUE", "at 09:00, on Monday and Tuesday"},
+	{"0 9 * * SAT-SUN", "at 09:00, on Saturday and Sunday"},
+	{"0 9 * * SUN-MON", "at 09:00, on Sunday and Monday"},
+	{"0 9 * * 6-7", "at 09:00, on Saturday and Sunday"},
+	{"0 9 * * FRI-MON", "at 09:00, on Friday thru Monday"},
+	{"0 9 * * MON-TUE,FRI#3", "at 09:00, on Monday, Tuesday and the third Friday"},
 	{"@daily", "at 00:00"},
 	{"@hourly", "at minute 0 of every hour"},
 	{"@weekly", "at 00:00, on Sunday"},
@@ -163,7 +169,7 @@ func grammar() *regexp.Regexp {
 		"a hashed day of the month"+between,
 		alt("day", "days")+" "+vlist(num)+" of every month"+opt(note),
 	)
-	dowItem := alt(day+opt(" to "+day), "the "+alt("first", "second", "third", "fourth", "fifth", "last")+" "+day)
+	dowItem := alt(day+opt(" thru "+day), "the "+alt("first", "second", "third", "fourth", "fifth", "last")+" "+day)
 	dow := alt(dowItem+opt("(?:, "+dowItem+")* and "+dowItem), "a hashed day of the week")
 	dayc := alt("on "+dom+opt(" when it falls on "+dow), "on "+dow)
 	monthc := alt("in "+listOf(month), "in a hashed month")
