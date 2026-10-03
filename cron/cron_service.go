@@ -178,6 +178,7 @@ func (service *CronService) Analyze(expression, key string, next, prev int, from
 	if from.IsZero() {
 		from = time.Now()
 	}
+	from = from.In(time.Local) // a schedule without CRON_TZ runs in the server's zone
 	result := Analyze(expression, key, next, prev, service.rules, from).Result
 	if result.Location == "Local" {
 		if name, err := GetServerTimezone(); err == nil {

@@ -42,6 +42,18 @@ func TestValidateFrom(t *testing.T) {
 	}
 }
 
+// An expression without CRON_TZ runs in the server's zone whatever zone
+// from was written in.
+func TestValidateFromKeepsServerZone(t *testing.T) {
+	f := newFixture(t)
+	var plain, from core.ScheduleAnalysis
+	_ = json.Unmarshal(f.post("/schedules/validate", `{"expression": "0 9 * * *"}`, "jeremy").Body.Bytes(), &plain)
+	_ = json.Unmarshal(f.post("/schedules/validate", `{"expression": "0 9 * * *", "from": "2030-01-01T00:00:00+05:30"}`, "jeremy").Body.Bytes(), &from)
+	if plain.Location == "" || from.Location != plain.Location {
+		t.Errorf("location without from %q, with from %q", plain.Location, from.Location)
+	}
+}
+
 func TestValidateBadFromIs422(t *testing.T) {
 	f := newFixture(t)
 	rec := f.post("/schedules/validate", `{"expression": "0 9 * * *", "from": "next tuesday"}`, "jeremy")
