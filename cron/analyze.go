@@ -355,6 +355,9 @@ func dstWarnings(ss *cron.SpecSchedule, now time.Time, listed []time.Time, loc *
 	naive.Location = time.UTC
 	var out []core.Finding
 	for _, tr := range transitions(loc, now, until) {
+		if tr.at.After(until) {
+			continue // the hourly scan looks up to an hour past until
+		}
 		delta := time.Duration(tr.after-tr.before) * time.Second
 		gap := delta > 0
 		offset := tr.after
