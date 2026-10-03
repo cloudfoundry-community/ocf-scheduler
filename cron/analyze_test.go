@@ -148,6 +148,16 @@ func TestDSTWarningsCoverListedRuns(t *testing.T) {
 	}
 }
 
+// The window ends at the last listed run: a gap later that day is not warned
+// about (here 2028-03-12 02:30, after the listed 01:30).
+func TestDSTWindowEndsAtLastListedRun(t *testing.T) {
+	r := Analyze("CRON_TZ=America/Los_Angeles 30 1,2 * 3 SUN#2", "", 2, 0, Rules{}, now).Result
+	want := "02:30 on 2027-03-14 does not exist in America/Los_Angeles; that run is skipped"
+	if len(r.Warnings) != 1 || r.Warnings[0].Message != want {
+		t.Errorf("runs %v: got %+v; want only %q", r.NextRuns, r.Warnings, want)
+	}
+}
+
 // From echoes the reference time, also for an expression that does not parse.
 func TestAnalyzeEchoesFrom(t *testing.T) {
 	for _, expr := range []string{"0 9 * * *", "60 * * * *"} {
