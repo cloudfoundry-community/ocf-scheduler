@@ -462,6 +462,17 @@ func domPhrase(text string) (string, error) {
 			return "", errUndescribed
 		}
 	}
+	if els := elements(text); len(els) > 1 && strings.ContainsAny(up, "LW") {
+		words := make([]string, len(els))
+		for i, e := range els {
+			w, err := domItem(e)
+			if err != nil {
+				return "", err
+			}
+			words[i] = w
+		}
+		return andList(words) + " of the month", nil
+	}
 	items, err := simpleItems(f)
 	if err != nil {
 		return "", err
@@ -471,6 +482,40 @@ func domPhrase(text string) (string, error) {
 		unit = "days"
 	}
 	return unit + " " + list(items, strconv.Itoa) + " of the month", nil
+}
+
+// domItem renders one element of a day-of-month list that holds L or W
+// forms; the caller adds "of the month".
+func domItem(e string) (string, error) {
+	up := strings.ToUpper(e)
+	switch {
+	case up == "L":
+		return "the last day", nil
+	case up == "LW":
+		return "the last weekday", nil
+	case strings.HasPrefix(up, "L-"):
+		n, err := strconv.Atoi(up[2:])
+		if err != nil {
+			return "", errUndescribed
+		}
+		return "the " + ordinal(n) + " day before the end", nil
+	case strings.HasSuffix(up, "W"):
+		n, err := strconv.Atoi(up[:len(up)-1])
+		if err != nil {
+			return "", errUndescribed
+		}
+		return fmt.Sprintf("the weekday nearest day %d", n), nil
+	}
+	it, perr := parseItem(e, fieldBounds[DayOfMonth])
+	switch {
+	case perr != nil:
+		return "", errUndescribed
+	case it.kind == kValue:
+		return fmt.Sprintf("day %d", it.lo), nil
+	case it.kind == kRange:
+		return fmt.Sprintf("days %d to %d", it.lo, it.hi), nil
+	}
+	return "", errUndescribed
 }
 
 func dowPhrase(text string) (string, error) {
