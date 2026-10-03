@@ -3,6 +3,7 @@ package cron
 import (
 	"fmt"
 	"math/bits"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -294,8 +295,21 @@ func domWarnings(ss *cron.SpecSchedule) []core.Finding {
 		out = append(out, core.Finding{Code: "dom_and_dow",
 			Message: "day-of-month and day-of-week are both restricted: it runs only on days that match both"})
 	}
-	days := setBits(ss.Dom)
-	if ss.Dom&starBit != 0 || len(ss.DomConstraints) > 0 || len(days) == 0 || days[0] < 29 {
+	if ss.Dom&starBit != 0 && len(ss.DomConstraints) == 0 {
+		return out
+	}
+	var days []int
+	if ss.Dom&starBit == 0 {
+		days = setBits(ss.Dom)
+	}
+	for _, c := range ss.DomConstraints {
+		if c.Type != cron.DomNearestWeekday {
+			return out // L, LW and L-n fall in every month
+		}
+		days = append(days, c.N) // nW does not run where day n does not exist
+	}
+	slices.Sort(days)
+	if len(days) == 0 || days[0] < 29 {
 		return out
 	}
 	var short []string

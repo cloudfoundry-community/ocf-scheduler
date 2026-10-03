@@ -70,6 +70,11 @@ func TestAnalyzeWarnings(t *testing.T) {
 		{"0 0 30,31 * *", "dom_skips_months"},
 		{"0 0 31 1 *", ""},
 		{"0 0 L * *", ""},
+		{"0 0 31W * *", "dom_skips_months"},
+		{"0 0 15W,31W * *", ""},
+		{"0 0 31,L * *", ""},
+		{"0 0 31W,LW * *", ""},
+		{"0 0 31W 1,3 *", ""},
 		{"CRON_TZ=UTC 0 1,,2 * * *", "empty_list_element"},
 		{"CRON_TZ=America/Los_Angeles 30 2 * * *", "dst_skipped"},
 		{"CRON_TZ=America/Los_Angeles 30 1 * * *", "dst_repeated"},
@@ -369,6 +374,15 @@ func TestDomSkipsMonthsDay29(t *testing.T) {
 	warn = codes(r.Warnings)
 	if warn != "" {
 		t.Errorf("0 0 29 2 *: warnings %q, want none", warn)
+	}
+}
+
+// nW skips the months without day n, like a plain n.
+func TestDomSkipsMonthsNearestWeekday(t *testing.T) {
+	r := Analyze("0 0 31W * *", "", 3, 0, Rules{}, now).Result
+	want := "day 31 does not exist in February, April, June, September and November; it does not run in those months"
+	if len(r.Warnings) != 1 || r.Warnings[0].Message != want {
+		t.Errorf("got %+v; want %q", r.Warnings, want)
 	}
 }
 
