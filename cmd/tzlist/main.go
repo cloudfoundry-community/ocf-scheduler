@@ -54,21 +54,19 @@ func Fatal(msg string, args ...any) {
 	os.Exit(1) // Terminate the program after logging
 }
 
-// Information returned by time.Zone function
-type TzZoneType struct {
-	Name   string
-	Offset int
-}
-
-// Offsets [0] standard time
-// Offsets [1] daylight savings time
-// len[Offsets] > 1 Has daylight savings time
-
+// A zone has DST only when both agree: OffsetsDiffer (Jan 1 and Jul 1 of
+// the current year have different UTC offsets) and Extend, the TZif footer
+// (POSIX TZ string) holding the zone's ongoing rule, names a DST zone.
+// The TZif isdst flag is not trusted.
 type TzInfoType struct {
 	Aliases          []string
 	IsServerTimeZone bool
-	Offsets          []TzZoneType
+	OffsetsDiffer    bool
 	Extend           string
+}
+
+func (zi TzInfoType) HasDst(dst string) bool {
+	return zi.OffsetsDiffer && dst != ""
 }
 
 var SchedulerFilename string
@@ -115,28 +113,9 @@ func (tzi TzInfoMap) Add(zone string, data *rfc9636.Location) {
 		slog.Debug("IsServerTimeZone is set")
 	}
 
-	// Check offset on two dates six months apart to detect DST
-	janTime := time.Date(year, time.January, 1, 0, 0, 0, 0, loc)
-	julTime := time.Date(year, time.July, 1, 0, 0, 0, 0, loc)
-
-	janName, janOffset := janTime.Zone()
-	julName, julOffset := julTime.Zone()
-
-	// Use IsDST to ensure Offsets[0] is always standard time and
-	// Offsets[1] is DST, regardless of hemisphere
-	if janTime.IsDST() {
-		// Southern hemisphere: January is summer/DST
-		zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{julName, julOffset})
-		if janOffset != julOffset {
-			zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{janName, janOffset})
-		}
-	} else {
-		// Northern hemisphere or no DST: January is winter/standard
-		zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{janName, janOffset})
-		if janOffset != julOffset {
-			zoneInfo.Offsets = append(zoneInfo.Offsets, TzZoneType{julName, julOffset})
-		}
-	}
+	_, janOffset := time.Date(year, time.January, 1, 0, 0, 0, 0, loc).Zone()
+	_, julOffset := time.Date(year, time.July, 1, 0, 0, 0, 0, loc).Zone()
+	zoneInfo.OffsetsDiffer = janOffset != julOffset
 
 	zoneInfo.Extend = data.Extend()
 	tzi[zone] = zoneInfo
@@ -146,7 +125,6 @@ func NewTzInfo() TzInfoType {
 	return TzInfoType{
 		Aliases:          make([]string, 0),
 		IsServerTimeZone: false,
-		Offsets:          make([]TzZoneType, 0, 2),
 		Extend:           "",
 	}
 }
@@ -175,7 +153,7 @@ func GenerateJson(zones []string) {
 			if err != nil {
 				slog.Error("DecodeTZ failure", "TZ", zone.Extend, "error", err)
 			}
-			zj := NewSchedulerJson(name, std, dst, len(zone.Offsets) > 1, zone.Aliases, rules, zone.IsServerTimeZone)
+			zj := NewSchedulerJson(name, std, dst, zone.HasDst(dst), zone.Aliases, rules, zone.IsServerTimeZone)
 			schedulerZones = append(schedulerZones, zj)
 		} else {
 			slog.Warn("Missing zone", "name", name)
@@ -255,7 +233,7 @@ func main() {
 			}
 
 			dstLabel := "no"
-			if len(zone.Offsets) > 1 {
+			if _, dst, _, _ := tzposix.DecodeTZ(zone.Extend); zone.HasDst(dst) {
 				dstLabel = "yes"
 			}
 			fmt.Printf("%-*s DST: %-3s %+v Extend %s\n", keylen, name, dstLabel, zone.Aliases, zone.Extend)
