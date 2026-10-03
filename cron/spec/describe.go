@@ -30,21 +30,19 @@ var errUndescribed = fmt.Errorf("no description for this construct")
 
 // Describe returns an English description of a cron expression in a small
 // regular grammar: one clause per field, in a fixed order, each starting with
-// a fixed keyword, 24-hour times. Call it on expressions go-cron accepted. If
-// a construct has no phrase yet, it returns the literal per-field rendering
-// and a non-nil error, so callers always have something to show.
+// a fixed keyword, 24-hour times. The time zone is left out: callers show
+// the schedule's location beside it. Call it on expressions go-cron
+// accepted. If a construct has no phrase yet, it returns the literal
+// per-field rendering and a non-nil error, so callers always have something
+// to show.
 func Describe(expression string) (string, error) {
 	s, err := Fields(expression)
 	if err != nil {
 		return expression, err
 	}
-	zone := ""
-	if s.Location != "" {
-		zone = ", " + s.Location + " time"
-	}
 	switch {
 	case s.Descriptor == "@every":
-		return "every " + s.Every + " from when the schedule starts" + zone, nil
+		return "every " + s.Every + " from when the schedule starts", nil
 	case triggeredOnly[s.Descriptor]:
 		return "only when triggered", nil
 	case s.Descriptor != "":
@@ -52,14 +50,13 @@ func Describe(expression string) (string, error) {
 		if !ok {
 			return expression, fmt.Errorf("unknown descriptor %s", s.Descriptor)
 		}
-		d, err := Describe(fields)
-		return d + zone, err
+		return Describe(fields)
 	}
 	d, err := describeFields(s)
 	if err != nil {
 		return literal(s), err
 	}
-	return d + zone, nil
+	return d, nil
 }
 
 // DescribeNote spells out a hashed step's values in terms of its hashed
@@ -80,12 +77,9 @@ func DescribeNote(expression string) string {
 }
 
 func literal(s Spec) string {
-	parts := make([]string, 0, len(s.Fields)+1)
+	parts := make([]string, 0, len(s.Fields))
 	for _, f := range s.Fields {
 		parts = append(parts, f.Name+" "+f.Text)
-	}
-	if s.Location != "" {
-		parts = append(parts, s.Location+" time")
 	}
 	return strings.Join(parts, ", ")
 }
