@@ -20,7 +20,7 @@ func TestValidateBareExpression(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}
-	if !got.Valid || got.Description != "at minutes 0, 15, 30 and 45 of every hour" || len(got.NextRuns) != 5 || got.Ref != nil {
+	if !got.Valid || got.Description != "at 0, 15, 30 and 45 minutes past the hour" || len(got.NextRuns) != 5 || got.Ref != nil {
 		t.Errorf("got %+v", got)
 	}
 }
