@@ -137,7 +137,7 @@ func Analyze(expression, key string, next, prev int, rules Rules, now time.Time)
 	if isSpec {
 		r.Warnings = append(r.Warnings, domWarnings(ss)...)
 		if len(r.Errors) == 0 && effectiveZone != nil {
-			r.Warnings = append(r.Warnings, dstWarnings(ss, now, effectiveZone)...)
+			r.Warnings = append(r.Warnings, dstWarnings(ss, now, nextRuns, effectiveZone)...)
 		}
 	}
 	return Analysis{Result: r, Schedule: sched}
@@ -333,7 +333,8 @@ func joinAnd(xs []string) string {
 }
 
 // dstWarnings reports runs that fall in a DST gap or overlap in the next 12
-// months. Only for schedules that restrict the hour: an every-minute or
+// months, or up to the last listed run when that is later, so a year-pinned
+// expression warns the same whenever it is checked. Only for schedules that restrict the hour: an every-minute or
 // hourly schedule losing or repeating one hour is expected.
 //
 // The intended wall-clock runs come from a copy of the schedule in UTC, which
@@ -341,14 +342,18 @@ func joinAnd(xs []string) string {
 // stepping from the previous run as the scheduler loop does: it moves some
 // skipped runs (02:30 → 03:30 in America/Los_Angeles) and drops others
 // (30-minute and midnight transitions), so the message says which.
-func dstWarnings(ss *cron.SpecSchedule, now time.Time, loc *time.Location) []core.Finding {
+func dstWarnings(ss *cron.SpecSchedule, now time.Time, listed []time.Time, loc *time.Location) []core.Finding {
 	if ss.Hour&starBit != 0 || loc == nil {
 		return nil
+	}
+	until := now.AddDate(1, 0, 0)
+	if n := len(listed); n > 0 && listed[n-1].After(until) {
+		until = listed[n-1].Add(time.Second)
 	}
 	naive := *ss
 	naive.Location = time.UTC
 	var out []core.Finding
-	for _, tr := range transitions(loc, now, now.AddDate(1, 0, 0)) {
+	for _, tr := range transitions(loc, now, until) {
 		delta := time.Duration(tr.after-tr.before) * time.Second
 		gap := delta > 0
 		offset := tr.after
@@ -377,11 +382,15 @@ func dstWarnings(ss *cron.SpecSchedule, now time.Time, loc *time.Location) []cor
 		what := "that run is skipped"
 		moved := intended[0].Add(delta)
 		regular := naive.Next(moved.Add(-time.Second)).Equal(moved)
-		if prev := cron.PrevN(ss, tr.at, 1); len(prev) == 1 && !regular {
-			next := ss.Next(prev[0]).In(loc)
-			if next.Format("2006-01-02") == date && next.Format("15:04") == moved.Format("15:04") {
-				what = "it runs at " + next.Format("15:04")
-			}
+		// step as the runner does: from the run before the gap, or from now
+		// when there is none (the first run of a year-pinned schedule)
+		from := now
+		if prev := cron.PrevN(ss, tr.at, 1); len(prev) == 1 {
+			from = prev[0]
+		}
+		if next := ss.Next(from).In(loc); !regular &&
+			next.Format("2006-01-02") == date && next.Format("15:04") == moved.Format("15:04") {
+			what = "it runs at " + next.Format("15:04")
 		}
 		out = append(out, core.Finding{Code: "dst_skipped",
 			Message: fmt.Sprintf("%s on %s does not exist in %s; %s", wall, date, loc, what)})

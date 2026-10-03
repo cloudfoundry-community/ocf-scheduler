@@ -134,6 +134,20 @@ func TestAnalyzeHash(t *testing.T) {
 	}
 }
 
+// DST warnings cover every listed run, not only the next 12 months, so a
+// year-pinned expression gives the same warnings whenever it is checked.
+func TestDSTWarningsCoverListedRuns(t *testing.T) {
+	expr := "CRON_TZ=America/Los_Angeles 30 2 * 3 SUN#2 2030"
+	r := Analyze(expr, "", 1, 0, Rules{}, now).Result
+	want := "02:30 on 2030-03-10 does not exist in America/Los_Angeles; it runs at 03:30"
+	if len(r.Warnings) != 1 || r.Warnings[0].Message != want {
+		t.Errorf("listed run: got %+v; want %q", r.Warnings, want)
+	}
+	if r := Analyze(expr, "", 0, 0, Rules{}, now).Result; len(r.Warnings) != 0 {
+		t.Errorf("no runs listed, 12-month window: got %+v", r.Warnings)
+	}
+}
+
 func TestAnalyzeDescriptionNote(t *testing.T) {
 	r := Analyze("H/15 * * * *", "", 1, 0, Rules{}, now).Result
 	if r.Description != "every 15 minutes from a hashed start" ||
