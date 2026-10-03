@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 
@@ -38,6 +39,10 @@ func ValidateSchedule(e *echo.Echo, services *core.Services) {
 		if input.Next != nil {
 			next = *input.Next
 		}
+		var from time.Time
+		if input.From != nil {
+			from = *input.From
+		}
 		switch {
 		case input.Expression == "" && input.RefGUID == "":
 			return c.JSON(http.StatusUnprocessableEntity, requestError("bad_request", "give an expression, a job or call, or both"))
@@ -69,14 +74,14 @@ func ValidateSchedule(e *echo.Echo, services *core.Services) {
 		}
 
 		if input.Expression != "" {
-			analysis := services.Cron.Analyze(input.Expression, input.RefGUID, next, input.Prev)
+			analysis := services.Cron.Analyze(input.Expression, input.RefGUID, next, input.Prev, from)
 			analysis.Ref = ref
 			return c.JSON(http.StatusOK, analysis)
 		}
 
 		resources := make([]*core.ScheduleAnalysis, 0, len(stored))
 		for _, schedule := range stored {
-			analysis := services.Cron.Analyze(schedule.Expression, input.RefGUID, next, input.Prev)
+			analysis := services.Cron.Analyze(schedule.Expression, input.RefGUID, next, input.Prev, from)
 			analysis.Ref = ref
 			analysis.ScheduleGUID = schedule.GUID
 			analysis.Enabled = &schedule.Enabled

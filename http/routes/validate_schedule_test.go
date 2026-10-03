@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
@@ -24,6 +25,30 @@ func TestValidateBareExpression(t *testing.T) {
 	}
 }
 
+// from replaces now as the reference time, so the run lists are fixed.
+func TestValidateFrom(t *testing.T) {
+	f := newFixture(t)
+	body := `{"expression": "CRON_TZ=UTC 0 9 * * *", "next": 2, "prev": 1, "from": "2030-01-01T00:00:00Z"}`
+	rec := f.post("/schedules/validate", body, "jeremy")
+	var got core.ScheduleAnalysis
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	want := []time.Time{time.Date(2030, 1, 1, 9, 0, 0, 0, time.UTC), time.Date(2030, 1, 2, 9, 0, 0, 0, time.UTC)}
+	if rec.Code != http.StatusOK || len(got.NextRuns) != 2 || !got.NextRuns[0].Equal(want[0]) || !got.NextRuns[1].Equal(want[1]) ||
+		len(got.PrevRuns) != 1 || !got.PrevRuns[0].Equal(time.Date(2029, 12, 31, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("status %d, body %s", rec.Code, rec.Body)
+	}
+}
+
+func TestValidateBadFromIs422(t *testing.T) {
+	f := newFixture(t)
+	rec := f.post("/schedules/validate", `{"expression": "0 9 * * *", "from": "next tuesday"}`, "jeremy")
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("status %d, body %s", rec.Code, rec.Body)
+	}
+}
+
 func TestValidateInvalidExpressionIs200(t *testing.T) {
 	f := newFixture(t)
 	rec := f.post("/schedules/validate", `{"expression": "60 * * * *"}`, "jeremy")
@@ -40,7 +65,7 @@ func TestValidateInJobContext(t *testing.T) {
 	rec := f.post("/schedules/validate", body, "jeremy")
 	var got core.ScheduleAnalysis
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	want := f.services.Cron.Analyze("H(15-45) 2 * * *", f.job.GUID, 2, 0)
+	want := f.services.Cron.Analyze("H(15-45) 2 * * *", f.job.GUID, 2, 0, time.Time{})
 	if rec.Code != http.StatusOK || got.Ref == nil || got.Ref.Name != "backup" || !got.Illustrative ||
 		got.HashedFields[0].Resolved != want.HashedFields[0].Resolved || len(got.NextRuns) != 2 {
 		t.Errorf("status %d, body %s", rec.Code, rec.Body)

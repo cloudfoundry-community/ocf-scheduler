@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"time"
 )
 
 const TimezoneJsonBase string = "scheduler-timezones.json"
@@ -26,7 +27,7 @@ type CronService interface {
 	Add(Runnable) error
 	Delete(Runnable) error
 	Count() int
-	Analyze(expression, key string, next, prev int) ScheduleAnalysis
+	Analyze(expression, key string, next, prev int, from time.Time) ScheduleAnalysis
 	GetTimezones() (*TimezoneSlice, error)
 }
 
