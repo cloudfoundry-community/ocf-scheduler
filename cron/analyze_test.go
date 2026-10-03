@@ -179,12 +179,12 @@ func TestAnalyzeScheduleMatchesRuns(t *testing.T) {
 // Inputs the design does not name (plan Review Focus).
 func TestReviewFocusEdges(t *testing.T) {
 	for _, tt := range []struct{ expr, desc, warn string }{
-		{"  CRON_TZ=UTC 0 2 * * *  ", "at 02:00, UTC time", ""},
-		{"CRON_TZ=UTC 0 0 * * mon-fri", "at 00:00, on Monday to Friday, UTC time", ""},
-		{"CRON_TZ=UTC 0 0 ? * MON", "at 00:00, on Monday, UTC time", ""},
-		{`CRON_TZ="America/New_York" 0 9 * * *`, "at 09:00, America/New_York time", ""},
-		{"CRON_TZ=Australia/Lord_Howe 15 2 * * *", "at 02:15, Australia/Lord_Howe time", "dst_skipped"},
-		{"CRON_TZ=America/Santiago 30 0 * * *", "at 00:30, America/Santiago time", "dst_skipped"},
+		{"  CRON_TZ=UTC 0 2 * * *  ", "at 02:00", ""},
+		{"CRON_TZ=UTC 0 0 * * mon-fri", "at 00:00, on Monday to Friday", ""},
+		{"CRON_TZ=UTC 0 0 ? * MON", "at 00:00, on Monday", ""},
+		{`CRON_TZ="America/New_York" 0 9 * * *`, "at 09:00", ""},
+		{"CRON_TZ=Australia/Lord_Howe 15 2 * * *", "at 02:15", "dst_skipped"},
+		{"CRON_TZ=America/Santiago 30 0 * * *", "at 00:30", "dst_skipped"},
 	} {
 		r := Analyze(tt.expr, "", 3, 0, Rules{}, now).Result
 		if !r.Valid || r.Description != tt.desc || codes(r.Warnings) != tt.warn {

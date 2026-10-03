@@ -26,7 +26,7 @@ var golden = []struct{ expr, want string }{
 	{"0 22-2 * * *", "at 22:00, 23:00, 00:00, 01:00 and 02:00"},
 	{"5-50/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour"},
 	{"5/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour"},
-	{"CRON_TZ=US/Pacific 5/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour, US/Pacific time"},
+	{"CRON_TZ=US/Pacific 5/15 * * * *", "at minutes 5, 20, 35 and 50 of every hour"},
 	{"10-40/10 * * * *", "at minutes 10, 20, 30 and 40 of every hour"},
 	{"*/7 * * * *", "at minutes 0, 7, 14, … 56 of every hour (every 7 minutes, starting over each hour)"},
 	{"*/7 9-10 * * *", "at minutes 0, 7, 14, … 56 of hours 9 to 10 (every 7 minutes, starting over each hour)"},
@@ -72,8 +72,8 @@ var golden = []struct{ expr, want string }{
 	{"@yearly", "at 00:00, on day 1 of the month, in January"},
 	{"@every 1h30m", "every 1h30m from when the schedule starts"},
 	{"@triggered", "only when triggered"},
-	{"CRON_TZ=UTC 0 0 * * *", "at 00:00, UTC time"},
-	{"TZ=America/Los_Angeles @daily", "at 00:00, America/Los_Angeles time"},
+	{"CRON_TZ=UTC 0 0 * * *", "at 00:00"},
+	{"TZ=America/Los_Angeles @daily", "at 00:00"},
 }
 
 func TestDescribe(t *testing.T) {
@@ -168,10 +168,9 @@ func grammar() *regexp.Regexp {
 	dayc := alt("on "+dom+opt(" when it falls on "+dow), "on "+dow)
 	monthc := alt("in "+listOf(month), "in a hashed month")
 	year := "in " + listOf(num)
-	zone := `[A-Za-z0-9_+\-/]+ time`
 	sched := alt("every [0-9a-zµ.]+ from when the schedule starts", "only when triggered",
 		tm+opt(", "+dayc)+opt(", "+monthc)+opt(", "+year))
-	return regexp.MustCompile("^" + sched + opt(", "+zone) + "$")
+	return regexp.MustCompile("^" + sched + "$")
 }
 
 func TestDescriptionsMatchGrammar(t *testing.T) {
