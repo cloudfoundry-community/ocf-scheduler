@@ -66,6 +66,12 @@ var golden = []struct{ expr, want string }{
 	{"0 30 2 * 3,11 SUN#1,SUN#2", "at 02:30, on the first Sunday and the second Sunday, in March and November"},
 	{"0 9 * * MON,FRI#L", "at 09:00, on Monday and the last Friday"},
 	{"0 9 * * MON-WED,FRI#3", "at 09:00, on Monday thru Wednesday and the third Friday"},
+	{"0 9 1,L * *", "at 09:00, on day 1 and the last day of the month"},
+	{"0 9 15W,L * *", "at 09:00, on the weekday nearest day 15 and the last day of the month"},
+	{"0 9 1-5,L * *", "at 09:00, on days 1 to 5 and the last day of the month"},
+	{"0 9 LW,15 * *", "at 09:00, on the last weekday and day 15 of the month"},
+	{"0 9 1,15,L-2 * *", "at 09:00, on day 1, day 15 and the 2nd day before the end of the month"},
+	{"0 9 1W,LW * MON", "at 09:00, on the weekday nearest day 1 and the last weekday of the month when it falls on Monday"},
 	{"0 9 * * MON-TUE", "at 09:00, on Monday and Tuesday"},
 	{"0 9 * * SAT-SUN", "at 09:00, on Saturday and Sunday"},
 	{"0 9 * * SUN-MON", "at 09:00, on Sunday and Monday"},
@@ -160,6 +166,9 @@ func grammar() *regexp.Regexp {
 	clock := `\d\d:\d\d(?::\d\d)?`
 	clocks := clock + opt("(?:, "+clock+")* and "+clock)
 	tm := alt("at "+clocks, lead+"(?: of "+unit+")*"+opt(note))
+	// one element of a day-of-month list that holds L or W forms
+	domEl := alt("day "+num, "days "+num+" to "+num, "the last day", "the last weekday",
+		"the "+num+alt("st", "nd", "rd", "th")+" day before the end", "the weekday nearest day "+num)
 	dom := alt(
 		alt("day", "days")+" "+listOf(num)+" of the month",
 		"the last day of the month",
@@ -167,6 +176,7 @@ func grammar() *regexp.Regexp {
 		"the weekday nearest day "+num,
 		"the last weekday of the month",
 		"a hashed day of the month"+between,
+		domEl+"(?:, "+domEl+")* and "+domEl+" of the month",
 		alt("day", "days")+" "+vlist(num)+" of every month"+opt(note),
 	)
 	dowItem := alt(day+opt(" thru "+day), "the "+alt("first", "second", "third", "fourth", "fifth", "last")+" "+day)
