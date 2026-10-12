@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+// MinPasswordLength is the shortest broker password the scheduler accepts.
+// The broker answers on the scheduler's public route and nothing limits the
+// rate of guesses, so the password is its main defence.
+const MinPasswordLength = 16
+
 // The environment variables that configure the broker. The BOSH release sets
 // them from the scheduler.broker job properties.
 const (
@@ -51,7 +56,7 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 
 	config := Config{
 		Enabled:        true,
-		Username:       strings.TrimSpace(getenv(EnvUsername)),
+		Username:       getenv(EnvUsername),
 		Password:       getenv(EnvPassword),
 		RequireBinding: requireBinding,
 	}
@@ -60,8 +65,18 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		return Config{}, fmt.Errorf("%s is true but %s is not set", EnvEnabled, EnvUsername)
 	}
 
+	// Cloud Controller sends the username exactly as it was registered, so
+	// trimming it here would only hide a mismatch until the first request.
+	if config.Username != strings.TrimSpace(config.Username) {
+		return Config{}, fmt.Errorf("%s has leading or trailing whitespace", EnvUsername)
+	}
+
 	if len(config.Password) == 0 {
 		return Config{}, fmt.Errorf("%s is true but %s is not set", EnvEnabled, EnvPassword)
+	}
+
+	if len(config.Password) < MinPasswordLength {
+		return Config{}, fmt.Errorf("%s must be at least %d characters long", EnvPassword, MinPasswordLength)
 	}
 
 	apiURL := strings.TrimRight(strings.TrimSpace(getenv(EnvAPIURL)), "/")

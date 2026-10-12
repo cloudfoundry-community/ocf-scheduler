@@ -110,11 +110,11 @@ scheduler immediately.
 | `LOG_LEVEL` | No | `info` | Log level (see below) |
 | `SCHEDULER_BROKER_ENABLED` | No | `false` | Serves the service broker under `/v2` when it is `true` |
 | `SCHEDULER_BROKER_USERNAME` | When the broker is on | | The basic auth username that Cloud Controller sends to the broker |
-| `SCHEDULER_BROKER_PASSWORD` | When the broker is on | | The basic auth password that Cloud Controller sends to the broker |
+| `SCHEDULER_BROKER_PASSWORD` | When the broker is on | | The basic auth password that Cloud Controller sends to the broker, at least 16 characters long |
 | `SCHEDULER_BROKER_API_URL` | When the broker is on | | The scheduler URL that binding credentials hand to apps, such as `https://scheduler.system.example.com` |
 | `SCHEDULER_BROKER_REQUIRE_BINDING` | No | `false` | Refuses to create or run jobs, calls, and schedules for an app that isn't bound, when it is `true` |
 
-The scheduler refuses to start when the broker settings don't fit together. That happens when `SCHEDULER_BROKER_ENABLED` is `true` and the username, password, or API URL is missing, when the API URL isn't an absolute `http` or `https` URL, when a boolean setting holds anything other than a boolean, and when `SCHEDULER_BROKER_REQUIRE_BINDING` is `true` while the broker is off. The startup log names the broker user, the API URL, and the `require_binding` setting, and it never prints the password.
+The scheduler refuses to start when the broker settings don't fit together. That happens when `SCHEDULER_BROKER_ENABLED` is `true` and the username, password, or API URL is missing, when the password is shorter than 16 characters, when the username starts or ends with whitespace, when the API URL isn't an absolute `http` or `https` URL, when a boolean setting holds anything other than a boolean, and when `SCHEDULER_BROKER_REQUIRE_BINDING` is `true` while the broker is off. The startup log names the broker user, the API URL, and the `require_binding` setting, and it never prints the password.
 
 #### Log Levels
 
@@ -323,6 +323,10 @@ Every request must carry `X-Broker-API-Version` 2.13 or later. A request without
 - Deleting the instance removes its bindings first, which pauses each app that loses its last binding, and then removes the instance.
 
 Every operation finishes before the broker answers, so the broker never answers `202 Accepted` and has no operation to poll. Changing the plan isn't supported.
+
+### Rolling back
+
+Version 2.2.0 adds three database migrations, 1791828900, 1791828901, and 1791828902, which create the `service_instances` and `service_bindings` tables and add the `schedules.paused_by` column. Releases before 2.2.0 refuse to start against a database that holds a migration they don't know, so rolling back from 2.2.0 to a 2.1.x release needs those three migrations reverted first. Their down steps drop the two tables and the column, and they remove every service instance and binding with them. Schedules that an unbind paused stay disabled after the rollback, because the mark that would resume them goes with the column. From 2.2.0 on, the scheduler starts against a database that a newer release has migrated, so later rollbacks don't need this step.
 
 ### Requiring a binding
 

@@ -13,7 +13,7 @@ func TestConfigFromEnv(t *testing.T) {
 	complete := map[string]string{
 		EnvEnabled:  "true",
 		EnvUsername: "broker",
-		EnvPassword: "secret-password",
+		EnvPassword: "secret-password-long",
 		EnvAPIURL:   "https://scheduler.example.com/",
 	}
 
@@ -47,7 +47,7 @@ func TestConfigFromEnv(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := Config{Enabled: true, Username: "broker", Password: "secret-password", APIURL: "https://scheduler.example.com", RequireBinding: true}
+		want := Config{Enabled: true, Username: "broker", Password: "secret-password-long", APIURL: "https://scheduler.example.com", RequireBinding: true}
 		if config != want {
 			t.Errorf("got %+v, want %+v", config, want)
 		}
@@ -56,6 +56,8 @@ func TestConfigFromEnv(t *testing.T) {
 	for name, values := range map[string]map[string]string{
 		"no username":                        with(map[string]string{EnvUsername: ""}),
 		"no password":                        with(map[string]string{EnvPassword: ""}),
+		"a short password":                   with(map[string]string{EnvPassword: "short-secret"}),
+		"a username with whitespace":         with(map[string]string{EnvUsername: " broker "}),
 		"no api url":                         with(map[string]string{EnvAPIURL: ""}),
 		"a relative api url":                 with(map[string]string{EnvAPIURL: "scheduler.example.com"}),
 		"an api url with another scheme":     with(map[string]string{EnvAPIURL: "ftp://scheduler.example.com"}),
@@ -68,7 +70,7 @@ func TestConfigFromEnv(t *testing.T) {
 			if err == nil {
 				t.Fatalf("want an error, got %+v", config)
 			}
-			if strings.Contains(err.Error(), "secret-password") {
+			if password := values[EnvPassword]; len(password) > 0 && strings.Contains(err.Error(), password) {
 				t.Errorf("the error carries the password: %v", err)
 			}
 		})

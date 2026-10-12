@@ -121,6 +121,11 @@ func main() {
 
 	log.Debug(tag, fmt.Sprintf("migration collection size %d", len(migrations.Collection.Migrations)))
 
+	// Start against a database that a newer release has migrated, so that
+	// rolling back to this release works. Releases before 2.2.0 lack this and
+	// refuse such a database.
+	migrate.SetIgnoreUnknown(true)
+
 	n, err := migrate.Exec(db, "postgres", migrations.Collection, migrate.Up)
 	if err != nil {
 		log.Fatal(tag, fmt.Sprintf("could not update database schema: %s", err.Error()))
