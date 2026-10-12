@@ -163,6 +163,10 @@ func (b *Broker) checkSpace(ctx context.Context, tag, spaceGUID, instanceID stri
 // removed the way a deprovision would remove it. checked is what
 // checkSpace learned before the caller took services.BindingLock, which the
 // caller holds for writing.
+//
+// An instance that took the space after checkSpace looked was provisioned
+// moments ago by a concurrent request, so it is not an orphan, and the
+// space is taken.
 func (b *Broker) clearSpace(tag, spaceGUID string, checked *spaceCheck) error {
 	other, err := b.services.Instances.InSpace(spaceGUID)
 	if errors.Is(err, core.ErrNotFound) {
@@ -174,7 +178,7 @@ func (b *Broker) clearSpace(tag, spaceGUID string, checked *spaceCheck) error {
 
 	if checked == nil || checked.instanceID != other.InstanceID {
 		b.services.Logger.Warn(tag, fmt.Sprintf("instance %s took space %s while this request was checking the space", other.InstanceID, spaceGUID))
-		return fmt.Errorf("space %s gained scheduler instance %s while this request was checking it; try again", spaceGUID, other.InstanceID)
+		return spaceTaken()
 	}
 
 	if checked.err != nil {
