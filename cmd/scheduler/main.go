@@ -11,6 +11,12 @@ import (
 	"strconv"
 	"time"
 
+	// The embedded zone database is where time.LoadLocation turns when it
+	// cannot read a zone from the system zoneinfo, so a read error such as
+	// running out of file descriptors cannot make a stored CRON_TZ=
+	// schedule look unparseable.
+	_ "time/tzdata"
+
 	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry/go-cfclient/v3/config"
 	"github.com/gammazero/workerpool"
