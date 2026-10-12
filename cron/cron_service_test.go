@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -27,8 +28,8 @@ func TestAddRejectsOnlyParseErrors(t *testing.T) {
 			t.Errorf("%q: %v", expr, err)
 		}
 	}
-	if err := service.Add(stubRun{&core.Schedule{GUID: "z", Expression: "60 * * * *"}}); err == nil {
-		t.Error("60 * * * *: want an error")
+	if err := service.Add(stubRun{&core.Schedule{GUID: "z", Expression: "60 * * * *"}}); !errors.Is(err, core.ErrInvalidSchedule) {
+		t.Errorf("60 * * * *: want an error wrapping ErrInvalidSchedule, got %v", err)
 	}
 	if service.Count() != len(ok) {
 		t.Errorf("registered %d entries, want %d", service.Count(), len(ok))

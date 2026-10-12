@@ -47,6 +47,113 @@ func TestRebindFinishesOnRetryWhenJobLookupsFail(t *testing.T) {
 	}
 }
 
+// recordingLog keeps every error line it is given, and passes every line on.
+type recordingLog struct {
+	core.LogService
+
+	locker sync.Mutex
+	errors []string
+}
+
+func (log *recordingLog) Error(tag, message string) {
+	log.locker.Lock()
+	log.errors = append(log.errors, message)
+	log.locker.Unlock()
+
+	log.LogService.Error(tag, message)
+}
+
+func (log *recordingLog) errorsNaming(text string) []string {
+	log.locker.Lock()
+	defer log.locker.Unlock()
+
+	found := make([]string, 0)
+	for _, line := range log.errors {
+		if strings.Contains(line, text) {
+			found = append(found, line)
+		}
+	}
+
+	return found
+}
+
+// A schedule whose expression no longer parses can never go back in cron, so
+// a rebind leaves it paused and marked, logs it, and resumes the others. A
+// later bind resumes it once the expression parses again.
+func TestRebindLeavesAnUnparseableScheduleBehind(t *testing.T) {
+	f := newFixture(t)
+	log := &recordingLog{LogService: f.services.Logger}
+	f.services.Logger = log
+
+	expectStatus(t, "provision", f.provision("instance-1", "space-a"), nethttp.StatusCreated)
+	expectStatus(t, "bind", f.bind("instance-1", "binding-1", "app-a"), nethttp.StatusCreated)
+	expectStatus(t, "unbind", f.unbind("instance-1", "binding-1"), nethttp.StatusOK)
+
+	// A time zone that the zone data no longer holds.
+	f.nightly.Expression = "CRON_TZ=Nowhere/Gone 0 2 * * *"
+
+	expectStatus(t, "rebind", f.bind("instance-1", "binding-2", "app-a"), nethttp.StatusCreated)
+
+	f.expectStopped("nightly", f.nightly, core.PausedByUnbind)
+	f.expectRunning("hourly", f.hourly)
+	f.expectRunning("ping", f.ping)
+	f.expectStopped("owned", f.owned, "")
+
+	logged := log.errorsNaming(f.nightly.GUID)
+	if len(logged) == 0 {
+		t.Errorf("no error names schedule %s", f.nightly.GUID)
+	}
+	for _, line := range logged {
+		for _, secret := range []string{brokerPassword, callSecret, "auth_header"} {
+			if strings.Contains(line, secret) {
+				t.Errorf("the log carries %q: %s", secret, line)
+			}
+		}
+	}
+
+	expectStatus(t, "repeated bind", f.bind("instance-1", "binding-2", "app-a"), nethttp.StatusOK)
+	f.expectStopped("nightly", f.nightly, core.PausedByUnbind)
+	if n := f.cron.Count(); n != 2 {
+		t.Errorf("cron holds %d entries, want 2", n)
+	}
+
+	f.nightly.Expression = "0 2 * * *"
+	expectStatus(t, "bind after the fix", f.bind("instance-1", "binding-2", "app-a"), nethttp.StatusOK)
+	f.expectRunning("nightly", f.nightly)
+	if n := f.cron.Count(); n != 3 {
+		t.Errorf("cron holds %d entries, want 3", n)
+	}
+}
+
+// fullCron refuses every Add for a reason other than the expression.
+type fullCron struct {
+	core.CronService
+}
+
+func (fullCron) Add(core.Runnable) error {
+	return fmt.Errorf("cron is full")
+}
+
+// A cron failure that has nothing to do with the expression still fails the
+// rebind, so Cloud Controller retries and the retry resumes the schedules.
+func TestRebindFailsWhenCronRefusesAValidSchedule(t *testing.T) {
+	f := newFixture(t)
+
+	expectStatus(t, "provision", f.provision("instance-1", "space-a"), nethttp.StatusCreated)
+	expectStatus(t, "bind", f.bind("instance-1", "binding-1", "app-a"), nethttp.StatusCreated)
+	expectStatus(t, "unbind", f.unbind("instance-1", "binding-1"), nethttp.StatusOK)
+
+	f.services.Cron = fullCron{f.cron}
+	expectStatus(t, "rebind", f.bind("instance-1", "binding-2", "app-a"), nethttp.StatusInternalServerError)
+	f.expectStopped("nightly", f.nightly, core.PausedByUnbind)
+	f.expectStopped("ping", f.ping, core.PausedByUnbind)
+
+	f.services.Cron = f.cron
+	expectStatus(t, "retry", f.bind("instance-1", "binding-2", "app-a"), nethttp.StatusOK)
+	f.expectRunning("nightly", f.nightly)
+	f.expectRunning("ping", f.ping)
+}
+
 // A resume whose store update fails leaves every schedule disabled, marked,
 // and out of cron, so the retry starts over.
 func TestRebindTakesSchedulesBackOutOfCronWhenTheResumeFails(t *testing.T) {

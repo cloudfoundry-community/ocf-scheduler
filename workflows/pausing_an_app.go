@@ -69,6 +69,13 @@ func PausingAnApp(services *core.Services, appGUID string) (int, error) {
 // mark only on the schedules that made it into cron. A schedule whose job or
 // call cannot be loaded keeps its mark and stays disabled, and the error that
 // follows lets Cloud Controller retry, so the retry finds it again.
+//
+// A schedule whose expression no longer parses also keeps its mark and stays
+// disabled, but it does not fail the resume. A retry could never put it in
+// cron, so failing would block every bind of the app for one schedule. Only
+// a bind resumes an app, so the schedule stays paused until the next bind
+// after its expression parses again, or until its owner deletes it and
+// creates it again.
 func ResumingAnApp(services *core.Services, appGUID string) (int, error) {
 	tag := "resuming-an-app"
 
@@ -79,7 +86,7 @@ func ResumingAnApp(services *core.Services, appGUID string) (int, error) {
 		return 0, fmt.Errorf("%s", doh)
 	}
 
-	failed := 0
+	failed, invalid := 0, 0
 	scheduled := make([]*core.Schedule, 0)
 	for _, schedule := range schedules {
 		if schedule.PausedBy != core.PausedByUnbind {
@@ -94,6 +101,12 @@ func ResumingAnApp(services *core.Services, appGUID string) (int, error) {
 		}
 
 		if err := services.Cron.Add(run); err != nil {
+			if errors.Is(err, core.ErrInvalidSchedule) {
+				invalid++
+				services.Logger.Error(tag, fmt.Sprintf("leaving schedule %s of app %s paused, because cron cannot run it: %v", schedule.GUID, appGUID, err))
+				continue
+			}
+
 			failed++
 			services.Logger.Error(tag, fmt.Sprintf("could not put schedule %s back in cron: %v", schedule.GUID, err))
 			continue
@@ -141,7 +154,11 @@ func ResumingAnApp(services *core.Services, appGUID string) (int, error) {
 		return resumed, fmt.Errorf("resumed %d schedules of app %s but could not put %d back in cron", resumed, appGUID, failed)
 	}
 
-	services.Logger.Info(tag, fmt.Sprintf("resumed %d schedules for app %s", resumed, appGUID))
+	if invalid > 0 {
+		services.Logger.Info(tag, fmt.Sprintf("resumed %d schedules for app %s and left %d paused with an expression cron cannot run", resumed, appGUID, invalid))
+	} else {
+		services.Logger.Info(tag, fmt.Sprintf("resumed %d schedules for app %s", resumed, appGUID))
+	}
 
 	return resumed, nil
 }

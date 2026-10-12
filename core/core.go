@@ -10,6 +10,10 @@ import (
 // ErrNotScheduled means a schedule has no cron entry to remove.
 var ErrNotScheduled = errors.New("no such runner")
 
+// ErrInvalidSchedule means a schedule's expression does not parse, so cron
+// cannot run it until the expression changes.
+var ErrInvalidSchedule = errors.New("invalid cron expression")
+
 const TimezoneJsonBase string = "scheduler-timezones.json"
 const TimezoneJsonDir string = "/var/vcap/store/scheduler/"
 

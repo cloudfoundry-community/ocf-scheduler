@@ -103,15 +103,16 @@ func NewCronService(log core.LogService, rules Rules) *CronService {
 	}
 }
 
-// Add registers the runnable's schedule. Only a parse failure stops it:
-// a stored schedule that breaks a later policy rule (never fires, under the
-// minimum interval) still loads, with a warning, so raising a limit never
-// silently stops existing schedules. Create rejects those before Add.
+// Add registers the runnable's schedule. Only a parse failure stops it, and
+// that error wraps core.ErrInvalidSchedule: a stored schedule that breaks a
+// later policy rule (never fires, under the minimum interval) still loads,
+// with a warning, so raising a limit never silently stops existing
+// schedules. Create rejects those before Add.
 func (service *CronService) Add(runnable core.Runnable) error {
 	schedule := runnable.Schedule()
 	analysis := Analyze(schedule.Expression, schedule.RefGUID, 0, 0, service.rules, time.Now())
 	if analysis.Schedule == nil {
-		return fmt.Errorf("invalid cron expression %q: %s", schedule.Expression, analysis.Result.Errors[0].Message)
+		return fmt.Errorf("%w %q: %s", core.ErrInvalidSchedule, schedule.Expression, analysis.Result.Errors[0].Message)
 	}
 	for _, finding := range analysis.Result.Errors {
 		service.log.Warn("cron-service", fmt.Sprintf("schedule %s (%s): %s", schedule.GUID, schedule.Expression, finding.Message))
