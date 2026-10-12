@@ -29,8 +29,7 @@ func ExecuteJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
-		status, body, release := requireBinding(services, tag, auth, job.AppGUID)
-		defer release()
+		status, body, admin := requireBinding(services, tag, auth, job.AppGUID)
 		if status != 0 {
 			return c.JSON(status, body)
 		}
@@ -45,13 +44,22 @@ func ExecuteJob(e *echo.Echo, services *core.Services) {
 		input.RefGUID = guid
 		input.RefType = "job"
 
-		execution, err := services.Executions.Persist(input)
-		if err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("failed to persist execution for job %s: %v", guid, err))
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
+		var execution *core.Execution
+		status, body = whileBound(services, tag, job.AppGUID, admin, func() (int, any) {
+			execution, err = services.Executions.Persist(input)
+			if err != nil {
+				services.Logger.Error(tag, fmt.Sprintf("failed to persist execution for job %s: %v", guid, err))
+				return http.StatusUnprocessableEntity, ""
+			}
 
-		services.Runner.Execute(services, execution, job)
+			// Execute only queues the run, so it never holds the lock long.
+			services.Runner.Execute(services, execution, job)
+
+			return 0, nil
+		})
+		if status != 0 {
+			return c.JSON(status, body)
+		}
 		services.Logger.Info(tag, fmt.Sprintf("dispatched execution for job %s", guid))
 
 		return c.JSON(

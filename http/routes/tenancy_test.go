@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -172,7 +173,12 @@ func (tn *tenancy) persistSchedule(t *testing.T, executable core.Executable) *co
 }
 
 func (tn *tenancy) do(method, path, body, auth string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	return tn.serve(method, path, strings.NewReader(body), auth)
+}
+
+// serve sends a request whose body comes from body as the route reads it.
+func (tn *tenancy) serve(method, path string, body io.Reader, auth string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, body)
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	if auth != "" {
 		req.Header.Set(echo.HeaderAuthorization, auth)

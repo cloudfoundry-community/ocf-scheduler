@@ -52,33 +52,69 @@ func ownedBy(schedule *core.Schedule, refType, refGUID string) bool {
 // so only a caller with access to the space gets this far. When enforcement
 // is on, the app must be bound to the space's scheduler service instance,
 // and an admin may go on regardless. It returns 0 when the caller may go on,
-// or else the status and body to answer with.
+// or else the status and body to answer with, and it reports whether the
+// caller went on as an admin.
 //
-// When enforcement is on, it also holds services.BindingLock for reading
-// until the route calls release, which the route defers. The broker cannot
-// unbind and pause the app in between, so work stored after the check is
-// never left running for an app that has just been unbound.
-func requireBinding(services *core.Services, tag, auth, appGUID string) (int, any, func()) {
+// It takes no lock, so it refuses an unbound app before the route reads the
+// request body. The route then stores its work through whileBound, which
+// checks the binding again under the lock.
+func requireBinding(services *core.Services, tag, auth, appGUID string) (int, any, bool) {
 	if !services.RequireBinding {
-		return 0, nil, func() {}
+		return 0, nil, false
 	}
 
 	if services.Bindings == nil {
 		services.Logger.Error(tag, "require_binding is on but the service broker is not running")
-		return http.StatusInternalServerError, "", func() {}
+		return http.StatusInternalServerError, "", false
+	}
+
+	status, body := checkBound(services, tag, appGUID)
+	if status == 0 {
+		return 0, nil, false
+	}
+
+	if status == http.StatusForbidden && services.Auth.IsAdmin(auth) {
+		return 0, nil, true
+	}
+
+	return status, body, false
+}
+
+// whileBound runs store, the step that stores a route's work and puts it in
+// cron or dispatches it. When require_binding is on and the caller is not an
+// admin, it holds services.BindingLock for reading, checks again that the
+// app is bound, and runs store only if it is. The broker cannot unbind and
+// pause the app in between, so work stored here is never left running for an
+// app that has just been unbound. The lock covers nothing the client
+// controls, because the route has read the body before it calls whileBound,
+// and the lock is released before the route answers. It returns store's
+// status and body, or the refusal.
+func whileBound(services *core.Services, tag, appGUID string, admin bool, store func() (int, any)) (int, any) {
+	if !services.RequireBinding || admin {
+		return store()
 	}
 
 	services.BindingLock.RLock()
-	release := services.BindingLock.RUnlock
+	defer services.BindingLock.RUnlock()
 
+	if status, body := checkBound(services, tag, appGUID); status != 0 {
+		return status, body
+	}
+
+	return store()
+}
+
+// checkBound returns 0 when the app is bound, 403 with a binding_required
+// error when it is not, and 500 when the binding store fails.
+func checkBound(services *core.Services, tag, appGUID string) (int, any) {
 	bound, err := services.Bindings.Bound(appGUID)
 	if err != nil {
 		services.Logger.Error(tag, fmt.Sprintf("could not check the bindings of app %s: %v", appGUID, err))
-		return http.StatusInternalServerError, "", release
+		return http.StatusInternalServerError, ""
 	}
 
-	if bound || services.Auth.IsAdmin(auth) {
-		return 0, nil, release
+	if bound {
+		return 0, nil
 	}
 
 	services.Logger.Warn(tag, fmt.Sprintf("app %s is not bound to a scheduler service instance", appGUID))
@@ -87,5 +123,5 @@ func requireBinding(services *core.Services, tag, auth, appGUID string) (int, an
 		"binding_required",
 		"app %s must be bound to a scheduler service instance first; run cf bind-service with the app and the space's scheduler instance",
 		appGUID,
-	), release
+	)
 }

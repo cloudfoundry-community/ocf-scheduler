@@ -31,8 +31,7 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
-		status, body, release := requireBinding(services, tag, auth, job.AppGUID)
-		defer release()
+		status, body, admin := requireBinding(services, tag, auth, job.AppGUID)
 		if status != 0 {
 			return c.JSON(status, body)
 		}
@@ -55,15 +54,23 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, core.Findings{Errors: analysis.Errors, Warnings: analysis.Warnings})
 		}
 
-		schedule, err := services.Schedules.Persist(input)
-		if err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("failed to persist schedule for job %s: %v", guid, err))
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
+		var schedule *core.Schedule
+		status, body = whileBound(services, tag, job.AppGUID, admin, func() (int, any) {
+			schedule, err = services.Schedules.Persist(input)
+			if err != nil {
+				services.Logger.Error(tag, fmt.Sprintf("failed to persist schedule for job %s: %v", guid, err))
+				return http.StatusUnprocessableEntity, ""
+			}
 
-		if err := services.Cron.Add(core.NewJobRun(job, schedule, services)); err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("failed to add cron entry for job %s: %v", guid, err))
-			return c.JSON(http.StatusUnprocessableEntity, requestError("schedule_failed", "%v", err))
+			if err := services.Cron.Add(core.NewJobRun(job, schedule, services)); err != nil {
+				services.Logger.Error(tag, fmt.Sprintf("failed to add cron entry for job %s: %v", guid, err))
+				return http.StatusUnprocessableEntity, requestError("schedule_failed", "%v", err)
+			}
+
+			return 0, nil
+		})
+		if status != 0 {
+			return c.JSON(status, body)
 		}
 
 		services.Logger.Info(tag, fmt.Sprintf("created schedule %s for job %s", schedule.GUID, guid))

@@ -33,8 +33,7 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
-		status, body, release := requireBinding(services, tag, auth, appGUID)
-		defer release()
+		status, body, admin := requireBinding(services, tag, auth, appGUID)
 		if status != 0 {
 			return c.JSON(status, body)
 		}
@@ -64,10 +63,18 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		call, err := services.Calls.Persist(input)
-		if err != nil {
-			services.Logger.Error(tag, "could not persist the call")
-			return c.JSON(http.StatusUnprocessableEntity, "")
+		var call *core.Call
+		status, body = whileBound(services, tag, appGUID, admin, func() (int, any) {
+			call, err = services.Calls.Persist(input)
+			if err != nil {
+				services.Logger.Error(tag, "could not persist the call")
+				return http.StatusUnprocessableEntity, ""
+			}
+
+			return 0, nil
+		})
+		if status != 0 {
+			return c.JSON(status, body)
 		}
 
 		success := fmt.Sprintf(

@@ -32,8 +32,7 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
-		status, body, release := requireBinding(services, tag, auth, appGUID)
-		defer release()
+		status, body, admin := requireBinding(services, tag, auth, appGUID)
 		if status != 0 {
 			return c.JSON(status, body)
 		}
@@ -57,10 +56,18 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusUnprocessableEntity, "")
 		}
 
-		job, err := services.Jobs.Persist(input)
-		if err != nil {
-			services.Logger.Error(tag, "could not persist the job")
-			return c.JSON(http.StatusUnprocessableEntity, "")
+		var job *core.Job
+		status, body = whileBound(services, tag, appGUID, admin, func() (int, any) {
+			job, err = services.Jobs.Persist(input)
+			if err != nil {
+				services.Logger.Error(tag, "could not persist the job")
+				return http.StatusUnprocessableEntity, ""
+			}
+
+			return 0, nil
+		})
+		if status != 0 {
+			return c.JSON(status, body)
 		}
 
 		success := fmt.Sprintf(

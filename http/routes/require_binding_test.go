@@ -2,9 +2,11 @@ package routes
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -172,4 +174,178 @@ func TestRequireBindingWaitsForTheBroker(t *testing.T) {
 		t.Errorf("status %d after the unbind, want 403, body %s", rec.Code, rec.Body)
 	}
 	tn.assertBUntouched(t)
+}
+
+// stallingBody holds its first read until release is closed, as a client
+// that stops sending its body would. started is closed when the route first
+// reads it.
+type stallingBody struct {
+	body     io.Reader
+	started  chan struct{}
+	release  chan struct{}
+	stalling sync.Once
+}
+
+func newStallingBody(body string) *stallingBody {
+	return &stallingBody{
+		body:    strings.NewReader(body),
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+}
+
+func (body *stallingBody) Read(p []byte) (int, error) {
+	body.stalling.Do(func() {
+		close(body.started)
+		<-body.release
+	})
+
+	return body.body.Read(p)
+}
+
+// A client that stalls its body must not hold the binding lock, or the
+// broker and every other guarded route would wait on that one client.
+func TestRequireBindingNeverHoldsTheLockWhileTheClientSends(t *testing.T) {
+	tn := newTenancy(t)
+	bindings := tn.enforce()
+	if _, err := bindings.Persist(&core.ServiceBinding{BindingID: "binding-b", InstanceID: "instance-b", AppGUID: "app-b"}); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, r := range tn.gatedOnB() {
+		body := newStallingBody(r.body)
+		done := make(chan *httptest.ResponseRecorder)
+		go func() {
+			done <- tn.serve(r.method, r.path, body, tn.userB)
+		}()
+
+		select {
+		case <-body.started:
+		case rec := <-done:
+			t.Fatalf("%s %s: answered %d without reading the body", r.method, r.path, rec.Code)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s %s: never read the body", r.method, r.path)
+		}
+
+		if tn.services.BindingLock.TryLock() {
+			tn.services.BindingLock.Unlock()
+		} else {
+			t.Errorf("%s %s: the route holds the binding lock while the client sends its body", r.method, r.path)
+		}
+
+		close(body.release)
+		if rec := <-done; rec.Code != r.ok {
+			t.Errorf("%s %s: status %d, want %d, body %s", r.method, r.path, rec.Code, r.ok, rec.Body)
+		}
+	}
+}
+
+// lockProbe records each store step that ran while the binding lock was
+// free, which would let the broker unbind the app between the route's
+// binding check and its write.
+type lockProbe struct {
+	lock *sync.RWMutex
+
+	locker   sync.Mutex
+	unlocked []string
+}
+
+func (probe *lockProbe) check(step string) {
+	if !probe.lock.TryLock() {
+		return
+	}
+	probe.lock.Unlock()
+
+	probe.locker.Lock()
+	defer probe.locker.Unlock()
+
+	probe.unlocked = append(probe.unlocked, step)
+}
+
+type probedJobs struct {
+	core.JobService
+	probe *lockProbe
+}
+
+func (jobs probedJobs) Persist(job *core.Job) (*core.Job, error) {
+	jobs.probe.check("persist job")
+	return jobs.JobService.Persist(job)
+}
+
+type probedCalls struct {
+	core.CallService
+	probe *lockProbe
+}
+
+func (calls probedCalls) Persist(call *core.Call) (*core.Call, error) {
+	calls.probe.check("persist call")
+	return calls.CallService.Persist(call)
+}
+
+type probedSchedules struct {
+	core.ScheduleService
+	probe *lockProbe
+}
+
+func (schedules probedSchedules) Persist(schedule *core.Schedule) (*core.Schedule, error) {
+	schedules.probe.check("persist schedule")
+	return schedules.ScheduleService.Persist(schedule)
+}
+
+type probedExecutions struct {
+	core.ExecutionService
+	probe *lockProbe
+}
+
+func (executions probedExecutions) Persist(execution *core.Execution) (*core.Execution, error) {
+	executions.probe.check("persist execution")
+	return executions.ExecutionService.Persist(execution)
+}
+
+type probedCron struct {
+	core.CronService
+	probe *lockProbe
+}
+
+func (cron probedCron) Add(runnable core.Runnable) error {
+	cron.probe.check("add to cron")
+	return cron.CronService.Add(runnable)
+}
+
+type probedRunner struct {
+	core.RunService
+	probe *lockProbe
+}
+
+func (runner probedRunner) Execute(services *core.Services, execution *core.Execution, executable core.Executable) {
+	runner.probe.check("dispatch run")
+	runner.RunService.Execute(services, execution, executable)
+}
+
+// Each guarded route stores its work, puts it in cron, and dispatches it
+// while it holds the binding lock, so an unbind cannot land between the
+// route's last binding check and its write.
+func TestRequireBindingHoldsTheLockWhileItStores(t *testing.T) {
+	tn := newTenancy(t)
+	bindings := tn.enforce()
+	if _, err := bindings.Persist(&core.ServiceBinding{BindingID: "binding-b", InstanceID: "instance-b", AppGUID: "app-b"}); err != nil {
+		t.Fatal(err)
+	}
+
+	probe := &lockProbe{lock: &tn.services.BindingLock}
+	tn.services.Jobs = probedJobs{tn.services.Jobs, probe}
+	tn.services.Calls = probedCalls{tn.services.Calls, probe}
+	tn.services.Schedules = probedSchedules{tn.services.Schedules, probe}
+	tn.services.Executions = probedExecutions{tn.services.Executions, probe}
+	tn.services.Cron = probedCron{tn.services.Cron, probe}
+	tn.services.Runner = probedRunner{tn.services.Runner, probe}
+
+	tn.check(t, tn.userB, tn.gatedOnB(), allowed)
+
+	for _, step := range probe.unlocked {
+		t.Errorf("%s ran without the binding lock", step)
+	}
+	if n := tn.runner.count(); n != 2 {
+		t.Errorf("%d runs were dispatched, want 2", n)
+	}
 }
