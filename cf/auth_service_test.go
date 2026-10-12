@@ -18,6 +18,10 @@ func TestGetBearer(t *testing.T) {
 		{name: "no bearer keyword", auth: "Basic abc123", expectErr: true},
 		{name: "empty string", auth: "", expectErr: true},
 		{name: "bearer at end with no token", auth: "Bearer", expectErr: true},
+		{name: "lowercase scheme", auth: "bearer abc123token", expect: "abc123token"},
+		{name: "uppercase scheme", auth: "BEARER abc123token", expect: "abc123token"},
+		{name: "repeated spaces", auth: "Bearer  abc123token", expect: "abc123token"},
+		{name: "trailing space with no token", auth: "Bearer ", expectErr: true},
 	}
 
 	for _, tt := range tests {

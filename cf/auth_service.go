@@ -218,11 +218,13 @@ func uaaIdentity(bearer string) (*Identity, error) {
 }
 
 func getBearer(auth string) (string, error) {
-	parts := strings.Split(auth, " ")
+	parts := strings.Fields(auth)
 	bearerLoc := -1
 
+	// The auth scheme is case-insensitive (RFC 7235), and `cf oauth-token`
+	// prints it as "bearer".
 	for idx, token := range parts {
-		if token == "Bearer" {
+		if strings.EqualFold(token, "Bearer") {
 			bearerLoc = idx
 			break
 		}
