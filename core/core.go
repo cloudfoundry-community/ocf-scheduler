@@ -2,8 +2,13 @@ package core
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"time"
 )
+
+// ErrNotScheduled means a schedule has no cron entry to remove.
+var ErrNotScheduled = errors.New("no such runner")
 
 const TimezoneJsonBase string = "scheduler-timezones.json"
 const TimezoneJsonDir string = "/var/vcap/store/scheduler/"
@@ -57,6 +62,13 @@ type Services struct {
 	Instances InstanceService
 	Bindings  BindingService
 
+	// BindingLock orders binding changes against the routes that
+	// require_binding guards. The service broker holds it for writing while
+	// it changes instances, bindings, and paused schedules, and a guarded
+	// route holds it for reading from its binding check until it has stored
+	// its work, so an unbind cannot slip between the two.
+	BindingLock sync.RWMutex
+
 	// RequireBinding makes the routes that create or run work refuse an app
 	// that has no service binding. It needs Bindings.
 	RequireBinding bool
@@ -69,6 +81,7 @@ type InfoService interface {
 
 	// ServiceInstanceExists asks Cloud Controller whether a service instance
 	// GUID is still known. It answers false only when Cloud Controller says
-	// the instance is not found, and an error when it cannot tell.
-	ServiceInstanceExists(string) (bool, error)
+	// the instance is not found, and an error when it cannot tell, including
+	// when ctx ends first.
+	ServiceInstanceExists(ctx context.Context, guid string) (bool, error)
 }

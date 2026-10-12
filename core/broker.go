@@ -78,4 +78,8 @@ type BindingService interface {
 
 	// Bound reports whether any binding names the app.
 	Bound(appGUID string) (bool, error)
+
+	// BoundExcept reports whether a binding other than bindingID names the
+	// app.
+	BoundExcept(appGUID, bindingID string) (bool, error)
 }

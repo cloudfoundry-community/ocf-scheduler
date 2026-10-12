@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
+	"time"
 
 	osbbroker "github.com/fivetwenty-io/osbapi/v2/pkg/broker"
 	"github.com/fivetwenty-io/osbapi/v2/pkg/osbapi"
@@ -21,14 +21,20 @@ import (
 
 // Broker implements osbapi.ServiceBroker on the scheduler's stores. Every
 // operation finishes before it answers, so none is ever asynchronous.
+//
+// The operations that change instances, bindings, and schedules hold
+// services.BindingLock for writing. That serializes them, so an unbind and a
+// bind for the same app cannot interleave, and it keeps them apart from the
+// routes that require_binding guards.
 type Broker struct {
 	services *core.Services
 	apiURL   string
-
-	// locker serializes the operations that change instances, bindings, and
-	// schedules, so an unbind and a bind for the same app cannot interleave.
-	locker sync.Mutex
 }
+
+// lookupTimeout bounds each Cloud Controller lookup the broker makes while
+// it holds services.BindingLock, so a slow Cloud Controller cannot stall
+// every other broker operation for long.
+const lookupTimeout = 10 * time.Second
 
 var _ osbapi.ServiceBroker = (*Broker)(nil)
 
@@ -74,8 +80,8 @@ func (b *Broker) Provision(ctx context.Context, instanceID string, req osbapi.Pr
 		return none, false, fmt.Errorf("%w: space_guid is required", osbapi.ErrBadRequest)
 	}
 
-	b.locker.Lock()
-	defer b.locker.Unlock()
+	b.services.BindingLock.Lock()
+	defer b.services.BindingLock.Unlock()
 
 	existing, err := b.services.Instances.Get(instanceID)
 	switch {
@@ -89,7 +95,7 @@ func (b *Broker) Provision(ctx context.Context, instanceID string, req osbapi.Pr
 		return none, false, b.storeError(tag, "look up service instance "+instanceID, err)
 	}
 
-	if err := b.clearSpace(tag, spaceGUID); err != nil {
+	if err := b.clearSpace(ctx, tag, spaceGUID); err != nil {
 		return none, false, err
 	}
 
@@ -117,7 +123,7 @@ func (b *Broker) Provision(ctx context.Context, instanceID string, req osbapi.Pr
 // there blocks the new one unless Cloud Controller no longer knows it, which
 // happens after cf purge-service-instance skips the broker. That orphan is
 // removed the way a deprovision would remove it.
-func (b *Broker) clearSpace(tag, spaceGUID string) error {
+func (b *Broker) clearSpace(ctx context.Context, tag, spaceGUID string) error {
 	other, err := b.services.Instances.InSpace(spaceGUID)
 	if errors.Is(err, core.ErrNotFound) {
 		return nil
@@ -126,7 +132,10 @@ func (b *Broker) clearSpace(tag, spaceGUID string) error {
 		return b.storeError(tag, "look up the instance in space "+spaceGUID, err)
 	}
 
-	exists, err := b.services.Info.ServiceInstanceExists(other.InstanceID)
+	lookup, cancel := context.WithTimeout(ctx, lookupTimeout)
+	defer cancel()
+
+	exists, err := b.services.Info.ServiceInstanceExists(lookup, other.InstanceID)
 	if err != nil {
 		b.services.Logger.Error(tag, fmt.Sprintf("could not ask Cloud Controller about instance %s: %v", other.InstanceID, err))
 		return fmt.Errorf("space %s already has scheduler instance %s, and Cloud Controller could not be asked whether it still exists; try again", spaceGUID, other.InstanceID)
@@ -149,8 +158,8 @@ func (b *Broker) Deprovision(ctx context.Context, instanceID string, req osbapi.
 		return none, false, err
 	}
 
-	b.locker.Lock()
-	defer b.locker.Unlock()
+	b.services.BindingLock.Lock()
+	defer b.services.BindingLock.Unlock()
 
 	if _, err := b.services.Instances.Get(instanceID); err != nil {
 		if errors.Is(err, core.ErrNotFound) {
@@ -239,12 +248,27 @@ func (b *Broker) Bind(ctx context.Context, instanceID, bindingID string, req osb
 	}
 
 	appGUID := req.AppGUID
-	if len(appGUID) == 0 && req.BindResource != nil {
+	if req.BindResource != nil && len(req.BindResource.AppGUID) > 0 {
+		if len(appGUID) > 0 && appGUID != req.BindResource.AppGUID {
+			return none, false, fmt.Errorf("%w: app_guid and bind_resource.app_guid name different apps", osbapi.ErrBadRequest)
+		}
 		appGUID = req.BindResource.AppGUID
 	}
 
-	b.locker.Lock()
-	defer b.locker.Unlock()
+	// Find the app's space before taking the lock, so a slow Cloud Controller
+	// holds up only this request.
+	var appSpaceGUID string
+	if len(appGUID) > 0 {
+		spaceGUID, err := b.services.Info.GetSpaceGUIDForApp(appGUID)
+		if err != nil {
+			b.services.Logger.Error(tag, fmt.Sprintf("could not find the space of app %s: %v", appGUID, err))
+			return none, false, fmt.Errorf("could not find the space of app %s in Cloud Controller; try again", appGUID)
+		}
+		appSpaceGUID = spaceGUID
+	}
+
+	b.services.BindingLock.Lock()
+	defer b.services.BindingLock.Unlock()
 
 	instance, err := b.services.Instances.Get(instanceID)
 	if errors.Is(err, core.ErrNotFound) {
@@ -272,16 +296,8 @@ func (b *Broker) Bind(ctx context.Context, instanceID, bindingID string, req osb
 		return none, false, b.storeError(tag, "look up service binding "+bindingID, err)
 	}
 
-	if len(appGUID) > 0 {
-		spaceGUID, err := b.services.Info.GetSpaceGUIDForApp(appGUID)
-		if err != nil {
-			b.services.Logger.Error(tag, fmt.Sprintf("could not find the space of app %s: %v", appGUID, err))
-			return none, false, fmt.Errorf("could not find the space of app %s in Cloud Controller; try again", appGUID)
-		}
-
-		if spaceGUID != instance.SpaceGUID {
-			return none, false, fmt.Errorf("%w: app %s is not in the space of instance %s", osbapi.ErrBadRequest, appGUID, instanceID)
-		}
+	if len(appGUID) > 0 && appSpaceGUID != instance.SpaceGUID {
+		return none, false, fmt.Errorf("%w: app %s is not in the space of instance %s", osbapi.ErrBadRequest, appGUID, instanceID)
 	}
 
 	_, err = b.services.Bindings.Persist(&core.ServiceBinding{
@@ -317,8 +333,8 @@ func (b *Broker) Unbind(ctx context.Context, instanceID, bindingID string, req o
 		return none, false, err
 	}
 
-	b.locker.Lock()
-	defer b.locker.Unlock()
+	b.services.BindingLock.Lock()
+	defer b.services.BindingLock.Unlock()
 
 	binding, err := b.services.Bindings.Get(bindingID)
 	if errors.Is(err, core.ErrNotFound) || (err == nil && binding.InstanceID != instanceID) {
@@ -337,32 +353,27 @@ func (b *Broker) Unbind(ctx context.Context, instanceID, bindingID string, req o
 	return none, false, nil
 }
 
-// removeBinding deletes a binding and pauses its app's schedules when the
-// app has no other binding. It pauses first, so a failure leaves the binding
-// in place for Cloud Controller to retry, and it resumes again if another
-// binding still names the app.
+// removeBinding deletes a binding and pauses its app's schedules when it is
+// the app's last binding. An app with another binding is never paused, so no
+// failure can leave a bound app paused. For the last binding it pauses
+// before it deletes, so a failure leaves the binding in place for Cloud
+// Controller to retry, and the retry finishes the pause.
 func (b *Broker) removeBinding(tag string, binding *core.ServiceBinding) error {
 	if len(binding.AppGUID) > 0 {
-		if _, err := workflows.PausingAnApp(b.services, binding.AppGUID); err != nil {
-			return err
+		others, err := b.services.Bindings.BoundExcept(binding.AppGUID, binding.BindingID)
+		if err != nil {
+			return b.storeError(tag, "check the other bindings of app "+binding.AppGUID, err)
+		}
+
+		if !others {
+			if _, err := workflows.PausingAnApp(b.services, binding.AppGUID); err != nil {
+				return b.storeError(tag, "pause the schedules of app "+binding.AppGUID, err)
+			}
 		}
 	}
 
 	if err := b.services.Bindings.Delete(binding.BindingID); err != nil {
 		return b.storeError(tag, "delete service binding "+binding.BindingID, err)
-	}
-
-	if len(binding.AppGUID) == 0 {
-		return nil
-	}
-
-	bound, err := b.services.Bindings.Bound(binding.AppGUID)
-	if err != nil {
-		return b.storeError(tag, "check the other bindings of app "+binding.AppGUID, err)
-	}
-
-	if bound {
-		return b.resume(tag, binding.AppGUID)
 	}
 
 	return nil

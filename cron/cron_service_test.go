@@ -55,3 +55,27 @@ func TestAddMatchesAnalyze(t *testing.T) {
 		}
 	}
 }
+
+// Adding a schedule that is already in cron replaces its entry, so a
+// schedule can never fire twice per tick or leave an entry that Delete
+// cannot reach.
+func TestAddReplacesAnExistingEntry(t *testing.T) {
+	service := NewCronService(logger.New(), Rules{})
+	schedule := &core.Schedule{GUID: "a", RefGUID: "job-guid-A", Expression: "0 2 * * *"}
+
+	for i := 0; i < 2; i++ {
+		if err := service.Add(stubRun{schedule}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := service.Count(); n != 1 {
+		t.Errorf("cron holds %d entries after adding one schedule twice, want 1", n)
+	}
+
+	if err := service.Delete(stubRun{schedule}); err != nil {
+		t.Fatal(err)
+	}
+	if n := service.Count(); n != 0 {
+		t.Errorf("cron holds %d entries after the delete, want 0", n)
+	}
+}

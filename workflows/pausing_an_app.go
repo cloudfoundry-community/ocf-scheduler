@@ -1,6 +1,7 @@
 package workflows
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
@@ -9,6 +10,13 @@ import (
 // PausingAnApp disables every enabled schedule on the app's jobs and calls,
 // marks each with core.PausedByUnbind, and takes it out of cron. Jobs, calls,
 // schedules, and history all stay. It returns how many schedules it paused.
+//
+// It also takes the app's other disabled schedules out of cron, because the
+// create routes put a schedule in cron even when it was created disabled, and
+// because an earlier attempt may have paused a schedule and then failed. A
+// retry therefore finishes what a failed attempt started. It returns an
+// error when any disabled schedule may still be in cron, so the caller can
+// keep the binding and let Cloud Controller retry.
 func PausingAnApp(services *core.Services, appGUID string) (int, error) {
 	tag := "pausing-an-app"
 
@@ -19,24 +27,33 @@ func PausingAnApp(services *core.Services, appGUID string) (int, error) {
 		return 0, fmt.Errorf("%s", doh)
 	}
 
-	pausedNow := make(map[string]bool, len(paused))
-	for _, schedule := range paused {
-		pausedNow[schedule.GUID] = true
+	schedules, err := services.Schedules.ByApp(appGUID)
+	if err != nil {
+		// Still take out what the pause just changed, so that only the
+		// sweep is left for the retry.
+		for _, schedule := range paused {
+			_ = unschedule(services, schedule)
+		}
 
-		// A schedule that never loaded into cron has nothing to remove.
+		doh := fmt.Sprintf("paused %d schedules for app %s but could not list its schedules to take them out of cron: %v", len(paused), appGUID, err)
+		services.Logger.Error(tag, doh)
+		return 0, fmt.Errorf("%s", doh)
+	}
+
+	failed := 0
+	for _, schedule := range schedules {
+		if schedule.Enabled {
+			continue
+		}
+
 		if err := unschedule(services, schedule); err != nil {
-			services.Logger.Warn(tag, fmt.Sprintf("paused schedule %s but could not take it out of cron: %v", schedule.GUID, err))
+			failed++
+			services.Logger.Error(tag, fmt.Sprintf("could not take schedule %s out of cron: %v", schedule.GUID, err))
 		}
 	}
 
-	// Also take the app's other disabled schedules out of cron. The create
-	// routes put a schedule in cron even when it was created disabled, and it
-	// must not keep firing once the app is unbound. Most are not in cron, so
-	// a failure here says nothing.
-	for _, schedule := range services.Schedules.ByApp(appGUID) {
-		if !schedule.Enabled && !pausedNow[schedule.GUID] {
-			_ = unschedule(services, schedule)
-		}
+	if failed > 0 {
+		return 0, fmt.Errorf("could not take %d schedules of app %s out of cron", failed, appGUID)
 	}
 
 	services.Logger.Info(tag, fmt.Sprintf("paused %d schedules for app %s", len(paused), appGUID))
@@ -76,14 +93,23 @@ func ResumingAnApp(services *core.Services, appGUID string) (int, error) {
 	return len(resumed), nil
 }
 
-// unschedule takes a schedule out of cron.
+// unschedule takes a schedule out of cron. Cron finds the entry by the
+// schedule's GUID alone, so it doesn't load the job or call, and a lost
+// database cannot leave the entry behind. A schedule that has no entry is
+// already where it should be.
 func unschedule(services *core.Services, schedule *core.Schedule) error {
-	run, err := runFor(services, schedule)
-	if err != nil {
-		return fmt.Errorf("could not load its %s: %w", schedule.RefType, err)
+	var run core.Runnable
+	if schedule.RefType == "call" {
+		run = core.NewCallRun(&core.Call{GUID: schedule.RefGUID}, schedule, services)
+	} else {
+		run = core.NewJobRun(&core.Job{GUID: schedule.RefGUID}, schedule, services)
 	}
 
-	return services.Cron.Delete(run)
+	if err := services.Cron.Delete(run); err != nil && !errors.Is(err, core.ErrNotScheduled) {
+		return err
+	}
+
+	return nil
 }
 
 // runFor loads the job or call behind a schedule and wraps it for cron.

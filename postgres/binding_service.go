@@ -96,6 +96,24 @@ func (service *BindingService) Bound(appGUID string) (bool, error) {
 	return bound, nil
 }
 
+func (service *BindingService) BoundExcept(appGUID, bindingID string) (bool, error) {
+	if len(appGUID) == 0 {
+		return false, nil
+	}
+
+	var bound bool
+	err := service.db.QueryRow(
+		"SELECT EXISTS (SELECT 1 FROM service_bindings WHERE app_guid = $1 AND binding_id <> $2)",
+		appGUID,
+		bindingID,
+	).Scan(&bound)
+	if err != nil {
+		return false, err
+	}
+
+	return bound, nil
+}
+
 func (service *BindingService) getCollection(query string, arg string) ([]*core.ServiceBinding, error) {
 	rows, err := service.db.Query(query, arg)
 	if err != nil {

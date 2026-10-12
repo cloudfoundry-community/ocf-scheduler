@@ -176,10 +176,23 @@ func TestBindingService(t *testing.T) {
 		expectBound("", false)
 		expectBound("app-2", false)
 
+		for _, check := range []struct {
+			except string
+			want   bool
+		}{{"binding-1", true}, {"nope", true}} {
+			if bound, err := service.BoundExcept("app-1", check.except); err != nil || bound != check.want {
+				t.Errorf("BoundExcept(app-1, %s) = %t, %v; want %t", check.except, bound, err, check.want)
+			}
+		}
+
 		if err := service.Delete("binding-1"); err != nil {
 			t.Fatal(err)
 		}
 		expectBound("app-1", true)
+
+		if bound, err := service.BoundExcept("app-1", "binding-2"); err != nil || bound {
+			t.Errorf("BoundExcept(app-1, binding-2) = %t, %v; want false", bound, err)
+		}
 
 		if err := service.Delete("binding-2"); err != nil {
 			t.Fatal(err)
@@ -233,8 +246,8 @@ func TestScheduleServicePauseAndResume(t *testing.T) {
 		return stored
 	}
 
-	if n := len(schedules.ByApp("app-1")); n != 3 {
-		t.Errorf("ByApp found %d schedules, want 3", n)
+	if found, err := schedules.ByApp("app-1"); err != nil || len(found) != 3 {
+		t.Errorf("ByApp found %d schedules, %v; want 3", len(found), err)
 	}
 
 	paused, err := schedules.Pause("app-1", core.PausedByUnbind)

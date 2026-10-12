@@ -150,6 +150,13 @@ func (service *CronService) Add(runnable core.Runnable) error {
 	service.locker.Lock()
 	defer service.locker.Unlock()
 
+	// A schedule has at most one entry. Adding it again, as resuming an app
+	// can, replaces the entry rather than firing the schedule twice.
+	if existing, found := service.mapping[schedule.GUID]; found {
+		service.Remove(existing)
+		delete(service.mapping, schedule.GUID)
+	}
+
 	id, err := service.ScheduleJob(analysis.Schedule, cron.FuncJob(process))
 	if err != nil {
 		return err
@@ -167,7 +174,7 @@ func (service *CronService) Delete(runnable core.Runnable) error {
 
 	id, found := service.mapping[runnable.Schedule().GUID]
 	if !found {
-		return fmt.Errorf("no such runner")
+		return core.ErrNotScheduled
 	}
 
 	service.Remove(id)

@@ -28,7 +28,7 @@ type ScheduleService interface {
 	Enabled() []*Schedule
 
 	// ByApp returns every schedule on the app's jobs and calls.
-	ByApp(appGUID string) []*Schedule
+	ByApp(appGUID string) ([]*Schedule, error)
 
 	// Pause disables every enabled schedule on the app's jobs and calls,
 	// marks each one with reason, and returns the schedules it changed.

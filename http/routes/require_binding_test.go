@@ -3,8 +3,10 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 	"github.com/cloudfoundry-community/ocf-scheduler/mock"
@@ -134,4 +136,40 @@ func TestRequireBindingFailsClosed(t *testing.T) {
 		tn.check(t, tn.userB, tn.gatedOnB(), denied(http.StatusInternalServerError, http.StatusInternalServerError, http.StatusInternalServerError))
 		tn.assertBUntouched(t)
 	})
+}
+
+// A guarded route waits while the broker changes bindings, so it sees the
+// unbind that the broker was making instead of slipping in before it.
+func TestRequireBindingWaitsForTheBroker(t *testing.T) {
+	tn := newTenancy(t)
+	bindings := tn.enforce()
+	if _, err := bindings.Persist(&core.ServiceBinding{BindingID: "binding-b", InstanceID: "instance-b", AppGUID: "app-b"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Stand in for the broker in the middle of an unbind.
+	tn.services.BindingLock.Lock()
+
+	done := make(chan *httptest.ResponseRecorder)
+	go func() {
+		done <- tn.do(http.MethodPost, "/jobs/"+tn.jobB.GUID+"/schedules",
+			`{"enabled": true, "expression": "0 3 * * *", "expression_type": "cron_expression"}`, tn.userB)
+	}()
+
+	select {
+	case rec := <-done:
+		tn.services.BindingLock.Unlock()
+		t.Fatalf("the route answered %d while the broker held the lock", rec.Code)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	if err := bindings.Delete("binding-b"); err != nil {
+		t.Fatal(err)
+	}
+	tn.services.BindingLock.Unlock()
+
+	if rec := <-done; rec.Code != http.StatusForbidden {
+		t.Errorf("status %d after the unbind, want 403, body %s", rec.Code, rec.Body)
+	}
+	tn.assertBUntouched(t)
 }

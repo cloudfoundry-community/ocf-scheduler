@@ -123,6 +123,27 @@ func (service *BindingService) Bound(appGUID string) (bool, error) {
 	return false, nil
 }
 
+func (service *BindingService) BoundExcept(appGUID, bindingID string) (bool, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	if service.fail != nil {
+		return false, service.fail
+	}
+
+	if len(appGUID) == 0 {
+		return false, nil
+	}
+
+	for id, binding := range service.storage {
+		if binding.AppGUID == appGUID && id != bindingID {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // Count is the number of stored bindings.
 func (service *BindingService) Count() int {
 	service.locker.Lock()

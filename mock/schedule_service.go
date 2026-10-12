@@ -158,7 +158,7 @@ func (service *ScheduleService) ownedByApp(schedule *core.Schedule, appGUID stri
 	return false
 }
 
-func (service *ScheduleService) ByApp(appGUID string) []*core.Schedule {
+func (service *ScheduleService) ByApp(appGUID string) ([]*core.Schedule, error) {
 	service.locker.Lock()
 	defer service.locker.Unlock()
 
@@ -170,7 +170,7 @@ func (service *ScheduleService) ByApp(appGUID string) []*core.Schedule {
 		}
 	}
 
-	return found
+	return found, nil
 }
 
 func (service *ScheduleService) Pause(appGUID string, reason string) ([]*core.Schedule, error) {

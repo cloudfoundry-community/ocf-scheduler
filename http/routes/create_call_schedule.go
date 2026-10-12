@@ -32,7 +32,9 @@ func CreateCallSchedule(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
-		if status, body := requireBinding(services, tag, auth, call.AppGUID); status != 0 {
+		status, body, release := requireBinding(services, tag, auth, call.AppGUID)
+		defer release()
+		if status != 0 {
 			return c.JSON(status, body)
 		}
 

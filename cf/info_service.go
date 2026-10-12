@@ -31,8 +31,8 @@ func (service *InfoService) GetSpaceGUIDForApp(guid string) (string, error) {
 // ServiceInstanceExists answers false only when Cloud Controller reports the
 // instance as not found. Any other failure is an error, so a caller never
 // mistakes an unreachable API for a purged instance.
-func (service *InfoService) ServiceInstanceExists(guid string) (bool, error) {
-	_, err := service.client.GetServiceInstance(context.Background(), guid)
+func (service *InfoService) ServiceInstanceExists(ctx context.Context, guid string) (bool, error) {
+	_, err := service.client.GetServiceInstance(ctx, guid)
 	if err == nil {
 		return true, nil
 	}

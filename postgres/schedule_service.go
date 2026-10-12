@@ -96,11 +96,16 @@ func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
 	)
 }
 
-func (service *ScheduleService) ByApp(appGUID string) []*core.Schedule {
-	return service.getCollection(
-		service.queryByApp, // "select * from schedules on the app's jobs and calls"
-		appGUID,
-	)
+// ByApp returns the schedules on the app's jobs and calls. Unlike the older
+// lookups, it reports a failed query, because pausing an app must not
+// mistake a lost database for an app without schedules.
+func (service *ScheduleService) ByApp(appGUID string) ([]*core.Schedule, error) {
+	rows, err := service.db.Query(service.queryByApp, appGUID)
+	if err != nil {
+		return nil, err
+	}
+
+	return scanSchedules(rows)
 }
 
 func (service *ScheduleService) Pause(appGUID string, reason string) ([]*core.Schedule, error) {

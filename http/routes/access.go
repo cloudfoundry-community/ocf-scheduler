@@ -53,24 +53,32 @@ func ownedBy(schedule *core.Schedule, refType, refGUID string) bool {
 // is on, the app must be bound to the space's scheduler service instance,
 // and an admin may go on regardless. It returns 0 when the caller may go on,
 // or else the status and body to answer with.
-func requireBinding(services *core.Services, tag, auth, appGUID string) (int, any) {
+//
+// When enforcement is on, it also holds services.BindingLock for reading
+// until the route calls release, which the route defers. The broker cannot
+// unbind and pause the app in between, so work stored after the check is
+// never left running for an app that has just been unbound.
+func requireBinding(services *core.Services, tag, auth, appGUID string) (int, any, func()) {
 	if !services.RequireBinding {
-		return 0, nil
+		return 0, nil, func() {}
 	}
 
 	if services.Bindings == nil {
 		services.Logger.Error(tag, "require_binding is on but the service broker is not running")
-		return http.StatusInternalServerError, ""
+		return http.StatusInternalServerError, "", func() {}
 	}
+
+	services.BindingLock.RLock()
+	release := services.BindingLock.RUnlock
 
 	bound, err := services.Bindings.Bound(appGUID)
 	if err != nil {
 		services.Logger.Error(tag, fmt.Sprintf("could not check the bindings of app %s: %v", appGUID, err))
-		return http.StatusInternalServerError, ""
+		return http.StatusInternalServerError, "", release
 	}
 
 	if bound || services.Auth.IsAdmin(auth) {
-		return 0, nil
+		return 0, nil, release
 	}
 
 	services.Logger.Warn(tag, fmt.Sprintf("app %s is not bound to a scheduler service instance", appGUID))
@@ -79,5 +87,5 @@ func requireBinding(services *core.Services, tag, auth, appGUID string) (int, an
 		"binding_required",
 		"app %s must be bound to a scheduler service instance first; run cf bind-service with the app and the space's scheduler instance",
 		appGUID,
-	)
+	), release
 }
