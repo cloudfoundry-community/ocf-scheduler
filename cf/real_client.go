@@ -33,6 +33,10 @@ func (r *RealCFClient) ListUsers(ctx context.Context, opts *cfclient.UserListOpt
 	return r.inner.Users.ListAll(ctx, opts)
 }
 
+func (r *RealCFClient) GetServiceInstance(ctx context.Context, guid string) (*resource.ServiceInstance, error) {
+	return r.inner.ServiceInstances.Get(ctx, guid)
+}
+
 func (r *RealCFClient) ListRoles(ctx context.Context, opts *cfclient.RoleListOptions) ([]*resource.Role, error) {
 	return r.inner.Roles.ListAll(ctx, opts)
 }

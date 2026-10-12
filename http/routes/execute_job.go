@@ -29,6 +29,10 @@ func ExecuteJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
+		if status, body := requireBinding(services, tag, auth, job.AppGUID); status != 0 {
+			return c.JSON(status, body)
+		}
+
 		input := &core.Execution{}
 
 		if err = c.Bind(&input); err != nil {

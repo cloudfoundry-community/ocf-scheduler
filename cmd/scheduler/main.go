@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	nethttp "net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 
 	_ "github.com/lib/pq"
 
+	"github.com/cloudfoundry-community/ocf-scheduler/broker"
 	"github.com/cloudfoundry-community/ocf-scheduler/cf"
 	"github.com/cloudfoundry-community/ocf-scheduler/combined"
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
@@ -104,6 +106,11 @@ func main() {
 	uaaEndpoint := os.Getenv("UAA_ENDPOINT")
 	if len(uaaEndpoint) == 0 {
 		log.Fatal(tag, "UAA_ENDPOINT not set")
+	}
+
+	brokerConfig, err := broker.ConfigFromEnv(os.Getenv)
+	if err != nil {
+		log.Fatal(tag, fmt.Sprintf("invalid service broker configuration: %s", err.Error()))
 	}
 
 	db, err := sql.Open("postgres", dbURL)
@@ -223,6 +230,27 @@ func main() {
 		Auth:       auth,
 	}
 
+	var brokerHandler nethttp.Handler
+	if brokerConfig.Enabled {
+		services.Instances = postgres.NewInstanceService(db)
+		services.Bindings = postgres.NewBindingService(db)
+		services.RequireBinding = brokerConfig.RequireBinding
+
+		brokerHandler, err = broker.NewHandler(services, brokerConfig)
+		if err != nil {
+			log.Fatal(tag, fmt.Sprintf("could not start the service broker: %s", err.Error()))
+		}
+
+		log.Info(tag, fmt.Sprintf(
+			"serving the service broker under /v2 for user %s with api_url %s and require_binding %t",
+			brokerConfig.Username,
+			brokerConfig.APIURL,
+			brokerConfig.RequireBinding,
+		))
+	} else {
+		log.Info(tag, "the service broker is off")
+	}
+
 	// Load up all existing schedules
 	log.Info(tag, "loading existing schedules")
 	for _, schedule := range schedules.Enabled() {
@@ -295,7 +323,7 @@ func main() {
 		}
 	}()
 
-	server := http.Server(fmt.Sprintf("0.0.0.0:%d", port), services)
+	server := http.Server(fmt.Sprintf("0.0.0.0:%d", port), services, brokerHandler)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {

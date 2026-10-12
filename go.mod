@@ -7,6 +7,7 @@ require (
 	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-beta.1
 	github.com/ess/hype v1.1.5
 	github.com/ess/testscope v1.0.0
+	github.com/fivetwenty-io/osbapi/v2 v2.0.5
 	github.com/gammazero/workerpool v1.2.1
 	github.com/google/uuid v1.6.0
 	github.com/labstack/echo/v4 v4.15.4

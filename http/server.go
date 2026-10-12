@@ -9,7 +9,10 @@ import (
 	"github.com/cloudfoundry-community/ocf-scheduler/http/routes"
 )
 
-func Server(bind string, services *core.Services) *http.Server {
+// Server serves the scheduler API on bind. When broker is not nil, it also
+// serves the Open Service Broker API under /v2, which checks its own basic
+// auth credentials instead of a Cloud Foundry token.
+func Server(bind string, services *core.Services, broker http.Handler) *http.Server {
 	e := echo.New()
 
 	// not technically necessary, just part of my default API skeleton
@@ -21,6 +24,10 @@ func Server(bind string, services *core.Services) *http.Server {
 	})
 
 	routes.Apply(e, services)
+
+	if broker != nil {
+		e.Any("/v2/*", echo.WrapHandler(broker))
+	}
 
 	server := e.Server
 	server.Addr = bind

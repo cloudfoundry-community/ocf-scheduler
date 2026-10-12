@@ -52,10 +52,23 @@ type Services struct {
 	Cron       CronService
 	Logger     LogService
 	Auth       AuthService
+
+	// Instances and Bindings are set when the service broker is enabled.
+	Instances InstanceService
+	Bindings  BindingService
+
+	// RequireBinding makes the routes that create or run work refuse an app
+	// that has no service binding. It needs Bindings.
+	RequireBinding bool
 }
 
 // InfoService is an interface to allow the grabbing of ad-hoc information from
 // an external source of truth.
 type InfoService interface {
 	GetSpaceGUIDForApp(string) (string, error)
+
+	// ServiceInstanceExists asks Cloud Controller whether a service instance
+	// GUID is still known. It answers false only when Cloud Controller says
+	// the instance is not found, and an error when it cannot tell.
+	ServiceInstanceExists(string) (bool, error)
 }

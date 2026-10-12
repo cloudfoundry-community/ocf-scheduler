@@ -100,3 +100,10 @@ func (service *AuthService) VerifySpace(auth string, spaceGUID string) error {
 
 	return nil
 }
+
+func (service *AuthService) IsAdmin(auth string) bool {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	return len(auth) > 0 && service.admins[auth]
+}

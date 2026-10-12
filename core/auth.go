@@ -21,4 +21,8 @@ type AuthService interface {
 	// or a space_developer role in the given space. Errors wrap
 	// ErrUnauthenticated or ErrForbidden.
 	VerifySpace(auth string, spaceGUID string) error
+
+	// IsAdmin reports whether the caller authenticates and holds
+	// cloud_controller.admin.
+	IsAdmin(auth string) bool
 }

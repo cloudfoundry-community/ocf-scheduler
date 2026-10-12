@@ -14,4 +14,5 @@ type CFClient interface {
 	GetTask(ctx context.Context, guid string) (*resource.Task, error)
 	ListUsers(ctx context.Context, opts *cfclient.UserListOptions) ([]*resource.User, error)
 	ListRoles(ctx context.Context, opts *cfclient.RoleListOptions) ([]*resource.Role, error)
+	GetServiceInstance(ctx context.Context, guid string) (*resource.ServiceInstance, error)
 }

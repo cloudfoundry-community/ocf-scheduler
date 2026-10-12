@@ -32,6 +32,10 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
+		if status, body := requireBinding(services, tag, auth, appGUID); status != 0 {
+			return c.JSON(status, body)
+		}
+
 		input := &core.Job{}
 
 		if err := c.Bind(&input); err != nil {

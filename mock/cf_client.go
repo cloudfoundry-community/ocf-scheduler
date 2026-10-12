@@ -70,6 +70,8 @@ type CFClient struct {
 	maxretries map[string]int
 	roles      []*resource.Role
 	failRoles  bool
+	instances  map[string]bool
+	failLookup bool
 	locker     sync.Mutex
 }
 
@@ -280,6 +282,42 @@ func (client *CFClient) Reset() {
 	client.maxretries = make(map[string]int)
 	client.roles = nil
 	client.failRoles = false
+	client.instances = make(map[string]bool)
+	client.failLookup = false
+}
+
+// GetServiceInstance knows the instances added with PrepareServiceInstance
+// and answers CF-ResourceNotFound for any other GUID.
+func (client *CFClient) GetServiceInstance(_ context.Context, guid string) (*resource.ServiceInstance, error) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	if client.failLookup {
+		return nil, fmt.Errorf("service instance lookup failed")
+	}
+
+	if !client.instances[guid] {
+		return nil, resource.NewResourceNotFoundError()
+	}
+
+	return &resource.ServiceInstance{Resource: resource.Resource{GUID: guid}}, nil
+}
+
+// PrepareServiceInstance makes Cloud Controller know a service instance GUID.
+func (client *CFClient) PrepareServiceInstance(guid string) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	client.instances[guid] = true
+}
+
+// FailServiceInstanceLookups makes GetServiceInstance fail as an unreachable
+// CF API would.
+func (client *CFClient) FailServiceInstanceLookups(fail bool) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	client.failLookup = fail
 }
 
 func (client *CFClient) PrepareApp(appGUID string, spaceGUID string) *resource.App {

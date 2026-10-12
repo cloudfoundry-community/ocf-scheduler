@@ -141,6 +141,18 @@ func (service *AuthService) VerifySpace(auth string, spaceGUID string) error {
 	return fmt.Errorf("%w: not a space developer in the space", core.ErrForbidden)
 }
 
+// IsAdmin reports whether the caller authenticates and holds
+// cloud_controller.admin.
+func (service *AuthService) IsAdmin(auth string) bool {
+	who, err := service.authenticate(auth)
+	if err != nil {
+		service.logger.Error("AuthService.IsAdmin", err.Error())
+		return false
+	}
+
+	return who.admin
+}
+
 func (service *AuthService) authenticate(auth string) (*caller, error) {
 	bearer, err := getBearer(auth)
 	if err != nil {

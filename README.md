@@ -19,6 +19,8 @@ It enables users to schedule CF tasks (jobs) and HTTP calls using cron expressio
 
 - UAA-based authentication and authorization
 
+- An optional Open Service Broker API, so a space turns the scheduler on with `cf create-service` and an app joins it with `cf bind-service`
+
 ## Architecture
 
 ```mermaid
@@ -41,6 +43,7 @@ which either creates a CF task via the CF API or makes an HTTP call to the confi
 | Directory | Description |
 |---|---|
 | `cmd/scheduler/` | Main scheduler service entry point and version metadata |
+| `broker/` | Open Service Broker API, its catalog, and its configuration |
 | `cmd/tzlist/` | Timezone list generation utility |
 | `cmd/cli/` | CLI testing tool for interacting with the scheduler for local development |
 | `cmd/jeuaa/` | Mock UAA server for local development |
@@ -105,6 +108,13 @@ scheduler immediately.
 | `SCHEDULER_PORT` | No | `8000` | HTTP listen port |
 | `SCHEDULER_WORKERS` | No | `20` | Worker pool size (minimum 10); values below 10 or non-numeric values log a warning and fall back to 20 |
 | `LOG_LEVEL` | No | `info` | Log level (see below) |
+| `SCHEDULER_BROKER_ENABLED` | No | `false` | Serves the service broker under `/v2` when it is `true` |
+| `SCHEDULER_BROKER_USERNAME` | When the broker is on | | The basic auth username that Cloud Controller sends to the broker |
+| `SCHEDULER_BROKER_PASSWORD` | When the broker is on | | The basic auth password that Cloud Controller sends to the broker |
+| `SCHEDULER_BROKER_API_URL` | When the broker is on | | The scheduler URL that binding credentials hand to apps, such as `https://scheduler.system.example.com` |
+| `SCHEDULER_BROKER_REQUIRE_BINDING` | No | `false` | Refuses to create or run jobs, calls, and schedules for an app that isn't bound, when it is `true` |
+
+The scheduler refuses to start when the broker settings don't fit together. That happens when `SCHEDULER_BROKER_ENABLED` is `true` and the username, password, or API URL is missing, when the API URL isn't an absolute `http` or `https` URL, when a boolean setting holds anything other than a boolean, and when `SCHEDULER_BROKER_REQUIRE_BINDING` is `true` while the broker is off. The startup log names the broker user, the API URL, and the `require_binding` setting, and it never prints the password.
 
 #### Log Levels
 
@@ -282,6 +292,41 @@ make release VERSION=1.2.3
 make clean       # Remove built executables (./tzlist, ./scheduler)
 make distclean   # Remove all release artifacts and executables
 ```
+
+## Service Broker
+
+The scheduler can serve the [Open Service Broker API](https://github.com/openservicebrokerapi/servicebroker) on its own port, under `/v2`, so that Cloud Foundry users manage it with the usual `cf` commands. The broker is off unless `SCHEDULER_BROKER_ENABLED` is `true`, and the settings it needs are in [Configuration](#configuration).
+
+### Registering the broker
+
+An operator registers the broker with Cloud Foundry and then makes its plan visible.
+
+```sh
+cf create-service-broker scheduler <SCHEDULER_BROKER_USERNAME> <SCHEDULER_BROKER_PASSWORD> https://scheduler.system.example.com
+cf enable-service-access scheduler
+```
+
+The catalog offers one service, `scheduler`, with one free plan, `standard`. Their IDs are fixed, so a broker registered once keeps working across upgrades.
+
+### How the broker behaves
+
+Every request must carry `X-Broker-API-Version` 2.13 or later. A request without it, or with an older version, gets `412 Precondition Failed` before its credentials are checked. A request with the wrong credentials gets `401 Unauthorized`. The broker credentials open only `/v2`, and the scheduler API still wants a UAA token.
+
+- Creating a service instance turns the scheduler on for the instance's space. A space holds only one instance, so a second `cf create-service` in the same space gets `409 Conflict`. When Cloud Controller no longer knows the space's existing instance, which happens after `cf purge-service-instance`, the broker replaces it as if it had been deleted.
+
+- Binding an app lets that app be scheduled. The binding credentials hold `api_url`, `instance_id`, and `app_guid`, and they never hold a secret, because each caller still authenticates with their own UAA token. The app must live in the instance's space. A service key binds no app and carries only `api_url` and `instance_id`.
+
+- Unbinding an app's last binding pauses the app's schedules. The broker disables each enabled schedule on the app's jobs and calls, marks it as paused by the unbind, and takes it out of cron. Jobs, calls, schedules, and execution history all stay.
+
+- Binding the app again resumes only the schedules that the unbind paused. A schedule that its owner disabled stays disabled.
+
+- Deleting the instance removes its bindings first, which pauses each app that loses its last binding, and then removes the instance.
+
+Every operation finishes before the broker answers, so the broker never answers `202 Accepted` and has no operation to poll. Changing the plan isn't supported.
+
+### Requiring a binding
+
+When `SCHEDULER_BROKER_REQUIRE_BINDING` is `true`, an app must be bound before anyone can create a job or a call for it, add a schedule to one, or run one. The routes that this covers are `POST /jobs`, `POST /calls`, `POST /jobs/:guid/schedules`, `POST /calls/:guid/schedules`, `POST /jobs/:guid/execute`, and `POST /calls/:guid/execute`. They check the caller's space access first, as they always do, and then answer `403 Forbidden` with a `binding_required` error for an app that isn't bound. A caller with `cloud_controller.admin` passes regardless. Reading, listing, and deleting stay open, so the owner of an unbound app can still see and clean up what it has.
 
 ## API Reference
 
