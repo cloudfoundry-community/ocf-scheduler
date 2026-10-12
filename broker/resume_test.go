@@ -125,6 +125,168 @@ func TestRebindLeavesAnUnparseableScheduleBehind(t *testing.T) {
 	}
 }
 
+// withToken replaces the broker's basic auth with a scheduler API token.
+func withToken(token string) option {
+	return func(req *nethttp.Request) { req.Header.Set("Authorization", token) }
+}
+
+// The owner of a schedule that a rebind left paused can delete it and create
+// it again, and can delete a job or call that owns a schedule with no cron
+// entry.
+func TestOwnerCanReplaceAScheduleTheRebindLeftPaused(t *testing.T) {
+	f := newFixture(t)
+	f.services.RequireBinding = true
+	f.services.Auth.(*mock.AuthService).Developer("jeremy", "space-a")
+	token := withToken("jeremy")
+
+	expectStatus(t, "provision", f.provision("instance-1", "space-a"), nethttp.StatusCreated)
+	expectStatus(t, "bind", f.bind("instance-1", "binding-1", "app-a"), nethttp.StatusCreated)
+	expectStatus(t, "unbind", f.unbind("instance-1", "binding-1"), nethttp.StatusOK)
+
+	f.nightly.Expression = "CRON_TZ=Nowhere/Gone 0 2 * * *"
+	expectStatus(t, "rebind", f.bind("instance-1", "binding-2", "app-a"), nethttp.StatusCreated)
+	f.expectStopped("nightly", f.nightly, core.PausedByUnbind)
+
+	jobSchedules := "/jobs/" + f.job.GUID + "/schedules/"
+	expectStatus(t, "delete the paused schedule",
+		f.do(nethttp.MethodDelete, jobSchedules+f.nightly.GUID, "", token), nethttp.StatusNoContent)
+	expectStatus(t, "delete the owner-disabled schedule",
+		f.do(nethttp.MethodDelete, jobSchedules+f.owned.GUID, "", token), nethttp.StatusNoContent)
+	for name, schedule := range map[string]*core.Schedule{"nightly": f.nightly, "owned": f.owned} {
+		if _, err := f.services.Schedules.Get(schedule.GUID); err == nil {
+			t.Errorf("%s is still stored after its delete", name)
+		}
+	}
+
+	rec := f.do(nethttp.MethodPost, "/jobs/"+f.job.GUID+"/schedules",
+		`{"enabled": true, "expression": "0 2 * * *", "expression_type": "cron_expression"}`, token)
+	expectStatus(t, "recreate", rec, nethttp.StatusCreated)
+	guid, _ := decode(t, rec)["guid"].(string)
+	recreated, err := f.services.Schedules.Get(guid)
+	if err != nil {
+		t.Fatalf("the recreated schedule %q is not stored: %v", guid, err)
+	}
+	f.expectRunning("recreated", recreated)
+
+	// A call whose only schedule has no cron entry can be deleted too.
+	if err := f.cron.Delete(core.NewCallRun(f.call, f.ping, f.services)); err != nil {
+		t.Fatal(err)
+	}
+	expectStatus(t, "delete the call",
+		f.do(nethttp.MethodDelete, "/calls/"+f.call.GUID, "", token), nethttp.StatusNoContent)
+
+	// So can a job with one schedule in cron and one out of it.
+	if err := f.cron.Delete(core.NewJobRun(f.job, f.hourly, f.services)); err != nil {
+		t.Fatal(err)
+	}
+	expectStatus(t, "delete the job",
+		f.do(nethttp.MethodDelete, "/jobs/"+f.job.GUID, "", token), nethttp.StatusNoContent)
+
+	if n := f.cron.Count(); n != 0 {
+		t.Errorf("cron holds %d entries after every owner was deleted, want 0", n)
+	}
+}
+
+// racingSchedules runs race once, inside the first Delete, either before or
+// after the row goes.
+type racingSchedules struct {
+	*mock.ScheduleService
+	race  func()
+	after bool
+
+	locker sync.Mutex
+	raced  bool
+}
+
+func (schedules *racingSchedules) Delete(schedule *core.Schedule) error {
+	schedules.locker.Lock()
+	raced := schedules.raced
+	schedules.raced = true
+	schedules.locker.Unlock()
+
+	if raced {
+		return schedules.ScheduleService.Delete(schedule)
+	}
+
+	if !schedules.after {
+		schedules.race()
+	}
+	err := schedules.ScheduleService.Delete(schedule)
+	if schedules.after {
+		schedules.race()
+	}
+
+	return err
+}
+
+// A rebind that runs while the owner deletes a paused schedule must not
+// leave a cron entry behind for the deleted schedule, whichever side of the
+// row delete it lands on.
+func TestDeletingAPausedScheduleDuringARebind(t *testing.T) {
+	for name, after := range map[string]bool{"before the row goes": false, "after the row goes": true} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			f.services.Auth.(*mock.AuthService).Developer("jeremy", "space-a")
+
+			expectStatus(t, "provision", f.provision("instance-1", "space-a"), nethttp.StatusCreated)
+			expectStatus(t, "bind", f.bind("instance-1", "binding-1", "app-a"), nethttp.StatusCreated)
+			expectStatus(t, "unbind", f.unbind("instance-1", "binding-1"), nethttp.StatusOK)
+			f.expectStopped("nightly", f.nightly, core.PausedByUnbind)
+
+			f.services.Schedules = &racingSchedules{
+				ScheduleService: f.services.Schedules.(*mock.ScheduleService),
+				after:           after,
+				race: func() {
+					expectStatus(t, "rebind", f.bind("instance-1", "binding-2", "app-a"), nethttp.StatusCreated)
+				},
+			}
+
+			expectStatus(t, "delete the paused schedule",
+				f.do(nethttp.MethodDelete, "/jobs/"+f.job.GUID+"/schedules/"+f.nightly.GUID, "", withToken("jeremy")),
+				nethttp.StatusNoContent)
+
+			if _, err := f.services.Schedules.Get(f.nightly.GUID); err == nil {
+				t.Error("the deleted schedule is still stored")
+			}
+			if f.cron.Scheduled(f.nightly.GUID) {
+				t.Error("the deleted schedule is still in cron")
+			}
+			f.expectRunning("hourly", f.hourly)
+			f.expectRunning("ping", f.ping)
+			if n := f.cron.Count(); n != 2 {
+				t.Errorf("cron holds %d entries, want 2", n)
+			}
+		})
+	}
+}
+
+// failingDeletes refuses every row delete, as a lost database would.
+type failingDeletes struct {
+	*mock.ScheduleService
+}
+
+func (failingDeletes) Delete(*core.Schedule) error {
+	return fmt.Errorf("%s", databaseError)
+}
+
+// A delete whose row delete fails leaves the schedule stored and in cron.
+func TestDeletingAScheduleKeepsItsCronEntryWhenTheStoreFails(t *testing.T) {
+	f := newFixture(t)
+	f.services.Auth.(*mock.AuthService).Developer("jeremy", "space-a")
+	f.services.Schedules = failingDeletes{f.services.Schedules.(*mock.ScheduleService)}
+
+	expectStatus(t, "delete",
+		f.do(nethttp.MethodDelete, "/jobs/"+f.job.GUID+"/schedules/"+f.nightly.GUID, "", withToken("jeremy")),
+		nethttp.StatusInternalServerError)
+
+	if _, err := f.services.Schedules.Get(f.nightly.GUID); err != nil {
+		t.Errorf("the schedule must stay stored, got %v", err)
+	}
+	if !f.cron.Scheduled(f.nightly.GUID) {
+		t.Error("the schedule must stay in cron")
+	}
+}
+
 // fullCron refuses every Add for a reason other than the expression.
 type fullCron struct {
 	core.CronService
