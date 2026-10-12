@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
@@ -46,7 +48,7 @@ func NewScheduleService(db *sql.DB) *ScheduleService {
 	qba := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE " + appSchedules
 	pba := "UPDATE schedules SET enabled = false, paused_by = $2, updated_at = $3 WHERE enabled AND " +
 		appSchedules + " RETURNING " + strings.Join(scheduleColumns, ", ")
-	rba := "UPDATE schedules SET enabled = true, paused_by = NULL, updated_at = $3 WHERE paused_by = $2 AND " +
+	rba := "UPDATE schedules SET enabled = true, paused_by = NULL, updated_at = $3 WHERE paused_by = $2 AND guid = ANY($4::text[]) AND " +
 		appSchedules + " RETURNING " + strings.Join(scheduleColumns, ", ")
 
 	is := generateInsert("schedules", scheduleColumns)
@@ -112,17 +114,20 @@ func (service *ScheduleService) Pause(appGUID string, reason string) ([]*core.Sc
 	return service.flip(service.pauseByApp, appGUID, reason)
 }
 
-func (service *ScheduleService) Resume(appGUID string, reason string) ([]*core.Schedule, error) {
-	return service.flip(service.resumeByApp, appGUID, reason)
+func (service *ScheduleService) Resume(appGUID string, reason string, guids []string) ([]*core.Schedule, error) {
+	return service.flip(service.resumeByApp, appGUID, reason, pq.Array(guids))
 }
 
 // flip runs a pause or resume update, which changes every matching schedule
-// in one statement, and returns the rows it changed.
-func (service *ScheduleService) flip(query, appGUID, reason string) ([]*core.Schedule, error) {
+// in one statement, and returns the rows it changed. A resume passes the
+// schedule GUIDs to change as extra.
+func (service *ScheduleService) flip(query, appGUID, reason string, extra ...any) ([]*core.Schedule, error) {
 	var changed []*core.Schedule
 
+	args := append([]any{appGUID, reason, time.Now().UTC()}, extra...)
+
 	err := WithTransaction(service.db, func(tx Transaction) error {
-		rows, qErr := tx.Query(query, appGUID, reason, time.Now().UTC())
+		rows, qErr := tx.Query(query, args...)
 		if qErr != nil {
 			return qErr
 		}

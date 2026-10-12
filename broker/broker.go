@@ -31,9 +31,8 @@ type Broker struct {
 	apiURL   string
 }
 
-// lookupTimeout bounds each Cloud Controller lookup the broker makes while
-// it holds services.BindingLock, so a slow Cloud Controller cannot stall
-// every other broker operation for long.
+// lookupTimeout bounds each Cloud Controller lookup the broker makes. None
+// is made while the broker holds services.BindingLock.
 const lookupTimeout = 10 * time.Second
 
 var _ osbapi.ServiceBroker = (*Broker)(nil)
@@ -80,6 +79,13 @@ func (b *Broker) Provision(ctx context.Context, instanceID string, req osbapi.Pr
 		return none, false, fmt.Errorf("%w: space_guid is required", osbapi.ErrBadRequest)
 	}
 
+	// Ask Cloud Controller about another instance in the space without the
+	// lock, so a slow Cloud Controller holds up only this request.
+	checked, err := b.checkSpace(ctx, tag, spaceGUID, instanceID)
+	if err != nil {
+		return none, false, err
+	}
+
 	b.services.BindingLock.Lock()
 	defer b.services.BindingLock.Unlock()
 
@@ -95,7 +101,7 @@ func (b *Broker) Provision(ctx context.Context, instanceID string, req osbapi.Pr
 		return none, false, b.storeError(tag, "look up service instance "+instanceID, err)
 	}
 
-	if err := b.clearSpace(ctx, tag, spaceGUID); err != nil {
+	if err := b.clearSpace(tag, spaceGUID, checked); err != nil {
 		return none, false, err
 	}
 
@@ -119,11 +125,45 @@ func (b *Broker) Provision(ctx context.Context, instanceID string, req osbapi.Pr
 	return none, false, nil
 }
 
+// spaceCheck is what Cloud Controller said about the instance that already
+// holds a space.
+type spaceCheck struct {
+	instanceID string
+	exists     bool
+	err        error
+}
+
+// checkSpace asks Cloud Controller whether the instance that holds the space
+// still exists. It returns nil when the space is free or holds instanceID
+// itself, and an error only when the store fails.
+func (b *Broker) checkSpace(ctx context.Context, tag, spaceGUID, instanceID string) (*spaceCheck, error) {
+	other, err := b.services.Instances.InSpace(spaceGUID)
+	if errors.Is(err, core.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, b.storeError(tag, "look up the instance in space "+spaceGUID, err)
+	}
+
+	if other.InstanceID == instanceID {
+		return nil, nil
+	}
+
+	lookup, cancel := context.WithTimeout(ctx, lookupTimeout)
+	defer cancel()
+
+	exists, err := b.services.Info.ServiceInstanceExists(lookup, other.InstanceID)
+
+	return &spaceCheck{instanceID: other.InstanceID, exists: exists, err: err}, nil
+}
+
 // clearSpace makes room for a new instance in the space. Another instance
 // there blocks the new one unless Cloud Controller no longer knows it, which
 // happens after cf purge-service-instance skips the broker. That orphan is
-// removed the way a deprovision would remove it.
-func (b *Broker) clearSpace(ctx context.Context, tag, spaceGUID string) error {
+// removed the way a deprovision would remove it. checked is what
+// checkSpace learned before the caller took services.BindingLock, which the
+// caller holds for writing.
+func (b *Broker) clearSpace(tag, spaceGUID string, checked *spaceCheck) error {
 	other, err := b.services.Instances.InSpace(spaceGUID)
 	if errors.Is(err, core.ErrNotFound) {
 		return nil
@@ -132,16 +172,17 @@ func (b *Broker) clearSpace(ctx context.Context, tag, spaceGUID string) error {
 		return b.storeError(tag, "look up the instance in space "+spaceGUID, err)
 	}
 
-	lookup, cancel := context.WithTimeout(ctx, lookupTimeout)
-	defer cancel()
+	if checked == nil || checked.instanceID != other.InstanceID {
+		b.services.Logger.Warn(tag, fmt.Sprintf("instance %s took space %s while this request was checking the space", other.InstanceID, spaceGUID))
+		return fmt.Errorf("space %s gained scheduler instance %s while this request was checking it; try again", spaceGUID, other.InstanceID)
+	}
 
-	exists, err := b.services.Info.ServiceInstanceExists(lookup, other.InstanceID)
-	if err != nil {
-		b.services.Logger.Error(tag, fmt.Sprintf("could not ask Cloud Controller about instance %s: %v", other.InstanceID, err))
+	if checked.err != nil {
+		b.services.Logger.Error(tag, fmt.Sprintf("could not ask Cloud Controller about instance %s: %v", other.InstanceID, checked.err))
 		return fmt.Errorf("space %s already has scheduler instance %s, and Cloud Controller could not be asked whether it still exists; try again", spaceGUID, other.InstanceID)
 	}
 
-	if exists {
+	if checked.exists {
 		return spaceTaken()
 	}
 
@@ -255,7 +296,16 @@ func (b *Broker) Bind(ctx context.Context, instanceID, bindingID string, req osb
 		appGUID = req.BindResource.AppGUID
 	}
 
-	// Find the app's space before taking the lock, so a slow Cloud Controller
+	// An unknown instance and an existing binding are answered from the
+	// local tables, so a repeated bind does not need Cloud Controller.
+	b.services.BindingLock.Lock()
+	_, response, done, err := b.settledBind(tag, instanceID, bindingID, appGUID)
+	b.services.BindingLock.Unlock()
+	if done {
+		return response, false, err
+	}
+
+	// Find the app's space without the lock, so a slow Cloud Controller
 	// holds up only this request.
 	var appSpaceGUID string
 	if len(appGUID) > 0 {
@@ -270,30 +320,11 @@ func (b *Broker) Bind(ctx context.Context, instanceID, bindingID string, req osb
 	b.services.BindingLock.Lock()
 	defer b.services.BindingLock.Unlock()
 
-	instance, err := b.services.Instances.Get(instanceID)
-	if errors.Is(err, core.ErrNotFound) {
-		return none, false, osbapi.ErrInstanceNotFound
-	}
-	if err != nil {
-		return none, false, b.storeError(tag, "look up service instance "+instanceID, err)
-	}
-
-	existing, err := b.services.Bindings.Get(bindingID)
-	switch {
-	case err == nil:
-		if existing.InstanceID != instanceID || existing.AppGUID != appGUID {
-			return none, false, fmt.Errorf("%w: binding %s exists with different attributes", osbapi.ErrBindingAlreadyExists, bindingID)
-		}
-
-		// Resume again in case the first attempt stored the binding and then
-		// failed, so a repeated bind always leaves the app running.
-		if err := b.resume(tag, appGUID); err != nil {
-			return none, false, err
-		}
-
-		return osbapi.BindResponse{Credentials: b.credentials(instanceID, appGUID)}, false, osbapi.ErrBindingAlreadyExists
-	case !errors.Is(err, core.ErrNotFound):
-		return none, false, b.storeError(tag, "look up service binding "+bindingID, err)
+	// Check again, because another request may have changed the instance
+	// or stored this binding while this one asked Cloud Controller.
+	instance, response, done, err := b.settledBind(tag, instanceID, bindingID, appGUID)
+	if done {
+		return response, false, err
 	}
 
 	if len(appGUID) > 0 && appSpaceGUID != instance.SpaceGUID {
@@ -323,6 +354,43 @@ func (b *Broker) Bind(ctx context.Context, instanceID, bindingID string, req osb
 	}
 
 	return osbapi.BindResponse{Credentials: b.credentials(instanceID, appGUID)}, false, nil
+}
+
+// settledBind answers a bind that the local tables settle: an unknown
+// instance, a binding that exists with other attributes, or a repeat of a
+// binding that exists. It reports done for those. Otherwise it returns the
+// instance for the bind to go on with. The caller holds
+// services.BindingLock for writing.
+func (b *Broker) settledBind(tag, instanceID, bindingID, appGUID string) (*core.ServiceInstance, osbapi.BindResponse, bool, error) {
+	none := osbapi.BindResponse{}
+
+	instance, err := b.services.Instances.Get(instanceID)
+	if errors.Is(err, core.ErrNotFound) {
+		return nil, none, true, osbapi.ErrInstanceNotFound
+	}
+	if err != nil {
+		return nil, none, true, b.storeError(tag, "look up service instance "+instanceID, err)
+	}
+
+	existing, err := b.services.Bindings.Get(bindingID)
+	switch {
+	case err == nil:
+		if existing.InstanceID != instanceID || existing.AppGUID != appGUID {
+			return nil, none, true, fmt.Errorf("%w: binding %s exists with different attributes", osbapi.ErrBindingAlreadyExists, bindingID)
+		}
+
+		// Resume again in case the first attempt stored the binding and then
+		// failed, so a repeated bind always leaves the app running.
+		if err := b.resume(tag, appGUID); err != nil {
+			return nil, none, true, err
+		}
+
+		return nil, osbapi.BindResponse{Credentials: b.credentials(instanceID, appGUID)}, true, osbapi.ErrBindingAlreadyExists
+	case !errors.Is(err, core.ErrNotFound):
+		return nil, none, true, b.storeError(tag, "look up service binding "+bindingID, err)
+	}
+
+	return instance, none, false, nil
 }
 
 func (b *Broker) Unbind(ctx context.Context, instanceID, bindingID string, req osbapi.UnbindRequest, _ bool) (osbapi.UnbindResponse, bool, error) {

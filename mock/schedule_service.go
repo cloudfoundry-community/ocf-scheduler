@@ -2,6 +2,7 @@ package mock
 
 import (
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ type ScheduleService struct {
 	storage []*core.Schedule
 	jobs    core.JobService
 	calls   core.CallService
+	byApp   error
 	locker  sync.Mutex
 }
 
@@ -158,9 +160,22 @@ func (service *ScheduleService) ownedByApp(schedule *core.Schedule, appGUID stri
 	return false
 }
 
+// FailByApp makes ByApp return err, as a lost database would. A nil err
+// clears it.
+func (service *ScheduleService) FailByApp(err error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	service.byApp = err
+}
+
 func (service *ScheduleService) ByApp(appGUID string) ([]*core.Schedule, error) {
 	service.locker.Lock()
 	defer service.locker.Unlock()
+
+	if service.byApp != nil {
+		return nil, service.byApp
+	}
 
 	found := make([]*core.Schedule, 0)
 
@@ -191,14 +206,14 @@ func (service *ScheduleService) Pause(appGUID string, reason string) ([]*core.Sc
 	return changed, nil
 }
 
-func (service *ScheduleService) Resume(appGUID string, reason string) ([]*core.Schedule, error) {
+func (service *ScheduleService) Resume(appGUID string, reason string, guids []string) ([]*core.Schedule, error) {
 	service.locker.Lock()
 	defer service.locker.Unlock()
 
 	changed := make([]*core.Schedule, 0)
 
 	for _, candidate := range service.storage {
-		if candidate.PausedBy == reason && len(reason) > 0 && service.ownedByApp(candidate, appGUID) {
+		if candidate.PausedBy == reason && len(reason) > 0 && slices.Contains(guids, candidate.GUID) && service.ownedByApp(candidate, appGUID) {
 			candidate.Enabled = true
 			candidate.PausedBy = ""
 			candidate.UpdatedAt = time.Now().UTC()

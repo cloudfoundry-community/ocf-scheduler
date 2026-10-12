@@ -57,12 +57,12 @@ func (schedules *flakySchedules) Pause(appGUID string, reason string) ([]*core.S
 	return schedules.ScheduleService.Pause(appGUID, reason)
 }
 
-func (schedules *flakySchedules) Resume(appGUID string, reason string) ([]*core.Schedule, error) {
+func (schedules *flakySchedules) Resume(appGUID string, reason string, guids []string) ([]*core.Schedule, error) {
 	if schedules.resumeErr != nil {
 		return nil, schedules.resumeErr
 	}
 
-	return schedules.ScheduleService.Resume(appGUID, reason)
+	return schedules.ScheduleService.Resume(appGUID, reason, guids)
 }
 
 func (f *fixture) flakySchedules() *flakySchedules {

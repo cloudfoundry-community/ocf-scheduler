@@ -34,7 +34,8 @@ type ScheduleService interface {
 	// marks each one with reason, and returns the schedules it changed.
 	Pause(appGUID string, reason string) ([]*Schedule, error)
 
-	// Resume enables every schedule on the app's jobs and calls that carries
-	// reason, clears the mark, and returns the schedules it changed.
-	Resume(appGUID string, reason string) ([]*Schedule, error)
+	// Resume enables each schedule named in guids that is on the app's jobs
+	// and calls and still carries reason, clears the mark, and returns the
+	// schedules it changed.
+	Resume(appGUID string, reason string, guids []string) ([]*Schedule, error)
 }

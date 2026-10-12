@@ -72,6 +72,7 @@ type CFClient struct {
 	failRoles  bool
 	instances  map[string]bool
 	failLookup bool
+	failApps   bool
 	locker     sync.Mutex
 }
 
@@ -85,6 +86,10 @@ func NewCFClient() (*CFClient, error) {
 func (client *CFClient) GetApp(_ context.Context, guid string) (*resource.App, error) {
 	client.locker.Lock()
 	defer client.locker.Unlock()
+
+	if client.failApps {
+		return nil, fmt.Errorf("app lookup failed")
+	}
 
 	return client.prepareApp(guid, ""), nil
 }
@@ -284,6 +289,7 @@ func (client *CFClient) Reset() {
 	client.failRoles = false
 	client.instances = make(map[string]bool)
 	client.failLookup = false
+	client.failApps = false
 }
 
 // GetServiceInstance knows the instances added with PrepareServiceInstance
@@ -318,6 +324,14 @@ func (client *CFClient) FailServiceInstanceLookups(fail bool) {
 	defer client.locker.Unlock()
 
 	client.failLookup = fail
+}
+
+// FailAppLookups makes GetApp fail as an unreachable CF API would.
+func (client *CFClient) FailAppLookups(fail bool) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	client.failApps = fail
 }
 
 func (client *CFClient) PrepareApp(appGUID string, spaceGUID string) *resource.App {

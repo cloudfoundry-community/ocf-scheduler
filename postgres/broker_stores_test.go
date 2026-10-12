@@ -280,12 +280,25 @@ func TestScheduleServicePauseAndResume(t *testing.T) {
 		t.Errorf("pausing again changed %d schedules, %v", len(again), err)
 	}
 
-	resumed, err := schedules.Resume("app-1", core.PausedByUnbind)
+	// Resume changes only the named schedules of the app that still carry
+	// the mark.
+	resumed, err := schedules.Resume("app-1", core.PausedByUnbind, []string{nightly.GUID, owned.GUID, elsewhere.GUID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resumed) != 2 {
-		t.Errorf("resumed %d schedules, want 2", len(resumed))
+	if len(resumed) != 1 || resumed[0].GUID != nightly.GUID {
+		t.Errorf("resumed %d schedules, want only nightly", len(resumed))
+	}
+	if stored := state(ping); stored.Enabled || stored.PausedBy != core.PausedByUnbind {
+		t.Errorf("ping: resume changed a schedule it was not given, got enabled=%t paused_by=%q", stored.Enabled, stored.PausedBy)
+	}
+
+	resumed, err = schedules.Resume("app-1", core.PausedByUnbind, []string{ping.GUID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resumed) != 1 {
+		t.Errorf("resumed %d schedules, want 1", len(resumed))
 	}
 
 	for name, schedule := range map[string]*core.Schedule{"nightly": nightly, "ping": ping} {

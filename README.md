@@ -326,7 +326,22 @@ Every operation finishes before the broker answers, so the broker never answers 
 
 ### Rolling back
 
-Version 2.2.0 adds three database migrations, 1791828900, 1791828901, and 1791828902, which create the `service_instances` and `service_bindings` tables and add the `schedules.paused_by` column. Releases before 2.2.0 refuse to start against a database that holds a migration they don't know, so rolling back from 2.2.0 to a 2.1.x release needs those three migrations reverted first. Their down steps drop the two tables and the column, and they remove every service instance and binding with them. Schedules that an unbind paused stay disabled after the rollback, because the mark that would resume them goes with the column. From 2.2.0 on, the scheduler starts against a database that a newer release has migrated, so later rollbacks don't need this step.
+Version 2.2.0 adds three database migrations, 1791828900, 1791828901, and 1791828902, which create the `service_instances` and `service_bindings` tables and add the `schedules.paused_by` column. Releases before 2.2.0 refuse to start against a database that holds a migration they don't know, so rolling back from 2.2.0 to a 2.1.x release needs those three migrations reverted first. The scheduler has no command that runs their down steps, so we run them by hand.
+
+First, stop every scheduler instance. Then connect to the scheduler's database with `psql` and run the following, which drops the two tables and the column and deletes the three rows that sql-migrate keeps in `gorp_migrations`:
+
+```sql
+BEGIN;
+-- Optional: let the schedules that an unbind paused run again on 2.1.x.
+UPDATE schedules SET enabled = true WHERE paused_by = 'unbind';
+ALTER TABLE schedules DROP COLUMN IF EXISTS paused_by;
+DROP TABLE IF EXISTS service_bindings;
+DROP TABLE IF EXISTS service_instances;
+DELETE FROM gorp_migrations WHERE id IN ('1791828900', '1791828901', '1791828902');
+COMMIT;
+```
+
+Deleting the rows alone would let 2.1.x start, but a later upgrade to 2.2.0 would then fail to create tables that already exist, so the procedure drops them too. It removes every service instance and binding, and Cloud Controller still lists the instances until they're purged with `cf purge-service-instance`. Without the optional `UPDATE`, the schedules that an unbind paused stay disabled after the rollback, because the mark that would resume them goes with the column. After the transaction commits, deploy the 2.1.x release. From 2.2.0 on, the scheduler starts against a database that a newer release has migrated, so later rollbacks don't need this step.
 
 ### Requiring a binding
 
