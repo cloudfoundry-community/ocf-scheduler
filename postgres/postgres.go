@@ -71,3 +71,8 @@ func generateInsert(tableName string, columns []string) string {
 
 	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableName, colString, valString)
 }
+
+// nullable stores an empty string as NULL.
+func nullable(value string) sql.NullString {
+	return sql.NullString{String: value, Valid: len(value) > 0}
+}

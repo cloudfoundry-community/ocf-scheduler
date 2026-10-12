@@ -18,7 +18,12 @@ var scheduleColumns = []string{
 	"ref_type",        // TEXT NOT NULL,
 	"created_at",      // TIMESTAMP WITH TIME ZONE NOT NULL,
 	"updated_at",      // TIMESTAMP WITH TIME ZONE NOT NULL
+	"paused_by",       // TEXT DEFAULT NULL
 }
+
+// appSchedules matches the schedules on the jobs and calls of the app in $1.
+const appSchedules = `((ref_type = 'job' AND ref_guid IN (SELECT guid FROM jobs WHERE app_guid = $1)) OR
+	(ref_type = 'call' AND ref_guid IN (SELECT guid FROM calls WHERE app_guid = $1)))`
 
 type ScheduleService struct {
 	db                  *sql.DB
@@ -26,6 +31,9 @@ type ScheduleService struct {
 	queryByEnabled      string
 	queryByCall         string
 	queryByJob          string
+	queryByApp          string
+	pauseByApp          string
+	resumeByApp         string
 	insertIntoSchedules string
 }
 
@@ -35,6 +43,12 @@ func NewScheduleService(db *sql.DB) *ScheduleService {
 	qbe := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE enabled"
 	qbj := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE ref_type = 'job' AND ref_guid = $1"
 
+	qba := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE " + appSchedules
+	pba := "UPDATE schedules SET enabled = false, paused_by = $2, updated_at = $3 WHERE enabled AND " +
+		appSchedules + " RETURNING " + strings.Join(scheduleColumns, ", ")
+	rba := "UPDATE schedules SET enabled = true, paused_by = NULL, updated_at = $3 WHERE paused_by = $2 AND " +
+		appSchedules + " RETURNING " + strings.Join(scheduleColumns, ", ")
+
 	is := generateInsert("schedules", scheduleColumns)
 	return &ScheduleService{
 		db:                  db,
@@ -42,6 +56,9 @@ func NewScheduleService(db *sql.DB) *ScheduleService {
 		queryByEnabled:      qbe,
 		queryByCall:         qbc,
 		queryByJob:          qbj,
+		queryByApp:          qba,
+		pauseByApp:          pba,
+		resumeByApp:         rba,
 		insertIntoSchedules: is,
 	}
 }
@@ -77,6 +94,44 @@ func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
 		service.queryByJob, // "select * from schedules where ref_type = 'job' and ref_guid = $1",
 		job.GUID,
 	)
+}
+
+func (service *ScheduleService) ByApp(appGUID string) []*core.Schedule {
+	return service.getCollection(
+		service.queryByApp, // "select * from schedules on the app's jobs and calls"
+		appGUID,
+	)
+}
+
+func (service *ScheduleService) Pause(appGUID string, reason string) ([]*core.Schedule, error) {
+	return service.flip(service.pauseByApp, appGUID, reason)
+}
+
+func (service *ScheduleService) Resume(appGUID string, reason string) ([]*core.Schedule, error) {
+	return service.flip(service.resumeByApp, appGUID, reason)
+}
+
+// flip runs a pause or resume update, which changes every matching schedule
+// in one statement, and returns the rows it changed.
+func (service *ScheduleService) flip(query, appGUID, reason string) ([]*core.Schedule, error) {
+	var changed []*core.Schedule
+
+	err := WithTransaction(service.db, func(tx Transaction) error {
+		rows, qErr := tx.Query(query, appGUID, reason, time.Now().UTC())
+		if qErr != nil {
+			return qErr
+		}
+
+		var sErr error
+		changed, sErr = scanSchedules(rows)
+		return sErr
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return changed, nil
 }
 
 func (service *ScheduleService) Delete(schedule *core.Schedule) error {
@@ -120,6 +175,7 @@ func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedul
 			candidate.RefType,
 			candidate.CreatedAt,
 			candidate.UpdatedAt,
+			nullable(candidate.PausedBy),
 		)
 
 		return aErr
@@ -140,6 +196,18 @@ func (service *ScheduleService) getCollection(query string, args ...any) []*core
 		return collection
 	}
 
+	found, _ := scanSchedules(rows)
+	return append(collection, found...)
+}
+
+// scanSchedules reads scheduleColumns rows and closes them. A row that fails
+// to scan is skipped, as getCollection always has, and the error from the
+// rows themselves is returned.
+func scanSchedules(rows *sql.Rows) ([]*core.Schedule, error) {
+	defer rows.Close()
+
+	collection := make([]*core.Schedule, 0)
+
 	for rows.Next() {
 		var guid string
 		var enabled bool
@@ -149,8 +217,9 @@ func (service *ScheduleService) getCollection(query string, args ...any) []*core
 		var refType string
 		var createdAt time.Time
 		var updatedAt time.Time
+		var pausedBy sql.NullString
 
-		err := rows.Scan(&guid, &enabled, &expression, &expressionType, &refGUID, &refType, &createdAt, &updatedAt)
+		err := rows.Scan(&guid, &enabled, &expression, &expressionType, &refGUID, &refType, &createdAt, &updatedAt, &pausedBy)
 		if err != nil {
 			continue
 		}
@@ -164,10 +233,11 @@ func (service *ScheduleService) getCollection(query string, args ...any) []*core
 			RefType:        refType,
 			CreatedAt:      createdAt,
 			UpdatedAt:      updatedAt,
+			PausedBy:       pausedBy.String,
 		}
 
 		collection = append(collection, candidate)
 	}
 
-	return collection
+	return collection, rows.Err()
 }

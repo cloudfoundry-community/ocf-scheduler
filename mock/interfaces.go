@@ -9,4 +9,6 @@ var (
 	_ core.ScheduleService  = &ScheduleService{}
 	_ core.AuthService      = &AuthService{}
 	_ core.ExecutionService = &ExecutionService{}
+	_ core.InstanceService  = &InstanceService{}
+	_ core.BindingService   = &BindingService{}
 )

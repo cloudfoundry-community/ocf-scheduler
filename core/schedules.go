@@ -13,6 +13,10 @@ type Schedule struct {
 
 	RefGUID string `json:"-"`
 	RefType string `json:"-"`
+
+	// PausedBy is PausedByUnbind when the service broker disabled the
+	// schedule, and empty otherwise. Callers cannot set it.
+	PausedBy string `json:"-"`
 }
 
 type ScheduleService interface {
@@ -22,4 +26,15 @@ type ScheduleService interface {
 	Get(string) (*Schedule, error)
 	Delete(*Schedule) error
 	Enabled() []*Schedule
+
+	// ByApp returns every schedule on the app's jobs and calls.
+	ByApp(appGUID string) []*Schedule
+
+	// Pause disables every enabled schedule on the app's jobs and calls,
+	// marks each one with reason, and returns the schedules it changed.
+	Pause(appGUID string, reason string) ([]*Schedule, error)
+
+	// Resume enables every schedule on the app's jobs and calls that carries
+	// reason, clears the mark, and returns the schedules it changed.
+	Resume(appGUID string, reason string) ([]*Schedule, error)
 }

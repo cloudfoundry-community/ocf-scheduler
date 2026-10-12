@@ -12,6 +12,8 @@ import (
 
 type ScheduleService struct {
 	storage []*core.Schedule
+	jobs    core.JobService
+	calls   core.CallService
 	locker  sync.Mutex
 }
 
@@ -124,4 +126,85 @@ func (service *ScheduleService) Enabled() []*core.Schedule {
 	}
 
 	return enabled
+}
+
+// Owners lets ByApp, Pause, and Resume find the app behind each schedule.
+// Without it they match nothing.
+func (service *ScheduleService) Owners(jobs core.JobService, calls core.CallService) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	service.jobs = jobs
+	service.calls = calls
+}
+
+// ownedByApp must be called with locker held.
+func (service *ScheduleService) ownedByApp(schedule *core.Schedule, appGUID string) bool {
+	switch schedule.RefType {
+	case "job":
+		if service.jobs == nil {
+			return false
+		}
+		job, err := service.jobs.Get(schedule.RefGUID)
+		return err == nil && job.AppGUID == appGUID
+	case "call":
+		if service.calls == nil {
+			return false
+		}
+		call, err := service.calls.Get(schedule.RefGUID)
+		return err == nil && call.AppGUID == appGUID
+	}
+
+	return false
+}
+
+func (service *ScheduleService) ByApp(appGUID string) []*core.Schedule {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	found := make([]*core.Schedule, 0)
+
+	for _, candidate := range service.storage {
+		if service.ownedByApp(candidate, appGUID) {
+			found = append(found, candidate)
+		}
+	}
+
+	return found
+}
+
+func (service *ScheduleService) Pause(appGUID string, reason string) ([]*core.Schedule, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	changed := make([]*core.Schedule, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.Enabled && service.ownedByApp(candidate, appGUID) {
+			candidate.Enabled = false
+			candidate.PausedBy = reason
+			candidate.UpdatedAt = time.Now().UTC()
+			changed = append(changed, candidate)
+		}
+	}
+
+	return changed, nil
+}
+
+func (service *ScheduleService) Resume(appGUID string, reason string) ([]*core.Schedule, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	changed := make([]*core.Schedule, 0)
+
+	for _, candidate := range service.storage {
+		if candidate.PausedBy == reason && len(reason) > 0 && service.ownedByApp(candidate, appGUID) {
+			candidate.Enabled = true
+			candidate.PausedBy = ""
+			candidate.UpdatedAt = time.Now().UTC()
+			changed = append(changed, candidate)
+		}
+	}
+
+	return changed, nil
 }
