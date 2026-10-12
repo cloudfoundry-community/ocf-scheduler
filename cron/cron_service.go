@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	cron "github.com/netresearch/go-cron"
@@ -56,6 +57,9 @@ type CronService struct {
 	log     core.LogService
 	rules   Rules
 	mapping map[string]cron.EntryID
+	// locker guards mapping, which HTTP handlers and the service broker
+	// change concurrently.
+	locker sync.Mutex
 }
 
 func GetServerTimezone() (string, error) {
@@ -143,6 +147,9 @@ func (service *CronService) Add(runnable core.Runnable) error {
 		runnable.Run()
 	}
 
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	id, err := service.ScheduleJob(analysis.Schedule, cron.FuncJob(process))
 	if err != nil {
 		return err
@@ -155,6 +162,9 @@ func (service *CronService) Add(runnable core.Runnable) error {
 }
 
 func (service *CronService) Delete(runnable core.Runnable) error {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	id, found := service.mapping[runnable.Schedule().GUID]
 	if !found {
 		return fmt.Errorf("no such runner")
@@ -189,12 +199,24 @@ func (service *CronService) Analyze(expression, key string, next, prev int, from
 }
 
 func (service *CronService) MappingSize() int {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
 	return len(service.mapping)
 }
 
+// Scheduled reports whether a schedule GUID has a cron entry.
+func (service *CronService) Scheduled(scheduleGUID string) bool {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	_, found := service.mapping[scheduleGUID]
+	return found
+}
+
+// logMappingSize must be called with locker held.
 func (service *CronService) logMappingSize(action string) {
-	size := service.MappingSize()
-	service.log.Info("cron-service", fmt.Sprintf("%s: current mapping size is %d", action, size))
+	service.log.Info("cron-service", fmt.Sprintf("%s: current mapping size is %d", action, len(service.mapping)))
 }
 
 func (service *CronService) GetTimezones() (*core.TimezoneSlice, error) {
