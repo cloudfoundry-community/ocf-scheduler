@@ -6,11 +6,12 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/http/presenters"
 )
 
 type callCollection struct {
-	Pagination *pagination  `json:"pagination"`
-	Resources  []*core.Call `json:"resources"`
+	Pagination *pagination        `json:"pagination"`
+	Resources  []*presenters.Call `json:"resources"`
 }
 
 func AllCalls(e *echo.Echo, services *core.Services) {
@@ -20,17 +21,16 @@ func AllCalls(e *echo.Echo, services *core.Services) {
 		tag := "all-calls"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if services.Auth.Verify(auth) != nil {
-			services.Logger.Error(tag, "authentication failed")
-			return c.JSON(http.StatusUnauthorized, "")
-		}
-
 		spaceGUID := c.QueryParam("space_guid")
+
+		if status := authorize(services, tag, auth, spaceGUID, http.StatusForbidden); status != 0 {
+			return c.JSON(status, "")
+		}
 
 		calls := services.Calls.InSpace(spaceGUID)
 
 		output := &callCollection{
-			Resources: calls,
+			Resources: presenters.AsCallCollection(calls),
 			Pagination: &pagination{
 				TotalPages:   1,
 				TotalResults: len(calls),

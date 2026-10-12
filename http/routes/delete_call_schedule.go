@@ -17,23 +17,27 @@ func DeleteCallSchedule(e *echo.Echo, services *core.Services) {
 		tag := "delete-call-schedule"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if services.Auth.Verify(auth) != nil {
-			services.Logger.Error(tag, "authentication failed")
-			return c.JSON(http.StatusUnauthorized, "")
-		}
-
 		guid := c.Param("guid")
 
 		call, err := services.Calls.Get(guid)
 		if err != nil {
 			services.Logger.Warn(tag, fmt.Sprintf("call %s not found", guid))
-			return c.JSON(http.StatusNotFound, "")
+			return c.JSON(missing(services, tag, auth, http.StatusNotFound), "")
+		}
+
+		if status := authorize(services, tag, auth, call.SpaceGUID, http.StatusNotFound); status != 0 {
+			return c.JSON(status, "")
 		}
 
 		scheduleGUID := c.Param("schedule_guid")
 		schedule, err := services.Schedules.Get(scheduleGUID)
 		if err != nil {
 			services.Logger.Warn(tag, fmt.Sprintf("schedule %s not found for call %s", scheduleGUID, guid))
+			return c.JSON(http.StatusNotFound, "")
+		}
+
+		if !ownedBy(schedule, "call", guid) {
+			services.Logger.Warn(tag, "schedule "+scheduleGUID+" does not belong to call "+guid)
 			return c.JSON(http.StatusNotFound, "")
 		}
 

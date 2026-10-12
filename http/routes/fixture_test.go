@@ -23,13 +23,15 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
+	auth := mock.NewAuthService()
+	auth.Developer("jeremy", "space-1")
 	services := &core.Services{
 		Jobs:      mock.NewJobService(),
 		Calls:     mock.NewCallService(),
 		Schedules: mock.NewScheduleService(),
 		Cron:      cron.NewCronService(logger.New(), cron.Rules{}),
 		Logger:    logger.New(),
-		Auth:      mock.NewAuthService(),
+		Auth:      auth,
 	}
 	job, err := services.Jobs.Persist(&core.Job{Name: "backup", AppGUID: "app-1", SpaceGUID: "space-1"})
 	if err != nil {

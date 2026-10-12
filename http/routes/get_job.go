@@ -16,20 +16,16 @@ func GetJob(e *echo.Echo, services *core.Services) {
 		tag := "get-job"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if services.Auth.Verify(auth) != nil {
-			services.Logger.Error(tag, "authentication failed")
-			return c.JSON(http.StatusUnauthorized, "")
-		}
-
 		guid := c.Param("guid")
 
 		job, err := services.Jobs.Get(guid)
 		if err != nil {
 			services.Logger.Warn(tag, fmt.Sprintf("job %s not found", guid))
-			return c.JSON(
-				http.StatusNotFound,
-				"",
-			)
+			return c.JSON(missing(services, tag, auth, http.StatusNotFound), "")
+		}
+
+		if status := authorize(services, tag, auth, job.SpaceGUID, http.StatusNotFound); status != 0 {
+			return c.JSON(status, "")
 		}
 
 		return c.JSON(

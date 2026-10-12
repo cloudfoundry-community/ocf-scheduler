@@ -18,15 +18,15 @@ func AllCallExecutions(e *echo.Echo, services *core.Services) {
 
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
-		}
-
 		guid := c.Param("guid")
 
 		call, err := services.Calls.Get(guid)
 		if err != nil {
-			return c.JSON(http.StatusNotFound, "")
+			return c.JSON(missing(services, tag, auth, http.StatusNotFound), "")
+		}
+
+		if status := authorize(services, tag, auth, call.SpaceGUID, http.StatusNotFound); status != 0 {
+			return c.JSON(status, "")
 		}
 
 		executions := services.Executions.ByCall(call)

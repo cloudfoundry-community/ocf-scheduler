@@ -13,17 +13,18 @@ func AllJobSchedules(e *echo.Echo, services *core.Services) {
 	// Get all schedules for a Job
 	// GET /jobs/{jobGuid}/schedules
 	e.GET("/jobs/:guid/schedules", func(c echo.Context) error {
+		tag := "all-job-schedules"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
-
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
-		}
 
 		guid := c.Param("guid")
 
 		job, err := services.Jobs.Get(guid)
 		if err != nil {
-			return c.JSON(http.StatusNotFound, "")
+			return c.JSON(missing(services, tag, auth, http.StatusNotFound), "")
+		}
+
+		if status := authorize(services, tag, auth, job.SpaceGUID, http.StatusNotFound); status != 0 {
+			return c.JSON(status, "")
 		}
 
 		schedules := services.Schedules.ByJob(job)

@@ -17,23 +17,27 @@ func DeleteJobSchedule(e *echo.Echo, services *core.Services) {
 		tag := "delete-job-schedule"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if services.Auth.Verify(auth) != nil {
-			services.Logger.Error(tag, "authentication failed")
-			return c.JSON(http.StatusUnauthorized, "")
-		}
-
 		guid := c.Param("guid")
 
 		job, err := services.Jobs.Get(guid)
 		if err != nil {
 			services.Logger.Warn(tag, fmt.Sprintf("job %s not found", guid))
-			return c.JSON(http.StatusNotFound, "")
+			return c.JSON(missing(services, tag, auth, http.StatusNotFound), "")
+		}
+
+		if status := authorize(services, tag, auth, job.SpaceGUID, http.StatusNotFound); status != 0 {
+			return c.JSON(status, "")
 		}
 
 		scheduleGUID := c.Param("schedule_guid")
 		schedule, err := services.Schedules.Get(scheduleGUID)
 		if err != nil {
 			services.Logger.Warn(tag, fmt.Sprintf("schedule %s not found for job %s", scheduleGUID, guid))
+			return c.JSON(http.StatusNotFound, "")
+		}
+
+		if !ownedBy(schedule, "job", guid) {
+			services.Logger.Warn(tag, "schedule "+scheduleGUID+" does not belong to job "+guid)
 			return c.JSON(http.StatusNotFound, "")
 		}
 

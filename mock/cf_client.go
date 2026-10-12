@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"slices"
 	"sync"
 
 	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
@@ -67,6 +68,8 @@ type CFClient struct {
 	tasks      map[string]*resource.Task
 	retries    map[string]int
 	maxretries map[string]int
+	roles      []*resource.Role
+	failRoles  bool
 	locker     sync.Mutex
 }
 
@@ -200,18 +203,71 @@ func (client *CFClient) ListUsers(_ context.Context, opts *cfclient.UserListOpti
 	return users, nil
 }
 
+// ListRoles returns the stock roles for the dummy user plus any granted with
+// GrantRole, filtered by the user, space, and type options the real API
+// honors.
 func (client *CFClient) ListRoles(_ context.Context, opts *cfclient.RoleListOptions) ([]*resource.Role, error) {
-	userGUID := ""
-	if opts != nil && len(opts.UserGUIDs.Values) > 0 {
-		userGUID = opts.UserGUIDs.Values[0]
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	if client.failRoles {
+		return nil, fmt.Errorf("role lookup failed")
 	}
 
-	if userGUID != dummyGUID {
-		return nil, fmt.Errorf("no such user")
+	candidates := append([]*resource.Role{spaceManager, spaceDeveloper}, client.roles...)
+	output := make([]*resource.Role, 0)
+
+	for _, role := range candidates {
+		if opts != nil {
+			if !matches(opts.UserGUIDs.Values, relationshipGUID(role.Relationships.User)) ||
+				!matches(opts.SpaceGUIDs.Values, relationshipGUID(role.Relationships.Space)) ||
+				!matches(opts.Types.Values, role.Type) {
+				continue
+			}
+		}
+
+		output = append(output, role)
 	}
 
-	output := []*resource.Role{spaceManager, spaceDeveloper}
 	return output, nil
+}
+
+// GrantRole gives a user a space role that ListRoles then reports.
+func (client *CFClient) GrantRole(userGUID, spaceGUID, roleType string) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	guid, _ := core.GenGUID()
+
+	client.roles = append(client.roles, &resource.Role{
+		Type: roleType,
+		Relationships: resource.RoleSpaceUserOrganizationRelationships{
+			User:  resource.ToOneRelationship{Data: &resource.Relationship{GUID: userGUID}},
+			Space: resource.ToOneRelationship{Data: &resource.Relationship{GUID: spaceGUID}},
+		},
+		Resource: resource.Resource{GUID: guid},
+	})
+}
+
+// FailRoleLookups makes ListRoles return an error, as an unreachable CF API
+// would.
+func (client *CFClient) FailRoleLookups(fail bool) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	client.failRoles = fail
+}
+
+func matches(filter []string, value string) bool {
+	return len(filter) == 0 || slices.Contains(filter, value)
+}
+
+func relationshipGUID(relationship resource.ToOneRelationship) string {
+	if relationship.Data == nil {
+		return ""
+	}
+
+	return relationship.Data.GUID
 }
 
 func (client *CFClient) Reset() {
@@ -222,6 +278,8 @@ func (client *CFClient) Reset() {
 	client.tasks = make(map[string]*resource.Task)
 	client.retries = make(map[string]int)
 	client.maxretries = make(map[string]int)
+	client.roles = nil
+	client.failRoles = false
 }
 
 func (client *CFClient) PrepareApp(appGUID string, spaceGUID string) *resource.App {

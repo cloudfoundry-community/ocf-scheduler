@@ -43,6 +43,12 @@ func (service *ExecutionService) UpdateMessage(execution *core.Execution, messag
 	return service.update(execution)
 }
 
+func (service *ExecutionService) UpdateTaskGUID(execution *core.Execution, taskGUID string) (*core.Execution, error) {
+	execution.TaskGUID = taskGUID
+
+	return service.update(execution)
+}
+
 func (service *ExecutionService) Start(execution *core.Execution) (*core.Execution, error) {
 	now := time.Now().UTC()
 

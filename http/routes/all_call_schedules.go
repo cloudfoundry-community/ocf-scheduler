@@ -13,17 +13,18 @@ func AllCallSchedules(e *echo.Echo, services *core.Services) {
 	// Get all schedules for a Call
 	// GET /calls/{callGuid}/schedules
 	e.GET("/calls/:guid/schedules", func(c echo.Context) error {
+		tag := "all-call-schedules"
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
-
-		if services.Auth.Verify(auth) != nil {
-			return c.JSON(http.StatusUnauthorized, "")
-		}
 
 		guid := c.Param("guid")
 
 		call, err := services.Calls.Get(guid)
 		if err != nil {
-			return c.JSON(http.StatusNotFound, "")
+			return c.JSON(missing(services, tag, auth, http.StatusNotFound), "")
+		}
+
+		if status := authorize(services, tag, auth, call.SpaceGUID, http.StatusNotFound); status != 0 {
+			return c.JSON(status, "")
 		}
 
 		schedules := services.Schedules.ByCall(call)

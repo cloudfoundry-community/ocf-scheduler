@@ -301,6 +301,20 @@ Authorization: bearer <UAA_TOKEN>
 
 Requests without a valid token receive a `401 Unauthorized` response.
 
+### Authorization
+
+A caller may act on a job, call, or schedule only in a space where they hold the `space_developer` role, and that holds for reading as well as for creating, running, and deleting. Callers whose token carries the `cloud_controller.admin` scope may act in every space. Space managers and auditors have no access. The scheduler looks the role up through the Cloud Controller v3 API on every request and denies the request if the lookup fails.
+
+- `POST /jobs?app_guid=` and `POST /calls?app_guid=` check the space that the app belongs to and answer `403 Forbidden` when the caller is not a developer there.
+
+- `GET /jobs?space_guid=` and `GET /calls?space_guid=` check the named space and answer `403 Forbidden` in the same way, including when `space_guid` is missing.
+
+- Routes that name a job or call by GUID check the space it was created in and answer `404 Not Found`, so they don't reveal another tenant's jobs or calls. A schedule GUID must also belong to the job or call in the path.
+
+- `GET /scheduler-time-zones` and `POST /schedules/validate` with only an expression need a `space_developer` or `space_manager` role in any space. Validating against a job or call checks that job's or call's space.
+
+A call's `auth_header` is stored and sent when the call runs, but no response ever returns it, not even to the call's owner or to an admin.
+
 ### Request Bodies
 
 **Create Job** (`POST /jobs?app_guid=`):

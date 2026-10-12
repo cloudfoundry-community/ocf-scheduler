@@ -17,12 +17,20 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if services.Auth.Verify(auth) != nil {
-			services.Logger.Error(tag, "authentication to this endpoint failed")
-			return c.JSON(http.StatusUnauthorized, "")
+		appGUID := c.QueryParam("app_guid")
+		if len(appGUID) == 0 {
+			return c.JSON(missing(services, tag, auth, http.StatusUnprocessableEntity), "")
 		}
 
-		appGUID := c.QueryParam("app_guid")
+		spaceGUID, err := services.Info.GetSpaceGUIDForApp(appGUID)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("could not get space GUID for app %s", appGUID))
+			return c.JSON(missing(services, tag, auth, http.StatusUnprocessableEntity), "")
+		}
+
+		if status := authorize(services, tag, auth, spaceGUID, http.StatusForbidden); status != 0 {
+			return c.JSON(status, "")
+		}
 
 		input := &core.Job{}
 
@@ -31,16 +39,6 @@ func CreateJob(e *echo.Echo, services *core.Services) {
 		}
 
 		input.AppGUID = appGUID
-		if len(appGUID) == 0 {
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
-
-		spaceGUID, err := services.Info.GetSpaceGUIDForApp(appGUID)
-		if err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("could not get space GUID for app %s", appGUID))
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
-
 		input.SpaceGUID = spaceGUID
 
 		if len(input.Name) == 0 {

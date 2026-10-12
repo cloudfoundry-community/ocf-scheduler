@@ -13,6 +13,8 @@ import (
 	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"golang.org/x/oauth2"
+
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 type Logger interface {
@@ -21,113 +23,170 @@ type Logger interface {
 	Debug(tag, message string)
 }
 
+// Identity is the UAA user a bearer token was issued to. UserGUID is the UAA
+// user ID, which Cloud Controller uses as the user's GUID.
+type Identity struct {
+	UserGUID string
+	Username string
+}
+
+// IdentityFunc resolves a bearer token to its user. Asking UAA also proves
+// that the token is valid, which is what lets the scopes decoded from the
+// token be trusted afterwards.
+type IdentityFunc func(bearer string) (*Identity, error)
+
 type AuthService struct {
-	client CFClient
-	logger Logger
+	client   CFClient
+	logger   Logger
+	identify IdentityFunc
+}
+
+type caller struct {
+	userGUID string
+	admin    bool
 }
 
 func NewAuthService(client CFClient, logger Logger) *AuthService {
+	return NewAuthServiceWithIdentity(client, logger, uaaIdentity)
+}
+
+// NewAuthServiceWithIdentity builds an AuthService that resolves tokens with
+// the given function instead of UAA's userinfo endpoint.
+func NewAuthServiceWithIdentity(client CFClient, logger Logger, identify IdentityFunc) *AuthService {
 	return &AuthService{
-		client: client,
-		logger: logger,
+		client:   client,
+		logger:   logger,
+		identify: identify,
 	}
 }
 
+// Verify accepts cloud_controller.admin, or a space_developer or
+// space_manager role in any space.
 func (service *AuthService) Verify(auth string) error {
 	tag := "AuthService.Verify"
-	service.logger.Debug(tag, "Starting verification process")
-	username, err := getUsername(auth)
-	if err != nil {
-		service.logger.Error(tag, fmt.Sprintf("Error getting username: %v", err))
-		return err
-	}
-	service.logger.Debug(tag, fmt.Sprintf("Username obtained: %s", username))
 
-	user, err := service.getUser(username)
+	who, err := service.authenticate(auth)
 	if err != nil {
-		service.logger.Error(tag, fmt.Sprintf("Error getting user: %v", err))
+		service.logger.Error(tag, err.Error())
 		return err
 	}
 
-	service.logger.Debug(tag, fmt.Sprintf("User obtained: %v", user))
-
-	roles, err := service.getUserRoles(user)
-	if err != nil {
-		service.logger.Error(tag, fmt.Sprintf("Error getting user roles: %v", err))
-		return err
-	}
-
-	service.logger.Debug(tag, fmt.Sprintf("User roles obtained: %v", roles))
-
-	tokenScopes, err := getTokenScopes(auth, service.logger)
-	if err != nil {
-		service.logger.Error(tag, fmt.Sprintf("Error getting token scopes: %v", err))
-		return err
-	}
-	service.logger.Debug(tag, fmt.Sprintf("Token scopes obtained: %v", tokenScopes))
-
-	// Check all the roles, but return good early if we find one that works.
-
-	// Check token scopes for cloud_controller.admin
-	if slices.Contains(tokenScopes, "cloud_controller.admin") {
-		service.logger.Debug(tag, "User has cloud_controller.admin scope")
+	if who.admin {
+		service.logger.Debug(tag, "caller has cloud_controller.admin scope")
 		return nil
 	}
 
-	// Check CF roles for space_manager or space_developer
+	opts := cfclient.NewRoleListOptions()
+	opts.UserGUIDs.EqualTo(who.userGUID)
+	opts.Types.EqualTo("space_developer", "space_manager")
+
+	roles, err := service.client.ListRoles(context.Background(), opts)
+	if err != nil {
+		service.logger.Error(tag, fmt.Sprintf("error listing roles for user %s: %v", who.userGUID, err))
+		return fmt.Errorf("%w: role lookup failed", core.ErrForbidden)
+	}
+
 	for _, role := range roles {
-		if role.Type == "space_manager" || role.Type == "space_developer" {
-			service.logger.Debug(tag, fmt.Sprintf("User has role: %s", role.Type))
+		if (role.Type == "space_developer" || role.Type == "space_manager") && roleUser(role) == who.userGUID {
+			service.logger.Debug(tag, fmt.Sprintf("user %s has role %s", who.userGUID, role.Type))
 			return nil
 		}
 	}
 
-	service.logger.Error(tag, "User does not have sufficient permissions")
-	return fmt.Errorf("insufficient permissions")
+	service.logger.Error(tag, fmt.Sprintf("user %s has no space role", who.userGUID))
+	return fmt.Errorf("%w: insufficient permissions", core.ErrForbidden)
 }
 
-func (service *AuthService) getUser(username string) (*resource.User, error) {
-	tag := "AuthService.getUser"
-	opts := cfclient.NewUserListOptions()
-	opts.UserNames.EqualTo(username)
+// VerifySpace accepts cloud_controller.admin, or a space_developer role in
+// spaceGUID. A failed role lookup denies the caller.
+func (service *AuthService) VerifySpace(auth string, spaceGUID string) error {
+	tag := "AuthService.VerifySpace"
 
-	users, err := service.client.ListUsers(context.Background(), opts)
+	who, err := service.authenticate(auth)
 	if err != nil {
-		service.logger.Error(tag, fmt.Sprintf("Error listing users: %v", err))
-		return nil, err
+		service.logger.Error(tag, err.Error())
+		return err
 	}
 
-	if len(users) == 0 {
-		service.logger.Error(tag, "No such user found")
-		return nil, fmt.Errorf("no such user")
+	if who.admin {
+		service.logger.Debug(tag, "caller has cloud_controller.admin scope")
+		return nil
 	}
 
-	return users[0], nil
-}
+	if len(spaceGUID) == 0 {
+		service.logger.Error(tag, fmt.Sprintf("user %s asked for no space", who.userGUID))
+		return fmt.Errorf("%w: no space given", core.ErrForbidden)
+	}
 
-func (service *AuthService) getUserRoles(user *resource.User) ([]*resource.Role, error) {
-	tag := "AuthService.getUserRoles"
 	opts := cfclient.NewRoleListOptions()
-	opts.UserGUIDs.EqualTo(user.GUID)
+	opts.UserGUIDs.EqualTo(who.userGUID)
+	opts.SpaceGUIDs.EqualTo(spaceGUID)
+	opts.Types.EqualTo("space_developer")
 
 	roles, err := service.client.ListRoles(context.Background(), opts)
 	if err != nil {
-		service.logger.Error(tag, fmt.Sprintf("Error listing roles: %v", err))
-		return nil, err
+		service.logger.Error(tag, fmt.Sprintf("error listing roles for user %s in space %s: %v", who.userGUID, spaceGUID, err))
+		return fmt.Errorf("%w: role lookup failed", core.ErrForbidden)
 	}
 
-	return roles, nil
+	// Match every field ourselves rather than trusting the API's filters.
+	for _, role := range roles {
+		if role.Type == "space_developer" && roleUser(role) == who.userGUID && roleSpace(role) == spaceGUID {
+			service.logger.Debug(tag, fmt.Sprintf("user %s is a space developer in %s", who.userGUID, spaceGUID))
+			return nil
+		}
+	}
+
+	service.logger.Error(tag, fmt.Sprintf("user %s is not a space developer in %s", who.userGUID, spaceGUID))
+	return fmt.Errorf("%w: not a space developer in the space", core.ErrForbidden)
 }
 
-func getUsername(auth string) (string, error) {
-	endpoint := os.Getenv("UAA_ENDPOINT")
-	if len(endpoint) == 0 {
-		return "", fmt.Errorf("no UAA endpoint")
-	}
-
+func (service *AuthService) authenticate(auth string) (*caller, error) {
 	bearer, err := getBearer(auth)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("%w: %v", core.ErrUnauthenticated, err)
+	}
+
+	identity, err := service.identify(bearer)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", core.ErrUnauthenticated, err)
+	}
+
+	if identity == nil || len(identity.UserGUID) == 0 {
+		return nil, fmt.Errorf("%w: token has no user", core.ErrUnauthenticated)
+	}
+
+	scopes, err := getTokenScopes(auth, service.logger)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", core.ErrUnauthenticated, err)
+	}
+
+	return &caller{
+		userGUID: identity.UserGUID,
+		admin:    slices.Contains(scopes, "cloud_controller.admin"),
+	}, nil
+}
+
+func roleUser(role *resource.Role) string {
+	if role.Relationships.User.Data == nil {
+		return ""
+	}
+
+	return role.Relationships.User.Data.GUID
+}
+
+func roleSpace(role *resource.Role) string {
+	if role.Relationships.Space.Data == nil {
+		return ""
+	}
+
+	return role.Relationships.Space.Data.GUID
+}
+
+func uaaIdentity(bearer string) (*Identity, error) {
+	endpoint := os.Getenv("UAA_ENDPOINT")
+	if len(endpoint) == 0 {
+		return nil, fmt.Errorf("no UAA endpoint")
 	}
 
 	opts := make([]uaa.Option, 0)
@@ -135,15 +194,15 @@ func getUsername(auth string) (string, error) {
 
 	client, err := uaa.New(endpoint, uaa.WithToken(&oauth2.Token{AccessToken: bearer}), opts...)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	me, err := client.GetMe()
 	if err != nil {
-		return "", fmt.Errorf("couldn't get user info: %s", err.Error())
+		return nil, fmt.Errorf("couldn't get user info: %s", err.Error())
 	}
 
-	return me.Username, nil
+	return &Identity{UserGUID: me.UserID, Username: me.Username}, nil
 }
 
 func getBearer(auth string) (string, error) {

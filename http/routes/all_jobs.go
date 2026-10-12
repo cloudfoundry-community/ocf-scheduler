@@ -36,12 +36,11 @@ func AllJobs(e *echo.Echo, services *core.Services) {
 
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if services.Auth.Verify(auth) != nil {
-			services.Logger.Error(tag, "authentication to this endpoint failed")
-			return c.JSON(http.StatusUnauthorized, "")
-		}
-
 		spaceGUID := c.QueryParam("space_guid")
+
+		if status := authorize(services, tag, auth, spaceGUID, http.StatusForbidden); status != 0 {
+			return c.JSON(status, "")
+		}
 
 		jobs, err := services.Jobs.InSpace(spaceGUID)
 		if err != nil {

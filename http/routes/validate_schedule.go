@@ -59,6 +59,9 @@ func ValidateSchedule(e *echo.Echo, services *core.Services) {
 		switch input.RefType {
 		case "job":
 			job, err := services.Jobs.Get(input.RefGUID)
+			if err == nil && authorize(services, tag, auth, job.SpaceGUID, http.StatusNotFound) != 0 {
+				err = core.ErrForbidden
+			}
 			if err != nil {
 				return c.JSON(http.StatusNotFound, requestError("ref_not_found", "job %s not found", input.RefGUID))
 			}
@@ -66,6 +69,9 @@ func ValidateSchedule(e *echo.Echo, services *core.Services) {
 			stored = services.Schedules.ByJob(job)
 		case "call":
 			call, err := services.Calls.Get(input.RefGUID)
+			if err == nil && authorize(services, tag, auth, call.SpaceGUID, http.StatusNotFound) != 0 {
+				err = core.ErrForbidden
+			}
 			if err != nil {
 				return c.JSON(http.StatusNotFound, requestError("ref_not_found", "call %s not found", input.RefGUID))
 			}

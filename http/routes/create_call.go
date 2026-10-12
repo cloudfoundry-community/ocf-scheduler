@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/cloudfoundry-community/ocf-scheduler/http/presenters"
 )
 
 func CreateCall(e *echo.Echo, services *core.Services) {
@@ -17,15 +18,20 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 
 		auth := c.Request().Header.Get(echo.HeaderAuthorization)
 
-		if authErr := services.Auth.Verify(auth); authErr != nil {
-			services.Logger.Error(
-				tag,
-				fmt.Sprintf("authentication to this endpoint failed: %s", authErr.Error()),
-			)
-			return c.JSON(http.StatusUnauthorized, "")
+		appGUID := c.QueryParam("app_guid")
+		if len(appGUID) == 0 {
+			return c.JSON(missing(services, tag, auth, http.StatusUnprocessableEntity), "")
 		}
 
-		appGUID := c.QueryParam("app_guid")
+		spaceGUID, err := services.Info.GetSpaceGUIDForApp(appGUID)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("could not get space GUID for app %s", appGUID))
+			return c.JSON(missing(services, tag, auth, http.StatusUnprocessableEntity), "")
+		}
+
+		if status := authorize(services, tag, auth, spaceGUID, http.StatusForbidden); status != 0 {
+			return c.JSON(status, "")
+		}
 
 		input := &core.Call{}
 
@@ -34,16 +40,6 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 		}
 
 		input.AppGUID = appGUID
-		if len(appGUID) == 0 {
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
-
-		spaceGUID, err := services.Info.GetSpaceGUIDForApp(appGUID)
-		if err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("could not get space GUID for app %s", appGUID))
-			return c.JSON(http.StatusUnprocessableEntity, "")
-		}
-
 		input.SpaceGUID = spaceGUID
 		services.Logger.Debug(tag, fmt.Sprintf("Space GUID is '%s'", spaceGUID))
 
@@ -77,7 +73,7 @@ func CreateCall(e *echo.Echo, services *core.Services) {
 		services.Logger.Info(tag, success)
 		return c.JSON(
 			http.StatusCreated,
-			call,
+			presenters.AsCall(call),
 		)
 	})
 }
