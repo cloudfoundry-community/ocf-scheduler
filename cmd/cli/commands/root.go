@@ -8,6 +8,7 @@ import (
 
 	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/calls"
 	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/jobs"
+	"github.com/cloudfoundry-community/ocf-scheduler/cmd/cli/commands/orphans"
 )
 
 var cfgFile string
@@ -34,6 +35,7 @@ func Execute() error {
 func init() {
 	RootCmd.AddCommand(calls.Command)
 	RootCmd.AddCommand(jobs.Command)
+	RootCmd.AddCommand(orphans.Command)
 	cobra.OnInitialize(initConfig)
 }
 
