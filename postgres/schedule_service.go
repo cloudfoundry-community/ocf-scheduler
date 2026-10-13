@@ -227,13 +227,16 @@ func (service *ScheduleService) query(query string, args ...any) ([]*core.Schedu
 	return scanSchedules(rows)
 }
 
-// scanSchedules reads scheduleColumns rows and closes them. A row that fails
-// to scan is skipped, as getCollection always has, and the error from the
-// rows themselves is returned.
+// scanSchedules reads scheduleColumns rows and closes them. It returns every
+// row that scans, along with the first error from a row that doesn't scan or
+// from the rows themselves. Callers that must not mistake a damaged row for a
+// missing one check the error, and getCollection still takes the good rows.
 func scanSchedules(rows *sql.Rows) ([]*core.Schedule, error) {
 	defer rows.Close()
 
 	collection := make([]*core.Schedule, 0)
+
+	var scanErr error
 
 	for rows.Next() {
 		var guid string
@@ -248,6 +251,10 @@ func scanSchedules(rows *sql.Rows) ([]*core.Schedule, error) {
 
 		err := rows.Scan(&guid, &enabled, &expression, &expressionType, &refGUID, &refType, &createdAt, &updatedAt, &pausedBy)
 		if err != nil {
+			if scanErr == nil {
+				scanErr = err
+			}
+
 			continue
 		}
 
@@ -264,6 +271,10 @@ func scanSchedules(rows *sql.Rows) ([]*core.Schedule, error) {
 		}
 
 		collection = append(collection, candidate)
+	}
+
+	if scanErr != nil {
+		return collection, scanErr
 	}
 
 	return collection, rows.Err()
