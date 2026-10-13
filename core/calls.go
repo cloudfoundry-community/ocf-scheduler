@@ -36,4 +36,8 @@ type CallService interface {
 	Named(string) (*Call, error)
 	Persist(*Call) (*Call, error)
 	InSpace(string) []*Call
+
+	// All returns every call in every space. Unlike InSpace, it reports a
+	// failed query.
+	All() ([]*Call, error)
 }

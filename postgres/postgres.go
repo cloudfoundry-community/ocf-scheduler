@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
 
 // Transaction is an interface that models the standard transaction in
@@ -54,7 +56,7 @@ func expectingOne(count int) error {
 	}
 
 	if count < 1 {
-		return fmt.Errorf("no records returned")
+		return fmt.Errorf("no records returned: %w", core.ErrNotFound)
 	}
 
 	return nil

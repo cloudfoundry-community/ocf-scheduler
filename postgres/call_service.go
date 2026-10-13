@@ -25,6 +25,7 @@ type CallService struct {
 	queryByPrimaryKey string
 	queryByName       string
 	queryBySpace      string
+	queryAll          string
 	insertIntoCalls   string
 }
 
@@ -32,21 +33,27 @@ func NewCallService(db *sql.DB) *CallService {
 	qbpk := "SELECT " + strings.Join(callColumns, ", ") + " FROM calls WHERE guid = $1"
 	qbn := "SELECT " + strings.Join(callColumns, ", ") + " FROM calls WHERE name = $1"
 	qbs := "SELECT " + strings.Join(callColumns, ", ") + " FROM calls WHERE space_guid = $1 ORDER BY name ASC"
+	qa := "SELECT " + strings.Join(callColumns, ", ") + " FROM calls ORDER BY app_guid ASC, name ASC"
 	is := generateInsert("calls", callColumns)
 	return &CallService{db: db,
 		queryByPrimaryKey: qbpk,
 		queryByName:       qbn,
 		queryBySpace:      qbs,
+		queryAll:          qa,
 		insertIntoCalls:   is,
 	}
 }
 
-// toasted
+// Get reports a failed query, so a caller can tell a lost database from a
+// call that does not exist.
 func (service *CallService) Get(guid string) (*core.Call, error) {
-	candidates := service.getCollection(
+	candidates, err := service.query(
 		service.queryByPrimaryKey, // "select * from calls where guid = $1",
 		guid,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := expectingOne(len(candidates)); err != nil {
 		return nil, err
@@ -130,6 +137,12 @@ func (service *CallService) InSpace(guid string) []*core.Call {
 	)
 }
 
+func (service *CallService) All() ([]*core.Call, error) {
+	return service.query(
+		service.queryAll, // "SELECT * FROM calls ORDER BY app_guid ASC, name ASC"
+	)
+}
+
 func (service *CallService) getCollection(query string, args ...any) []*core.Call {
 	collection := make([]*core.Call, 0)
 
@@ -139,33 +152,47 @@ func (service *CallService) getCollection(query string, args ...any) []*core.Cal
 	}
 
 	for rows.Next() {
-		var guid string
-		var name string
-		var url string
-		var authHeader string
-		var spaceGUID string
-		var appGUID string
-		var createdAt time.Time
-		var updatedAt time.Time
-
-		err := rows.Scan(&guid, &name, &url, &authHeader, &appGUID, &spaceGUID, &createdAt, &updatedAt)
+		candidate, err := scanCall(rows)
 		if err != nil {
 			continue
-		}
-
-		candidate := &core.Call{
-			GUID:       guid,
-			Name:       name,
-			URL:        url,
-			AuthHeader: authHeader,
-			AppGUID:    appGUID,
-			SpaceGUID:  spaceGUID,
-			CreatedAt:  createdAt,
-			UpdatedAt:  updatedAt,
 		}
 
 		collection = append(collection, candidate)
 	}
 
 	return collection
+}
+
+// query is getCollection for callers that must not mistake a failed query
+// or scan for a missing call.
+func (service *CallService) query(query string, args ...any) ([]*core.Call, error) {
+	collection := make([]*core.Call, 0)
+
+	rows, err := service.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		candidate, err := scanCall(rows)
+		if err != nil {
+			return nil, err
+		}
+
+		collection = append(collection, candidate)
+	}
+
+	return collection, rows.Err()
+}
+
+func scanCall(rows *sql.Rows) (*core.Call, error) {
+	var call core.Call
+
+	err := rows.Scan(&call.GUID, &call.Name, &call.URL, &call.AuthHeader, &call.AppGUID, &call.SpaceGUID, &call.CreatedAt, &call.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &call, nil
 }

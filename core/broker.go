@@ -11,7 +11,9 @@ import (
 const PausedByUnbind = "unbind"
 
 var (
-	// ErrNotFound means the service instance or binding does not exist.
+	// ErrNotFound means the record asked for, such as a service instance, a
+	// binding, a job, or a call, does not exist, as opposed to a lookup that
+	// failed.
 	ErrNotFound = errors.New("not found")
 
 	// ErrConflict means the record would break a uniqueness rule, such as a

@@ -36,7 +36,7 @@ func (service *JobService) get(guid string) (*core.Job, error) {
 	}
 
 	if len(candidates) < 1 {
-		return nil, fmt.Errorf("too few results")
+		return nil, fmt.Errorf("too few results: %w", core.ErrNotFound)
 	}
 
 	return candidates[0], nil
@@ -136,6 +136,13 @@ func (service *JobService) InSpace(guid string) ([]*core.Job, error) {
 	}
 
 	return spaced, nil
+}
+
+func (service *JobService) All() ([]*core.Job, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	return append(make([]*core.Job, 0, len(service.storage)), service.storage...), nil
 }
 
 func (service *JobService) Success(job *core.Job) (*core.Job, error) {

@@ -14,6 +14,7 @@ type JobService struct {
 	queryByPrimaryKey string
 	queryByName       string
 	queryBySpace      string
+	queryAll          string
 	insertIntoJobs    string
 }
 
@@ -41,12 +42,14 @@ func NewJobService(db *sql.DB) *JobService {
 	qbpk := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE guid = $1"
 	qbn := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE name = $1"
 	qbs := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs WHERE space_guid = $1 ORDER BY name ASC"
+	qa := "SELECT " + strings.Join(jobColumns, ", ") + " FROM jobs ORDER BY app_guid ASC, name ASC"
 	is := generateInsert("jobs", jobColumns)
 
 	return &JobService{db: db,
 		queryByPrimaryKey: qbpk,
 		queryByName:       qbn,
 		queryBySpace:      qbs,
+		queryAll:          qa,
 		insertIntoJobs:    is,
 	}
 }
@@ -190,6 +193,12 @@ func (service *JobService) InSpace(guid string) ([]*core.Job, error) {
 		return nil, err
 	}
 	return candidates, nil
+}
+
+func (service *JobService) All() ([]*core.Job, error) {
+	return service.getCollection(
+		service.queryAll, // "SELECT * FROM jobs ORDER BY app_guid ASC, name ASC"
+	)
 }
 
 func (service *JobService) scanJob(rows *sql.Rows) (*core.Job, error) {

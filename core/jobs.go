@@ -39,6 +39,9 @@ type JobService interface {
 	Named(string) (*Job, error)
 	Persist(*Job) (*Job, error)
 	InSpace(string) ([]*Job, error)
+
+	// All returns every job in every space.
+	All() ([]*Job, error)
 	Success(*Job) (*Job, error)
 	Fail(*Job) (*Job, error)
 }

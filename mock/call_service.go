@@ -36,7 +36,7 @@ func (service *CallService) get(guid string) (*core.Call, error) {
 	}
 
 	if len(candidates) < 1 {
-		return nil, fmt.Errorf("too few results")
+		return nil, fmt.Errorf("too few results: %w", core.ErrNotFound)
 	}
 
 	return candidates[0], nil
@@ -123,6 +123,13 @@ func (service *CallService) InSpace(guid string) []*core.Call {
 	}
 
 	return spaced
+}
+
+func (service *CallService) All() ([]*core.Call, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	return append(make([]*core.Call, 0, len(service.storage)), service.storage...), nil
 }
 
 func NewCallService() *CallService {
