@@ -53,3 +53,15 @@ func TestScheduleService_DeleteOfAMissingScheduleSucceeds(t *testing.T) {
 		t.Errorf("expected no error, got %v", err)
 	}
 }
+
+func TestCallService_DeleteReportsAFailedLookup(t *testing.T) {
+	db, err := sql.Open("postgres", "postgres://nobody@127.0.0.1:1/none?sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+
+	if err := NewCallService(db).Delete(&core.Call{GUID: "call-1"}); err == nil {
+		t.Errorf("expected an error, the call was not deleted")
+	}
+}

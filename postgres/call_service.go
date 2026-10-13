@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -64,8 +65,14 @@ func (service *CallService) Get(guid string) (*core.Call, error) {
 
 func (service *CallService) Delete(call *core.Call) error {
 	// Let's not try to delete something that isn't in the db
+	// A lookup that fails is not the same as a call that isn't there, so it
+	// is returned.
 	if _, err := service.Get(call.GUID); err != nil {
-		return nil
+		if errors.Is(err, core.ErrNotFound) {
+			return nil
+		}
+
+		return err
 	}
 
 	err := WithTransaction(service.db, func(tx Transaction) error {
