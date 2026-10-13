@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/ess/hype"
 )
@@ -21,6 +22,14 @@ type Driver struct {
 }
 
 var Client *Driver
+
+// fetchClient waits as long as gorouter does by default, because an orphan
+// list asks Cloud Controller about every app before it answers.
+var fetchClient = &http.Client{Timeout: 15 * time.Minute}
+
+// maxMessage bounds the text shown from a body that isn't the scheduler's
+// own error, such as a gateway's HTML page.
+const maxMessage = 512
 
 func NewDriver(baseURL string, token string) (*Driver, error) {
 	raw, err := hype.New(baseURL)
@@ -113,7 +122,12 @@ func Message(body []byte) string {
 		return strings.Join(messages, "; ")
 	}
 
-	return strings.TrimSpace(string(body))
+	message := strings.TrimSpace(string(body))
+	if len(message) > maxMessage {
+		message = message[:maxMessage] + "..."
+	}
+
+	return message
 }
 
 // Fetch makes a request and keeps the body of the response, even when the
@@ -130,7 +144,7 @@ func (driver *Driver) Fetch(method, path string, body []byte) (*Result, error) {
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", driver.token)
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := fetchClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
