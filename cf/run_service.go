@@ -33,6 +33,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 					executable.Type(),
 				),
 			)
+			return
 		}
 
 		// do real stuff
