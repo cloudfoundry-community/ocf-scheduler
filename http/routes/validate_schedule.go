@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -66,7 +67,12 @@ func ValidateSchedule(e *echo.Echo, services *core.Services) {
 				return c.JSON(http.StatusNotFound, requestError("ref_not_found", "job %s not found", input.RefGUID))
 			}
 			ref = &core.Ref{Type: "job", GUID: job.GUID, Name: job.Name}
-			stored = services.Schedules.ByJob(job)
+			var sErr error
+			stored, sErr = services.Schedules.ByJob(job)
+			if sErr != nil {
+				services.Logger.Error(tag, fmt.Sprintf("error retrieving schedules for job %s: %v", job.GUID, sErr))
+				return c.JSON(http.StatusInternalServerError, requestError("internal_error", "could not read the stored schedules"))
+			}
 		case "call":
 			call, err := services.Calls.Get(input.RefGUID)
 			if err == nil && authorize(services, tag, auth, call.SpaceGUID, http.StatusNotFound) != 0 {
@@ -76,7 +82,12 @@ func ValidateSchedule(e *echo.Echo, services *core.Services) {
 				return c.JSON(http.StatusNotFound, requestError("ref_not_found", "call %s not found", input.RefGUID))
 			}
 			ref = &core.Ref{Type: "call", GUID: call.GUID, Name: call.Name}
-			stored = services.Schedules.ByCall(call)
+			var sErr error
+			stored, sErr = services.Schedules.ByCall(call)
+			if sErr != nil {
+				services.Logger.Error(tag, fmt.Sprintf("error retrieving schedules for call %s: %v", call.GUID, sErr))
+				return c.JSON(http.StatusInternalServerError, requestError("internal_error", "could not read the stored schedules"))
+			}
 		}
 
 		if input.Expression != "" {

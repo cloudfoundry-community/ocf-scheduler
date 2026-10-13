@@ -46,7 +46,7 @@ func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedul
 	return candidate, nil
 }
 
-func (service *ScheduleService) ByCall(call *core.Call) []*core.Schedule {
+func (service *ScheduleService) ByCall(call *core.Call) ([]*core.Schedule, error) {
 	service.locker.Lock()
 	defer service.locker.Unlock()
 
@@ -58,10 +58,10 @@ func (service *ScheduleService) ByCall(call *core.Call) []*core.Schedule {
 		}
 	}
 
-	return found
+	return found, nil
 }
 
-func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
+func (service *ScheduleService) ByJob(job *core.Job) ([]*core.Schedule, error) {
 	service.locker.Lock()
 	defer service.locker.Unlock()
 
@@ -73,7 +73,7 @@ func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
 		}
 	}
 
-	return found
+	return found, nil
 }
 
 func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {

@@ -288,7 +288,9 @@ func (tn *tenancy) assertBUntouched(t *testing.T) {
 	if calls := tn.services.Calls.InSpace("space-b"); len(calls) != 1 {
 		t.Errorf("space B has %d calls, want 1", len(calls))
 	}
-	if n := len(tn.services.Schedules.ByJob(tn.jobB)) + len(tn.services.Schedules.ByCall(tn.callB)); n != 2 {
+	jobScheds, _ := tn.services.Schedules.ByJob(tn.jobB)
+	callScheds, _ := tn.services.Schedules.ByCall(tn.callB)
+	if n := len(jobScheds) + len(callScheds); n != 2 {
 		t.Errorf("B has %d schedules, want 2", n)
 	}
 	if n := tn.runner.count(); n != 0 {

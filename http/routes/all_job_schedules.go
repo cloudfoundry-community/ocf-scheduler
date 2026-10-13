@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -27,7 +28,11 @@ func AllJobSchedules(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
-		schedules := services.Schedules.ByJob(job)
+		schedules, err := services.Schedules.ByJob(job)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("error retrieving schedules for job %s: %v", guid, err))
+			return c.JSON(http.StatusInternalServerError, "error retrieving schedules")
+		}
 
 		output := &jobScheduleCollection{
 			Resources: presenters.AsJobScheduleCollection(schedules),

@@ -30,7 +30,13 @@ func DeleteCall(e *echo.Echo, services *core.Services) {
 		}
 
 		// delete things associated with the call
-		for _, schedule := range services.Schedules.ByCall(call) {
+		schedules, err := services.Schedules.ByCall(call)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("failed to list schedules for call %s: %v", guid, err))
+			return c.JSON(http.StatusInternalServerError, "")
+		}
+
+		for _, schedule := range schedules {
 			err = workflows.DeletingASchedule(services, schedule, call)
 			if err != nil {
 				services.Logger.Error(tag, fmt.Sprintf("failed to delete schedule %s for call %s: %v", schedule.GUID, guid, err))

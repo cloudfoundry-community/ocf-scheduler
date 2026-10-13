@@ -78,8 +78,10 @@ func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
 	return candidates[0], nil
 }
 
-func (service *ScheduleService) ByCall(call *core.Call) []*core.Schedule {
-	return service.getCollection(
+// ByCall reports a failed query, because deleting a call must not mistake a
+// lost database for a call without schedules.
+func (service *ScheduleService) ByCall(call *core.Call) ([]*core.Schedule, error) {
+	return service.query(
 		service.queryByCall, // "select * from schedules where ref_type = 'call' and ref_guid = $1"
 		call.GUID,
 	)
@@ -91,8 +93,10 @@ func (service *ScheduleService) Enabled() []*core.Schedule {
 	)
 }
 
-func (service *ScheduleService) ByJob(job *core.Job) []*core.Schedule {
-	return service.getCollection(
+// ByJob reports a failed query, because deleting a job must not mistake a
+// lost database for a job without schedules.
+func (service *ScheduleService) ByJob(job *core.Job) ([]*core.Schedule, error) {
+	return service.query(
 		service.queryByJob, // "select * from schedules where ref_type = 'job' and ref_guid = $1",
 		job.GUID,
 	)
@@ -201,13 +205,20 @@ func (service *ScheduleService) Persist(candidate *core.Schedule) (*core.Schedul
 func (service *ScheduleService) getCollection(query string, args ...any) []*core.Schedule {
 	collection := make([]*core.Schedule, 0)
 
+	found, _ := service.query(query, args...)
+
+	return append(collection, found...)
+}
+
+// query runs a schedule lookup and returns the error from the query or from
+// reading its rows.
+func (service *ScheduleService) query(query string, args ...any) ([]*core.Schedule, error) {
 	rows, err := service.db.Query(query, args...)
 	if err != nil {
-		return collection
+		return nil, err
 	}
 
-	found, _ := scanSchedules(rows)
-	return append(collection, found...)
+	return scanSchedules(rows)
 }
 
 // scanSchedules reads scheduleColumns rows and closes them. A row that fails

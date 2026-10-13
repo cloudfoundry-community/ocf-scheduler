@@ -31,7 +31,13 @@ func DeleteJob(e *echo.Echo, services *core.Services) {
 		}
 
 		// delete things associated with the job
-		for _, schedule := range services.Schedules.ByJob(job) {
+		schedules, err := services.Schedules.ByJob(job)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("failed to list schedules for job %s: %v", guid, err))
+			return c.JSON(http.StatusInternalServerError, "")
+		}
+
+		for _, schedule := range schedules {
 			err = workflows.DeletingASchedule(services, schedule, job)
 			if err != nil {
 				services.Logger.Error(tag, fmt.Sprintf("failed to delete schedule %s for job %s: %v", schedule.GUID, guid, err))
