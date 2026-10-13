@@ -73,7 +73,7 @@ func (service *JobService) Get(guid string) (*core.Job, error) {
 func (service *JobService) Delete(job *core.Job) error {
 	// Let's not try to delete something that isn't in the db
 	if _, err := service.Get(job.GUID); err != nil {
-		return fmt.Errorf("job with GUID %s not found: %v", job.GUID, err)
+		return fmt.Errorf("job with GUID %s not found: %w", job.GUID, err)
 	}
 
 	err := WithTransaction(service.db, func(tx Transaction) error {

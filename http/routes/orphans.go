@@ -274,7 +274,12 @@ func deleteOrphan(ctx context.Context, services *core.Services, tag, guid string
 		}
 	}
 
-	if err := deleteExecutable(services, executable); err != nil {
+	if err := deleteExecutable(services, executable); errors.Is(err, core.ErrNotFound) {
+		// Another request deleted it between our lookup and our delete.
+		services.Logger.Warn(tag, fmt.Sprintf("%s %s was already gone", result.Type, guid))
+		result.Result = orphanNotFound
+		return result
+	} else if err != nil {
 		services.Logger.Error(tag, fmt.Sprintf("failed to delete %s %s: %v", result.Type, guid, err))
 		result.Result = orphanFailed
 		result.Message = fmt.Sprintf("could not delete the %s", result.Type)

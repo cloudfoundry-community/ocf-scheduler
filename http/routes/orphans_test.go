@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -421,4 +422,27 @@ func TestOrphanRoutesRefuseWhenTheClientScopesCannotBeRead(t *testing.T) {
 			}
 		})
 	}
+}
+
+// vanishingJobs deletes the job and then reports it as not found, as the
+// slower of two concurrent deletes would see it.
+type vanishingJobs struct {
+	core.JobService
+}
+
+func (jobs vanishingJobs) Delete(job *core.Job) error {
+	if err := jobs.JobService.Delete(job); err != nil {
+		return err
+	}
+
+	return fmt.Errorf("job with GUID %s not found: %w", job.GUID, core.ErrNotFound)
+}
+
+func TestDeleteOrphansAnswersNotFoundWhenTheJobIsAlreadyGone(t *testing.T) {
+	tn := newTenancy(t)
+	tn.cf.RemoveApp("app-b")
+	tn.services.Jobs = vanishingJobs{tn.services.Jobs}
+
+	results := tn.deleteOrphans(t, tn.jobB.GUID)
+	expectResult(t, results, tn.jobB.GUID, "job", orphanNotFound)
 }
