@@ -149,8 +149,14 @@ func (service *ScheduleService) flip(query, appGUID, reason string, extra ...any
 }
 
 func (service *ScheduleService) Delete(schedule *core.Schedule) error {
-	// Let's not try to delete something that isn't in the db
-	if _, err := service.Get(schedule.GUID); err != nil {
+	// Let's not try to delete something that isn't in the db. A lookup that
+	// fails is not the same as a schedule that isn't there, so it is returned.
+	found, lErr := service.query(service.queryByPrimaryKey, schedule.GUID)
+	if lErr != nil {
+		return lErr
+	}
+
+	if len(found) != 1 {
 		return nil
 	}
 

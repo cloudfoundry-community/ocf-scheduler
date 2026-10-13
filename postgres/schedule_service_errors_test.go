@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
+	"github.com/ess/testscope"
 )
 
 // lostDatabase returns a service whose every query fails, as a lost database
@@ -34,5 +35,21 @@ func TestScheduleService_ByCallReportsAFailedQuery(t *testing.T) {
 
 	if err == nil {
 		t.Errorf("expected an error, got %d schedules", len(found))
+	}
+}
+
+func TestScheduleService_DeleteReportsAFailedLookup(t *testing.T) {
+	if err := lostDatabase(t).Delete(&core.Schedule{GUID: "schedule-1"}); err == nil {
+		t.Errorf("expected an error, the schedule was not deleted")
+	}
+}
+
+func TestScheduleService_DeleteOfAMissingScheduleSucceeds(t *testing.T) {
+	testscope.SkipUnlessUnit(t)
+
+	guid, _ := core.GenGUID()
+
+	if err := NewScheduleService(testdb).Delete(&core.Schedule{GUID: guid}); err != nil {
+		t.Errorf("expected no error, got %v", err)
 	}
 }
