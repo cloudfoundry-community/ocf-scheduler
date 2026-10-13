@@ -73,6 +73,8 @@ type CFClient struct {
 	instances  map[string]bool
 	failLookup bool
 	failApps   bool
+	goneApps   map[string]bool
+	appErrors  map[string]error
 	locker     sync.Mutex
 }
 
@@ -89,6 +91,14 @@ func (client *CFClient) GetApp(_ context.Context, guid string) (*resource.App, e
 
 	if client.failApps {
 		return nil, fmt.Errorf("app lookup failed")
+	}
+
+	if err, found := client.appErrors[guid]; found {
+		return nil, err
+	}
+
+	if client.goneApps[guid] {
+		return nil, resource.NewResourceNotFoundError()
 	}
 
 	return client.prepareApp(guid, ""), nil
@@ -290,6 +300,8 @@ func (client *CFClient) Reset() {
 	client.instances = make(map[string]bool)
 	client.failLookup = false
 	client.failApps = false
+	client.goneApps = make(map[string]bool)
+	client.appErrors = make(map[string]error)
 }
 
 // GetServiceInstance knows the instances added with PrepareServiceInstance
@@ -332,6 +344,37 @@ func (client *CFClient) FailAppLookups(fail bool) {
 	defer client.locker.Unlock()
 
 	client.failApps = fail
+}
+
+// RemoveApp makes GetApp answer CF-ResourceNotFound for appGUID, as Cloud
+// Controller does once the app is deleted.
+func (client *CFClient) RemoveApp(appGUID string) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	client.goneApps[appGUID] = true
+}
+
+// RestoreApp undoes RemoveApp, so GetApp finds appGUID again.
+func (client *CFClient) RestoreApp(appGUID string) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	delete(client.goneApps, appGUID)
+}
+
+// FailAppLookup makes GetApp answer err for appGUID alone, or clears that
+// failure when err is nil.
+func (client *CFClient) FailAppLookup(appGUID string, err error) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	if err == nil {
+		delete(client.appErrors, appGUID)
+		return
+	}
+
+	client.appErrors[appGUID] = err
 }
 
 func (client *CFClient) PrepareApp(appGUID string, spaceGUID string) *resource.App {

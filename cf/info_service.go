@@ -43,3 +43,20 @@ func (service *InfoService) ServiceInstanceExists(ctx context.Context, guid stri
 
 	return false, err
 }
+
+// AppExists answers false only when Cloud Controller reports the app as not
+// found. Any other failure, such as a 403, a 5xx, or a timeout, is an error,
+// so a caller never mistakes an unreachable or unwilling API for a deleted
+// app.
+func (service *InfoService) AppExists(ctx context.Context, guid string) (bool, error) {
+	_, err := service.client.GetApp(ctx, guid)
+	if err == nil {
+		return true, nil
+	}
+
+	if resource.IsResourceNotFoundError(err) || resource.IsAppNotFoundError(err) {
+		return false, nil
+	}
+
+	return false, err
+}

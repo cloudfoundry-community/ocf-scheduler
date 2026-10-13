@@ -88,4 +88,9 @@ type InfoService interface {
 	// the instance is not found, and an error when it cannot tell, including
 	// when ctx ends first.
 	ServiceInstanceExists(ctx context.Context, guid string) (bool, error)
+
+	// AppExists asks Cloud Controller whether an app GUID is still known. It
+	// answers false only when Cloud Controller says the app is not found, and
+	// an error when it cannot tell, including when ctx ends first.
+	AppExists(ctx context.Context, guid string) (bool, error)
 }
