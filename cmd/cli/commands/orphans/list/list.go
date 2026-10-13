@@ -3,6 +3,7 @@ package list
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"text/tabwriter"
 
@@ -38,7 +39,10 @@ answer for any app.`,
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		response := core.Client.Get("orphans", nil)
+		response, err := core.Client.Fetch(http.MethodGet, "orphans", nil)
+		if err != nil {
+			return err
+		}
 
 		if !response.Okay() {
 			return response.Error()
@@ -48,7 +52,7 @@ answer for any app.`,
 			Resources []*orphan `json:"resources"`
 		}{}
 
-		err := json.Unmarshal(response.Data(), &data)
+		err = json.Unmarshal(response.Body, &data)
 		if err != nil {
 			return err
 		}

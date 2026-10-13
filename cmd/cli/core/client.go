@@ -1,11 +1,19 @@
 package core
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
 	"github.com/ess/hype"
 )
 
 type Driver struct {
 	raw         *hype.Driver
+	baseURL     string
 	token       string
 	accept      *hype.Header
 	contentType *hype.Header
@@ -22,6 +30,7 @@ func NewDriver(baseURL string, token string) (*Driver, error) {
 
 	d := &Driver{
 		raw,
+		baseURL,
 		token,
 		hype.NewHeader("Accept", "application/json"),
 		hype.NewHeader("Content-Type", "application/json"),
@@ -57,4 +66,80 @@ func (driver *Driver) Post(path string, params hype.Params, data []byte) hype.Re
 		Post(path, params, data).
 		WithHeaderSet(driver.accept, driver.contentType, driver.auth).
 		Response()
+}
+
+// Result is a response whose body is kept whatever the status, which the
+// hype response does not do for a status outside 2xx.
+type Result struct {
+	Status int
+	Body   []byte
+}
+
+func (result *Result) Okay() bool {
+	return result.Status >= 200 && result.Status < 300
+}
+
+// Error describes a failed response, with the message that the scheduler
+// sent when there is one.
+func (result *Result) Error() error {
+	message := Message(result.Body)
+	if message == "" {
+		return fmt.Errorf("response status: %d", result.Status)
+	}
+
+	return fmt.Errorf("response status: %d: %s", result.Status, message)
+}
+
+// Message extracts the explanation from an error body. The scheduler sends
+// either a JSON string or an object with a list of errors, and a gateway may
+// send plain text.
+func Message(body []byte) string {
+	var text string
+	if json.Unmarshal(body, &text) == nil {
+		return strings.TrimSpace(text)
+	}
+
+	var findings struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if json.Unmarshal(body, &findings) == nil && len(findings.Errors) > 0 {
+		messages := make([]string, 0, len(findings.Errors))
+		for _, finding := range findings.Errors {
+			messages = append(messages, finding.Message)
+		}
+
+		return strings.Join(messages, "; ")
+	}
+
+	return strings.TrimSpace(string(body))
+}
+
+// Fetch makes a request and keeps the body of the response, even when the
+// status is an error.
+func (driver *Driver) Fetch(method, path string, body []byte) (*Result, error) {
+	url := strings.TrimRight(driver.baseURL, "/") + "/" + strings.TrimLeft(path, "/")
+
+	request, err := http.NewRequest(method, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", driver.token)
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Result{Status: response.StatusCode, Body: data}, nil
 }

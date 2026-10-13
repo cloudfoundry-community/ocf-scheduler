@@ -3,6 +3,7 @@ package del
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"text/tabwriter"
 
@@ -41,7 +42,10 @@ deleted.`,
 			return err
 		}
 
-		response := core.Client.Post("orphans/delete", nil, body)
+		response, err := core.Client.Fetch(http.MethodPost, "orphans/delete", body)
+		if err != nil {
+			return err
+		}
 
 		if !response.Okay() {
 			return response.Error()
@@ -51,7 +55,7 @@ deleted.`,
 			Results []*result `json:"results"`
 		}{}
 
-		err = json.Unmarshal(response.Data(), &data)
+		err = json.Unmarshal(response.Body, &data)
 		if err != nil {
 			return err
 		}
