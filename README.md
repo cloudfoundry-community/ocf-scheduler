@@ -357,7 +357,15 @@ Both routes need a token with the `cloud_controller.admin` scope. A caller whose
 
 The scheduler asks Cloud Controller for each app with `GET /v3/apps/:guid`. It treats an app as gone only when Cloud Controller answers `404` with its own not-found error. Any other answer means the scheduler can't tell, and that includes a `403`, a `5xx`, a timeout, and a `404` that carries no Cloud Controller error, such as the one a router sends for a route it doesn't know. The scheduler never counts any of those as a deleted app.
 
-Cloud Controller also answers `404` for an app that the asking client isn't allowed to see. The scheduler asks with its own UAA client, the one set by `CLIENT_ID` and `CLIENT_SECRET`, so that client must be able to read every app in the foundation, for example by holding `cloud_controller.admin` or `cloud_controller.admin_read_only`. If it can't, every app outside its reach looks deleted. Reading the list before deleting anything is the guard against that.
+Cloud Controller also answers `404` for an app that the asking client isn't allowed to see. The scheduler asks with its own UAA client, the one set by `CLIENT_ID` and `CLIENT_SECRET`, so if that client can't read every app in the foundation, each app outside its reach looks deleted. To guard against that, both routes read the scopes on the scheduler's own Cloud Controller token before they ask about any app. The token must carry one of the following scopes:
+
+- `cloud_controller.admin`
+
+- `cloud_controller.admin_read_only`
+
+- `cloud_controller.global_auditor`
+
+When the token carries none of them, the route answers `500 Internal Server Error` with a message that names all three, and it lists and deletes nothing. When the scheduler can't get a token from UAA, or can't decode the one it gets, the route answers `502 Bad Gateway` and does nothing either. To fix the first case, we grant the scheduler's UAA client one of those scopes as an authority. The scheduler keeps each token until it expires, so restarting the scheduler makes the new scope take effect at once.
 
 ### Listing them
 
@@ -470,7 +478,7 @@ A caller may act on a job, call, or schedule only in a space where they hold the
 
 - Routes that name a job or call by GUID check the space it was created in and answer `404 Not Found`, so they don't reveal another tenant's jobs or calls. A schedule GUID must also belong to the job or call in the path.
 
-- `GET /orphans` and `POST /orphans/delete` need the `cloud_controller.admin` scope and answer `403 Forbidden` to every other caller.
+- `GET /orphans` and `POST /orphans/delete` need the `cloud_controller.admin` scope and answer `403 Forbidden` to every other caller. They also refuse to run until the scheduler's own Cloud Controller token can read every app, as [How the scheduler decides that an app is gone](#how-the-scheduler-decides-that-an-app-is-gone) explains.
 
 - `GET /scheduler-time-zones` and `POST /schedules/validate` with only an expression need a `space_developer` or `space_manager` role in any space. Validating against a job or call checks that job's or call's space.
 

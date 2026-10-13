@@ -60,3 +60,24 @@ func (service *InfoService) AppExists(ctx context.Context, guid string) (bool, e
 
 	return false, err
 }
+
+// ClientScopes returns the scopes on the scheduler's own Cloud Controller
+// token. It is an error when no token can be had or the token cannot be
+// decoded.
+func (service *InfoService) ClientScopes() ([]string, error) {
+	token, err := service.client.Token()
+	if err != nil {
+		return nil, fmt.Errorf("could not get a token: %w", err)
+	}
+
+	if token == nil || len(token.AccessToken) == 0 {
+		return nil, fmt.Errorf("got an empty token")
+	}
+
+	claims, err := DecodeJWT(token.AccessToken)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode the token: %w", err)
+	}
+
+	return claims.Scope, nil
+}

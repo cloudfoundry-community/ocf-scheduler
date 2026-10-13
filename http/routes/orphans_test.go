@@ -2,9 +2,11 @@ package routes
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -299,4 +301,124 @@ func TestDeleteOrphansNeedsAList(t *testing.T) {
 		}
 	}
 	tn.assertBUntouched(t)
+}
+
+// expectNothingAsked checks that a refused request listed and deleted
+// nothing, and never asked Cloud Controller about an app.
+func expectNothingAsked(t *testing.T, tn *tenancy, info *countingInfo, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if len(info.asked) != 0 {
+		t.Errorf("asked Cloud Controller about apps %v", info.asked)
+	}
+	for _, guid := range []string{tn.jobB.GUID, tn.callB.GUID, "resources", "results"} {
+		if strings.Contains(rec.Body.String(), guid) {
+			t.Errorf("the refusal carries %s: %s", guid, rec.Body)
+		}
+	}
+	tn.assertBUntouched(t)
+	if n := tn.services.Cron.Count(); n != 2 {
+		t.Errorf("cron holds %d entries, want 2", n)
+	}
+}
+
+// The scopes that let the scheduler's own client read every app, written
+// out here so the test does not lean on the list it checks.
+var wantAppReaderScopes = []string{"cloud_controller.admin", "cloud_controller.admin_read_only", "cloud_controller.global_auditor"}
+
+func TestOrphanRoutesWorkWithEachAppReaderScope(t *testing.T) {
+	for _, scope := range wantAppReaderScopes {
+		t.Run(scope, func(t *testing.T) {
+			tn := newTenancy(t)
+			tn.cf.SetClientScopes("uaa.resource", scope)
+			tn.cf.RemoveApp("app-b")
+
+			if orphans := tn.listOrphans(t); len(orphans) != 2 {
+				t.Errorf("listed %d orphans, want job B and call B", len(orphans))
+			}
+
+			results := tn.deleteOrphans(t, tn.jobB.GUID, tn.callB.GUID)
+			expectResult(t, results, tn.jobB.GUID, "job", orphanDeleted)
+			expectResult(t, results, tn.callB.GUID, "call", orphanDeleted)
+		})
+	}
+}
+
+func TestOrphanRoutesRefuseWithoutAnAppReaderScope(t *testing.T) {
+	for name, scopes := range map[string][]string{
+		"no scopes":         nil,
+		"read and write":    {"cloud_controller.read", "cloud_controller.write", "uaa.resource"},
+		"lookalike scopes":  {"cloud_controller.admin_read", "cloud_controller.global_auditors"},
+		"another admin":     {"uaa.admin", "scim.read"},
+		"an empty scope":    {""},
+		"auditor substring": {"x.cloud_controller.global_auditor"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, req := range []struct{ method, path, body string }{
+				{http.MethodGet, "/orphans", ""},
+				{http.MethodPost, "/orphans/delete", ""},
+			} {
+				tn := newTenancy(t)
+				info := &countingInfo{InfoService: tn.services.Info, asked: map[string]int{}}
+				tn.services.Info = info
+				tn.cf.SetClientScopes(scopes...)
+				tn.cf.RemoveApp("app-b")
+
+				body := req.body
+				if req.method == http.MethodPost {
+					body = `{"guids": ["` + tn.jobB.GUID + `", "` + tn.callB.GUID + `"]}`
+				}
+
+				rec := tn.do(req.method, req.path, body, tn.admin)
+				if rec.Code != http.StatusInternalServerError {
+					t.Errorf("%s %s: status %d, want %d, body %s", req.method, req.path, rec.Code, http.StatusInternalServerError, rec.Body)
+				}
+				for _, scope := range wantAppReaderScopes {
+					if !strings.Contains(rec.Body.String(), scope) {
+						t.Errorf("%s %s: the refusal does not name %s: %s", req.method, req.path, scope, rec.Body)
+					}
+				}
+				expectNothingAsked(t, tn, info, rec)
+			}
+		})
+	}
+}
+
+func TestOrphanRoutesRefuseWhenTheClientScopesCannotBeRead(t *testing.T) {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	for name, spoil := range map[string]func(tn *tenancy){
+		"UAA unreachable": func(tn *tenancy) { tn.cf.FailClientToken(errors.New("connection refused")) },
+		"empty token":     func(tn *tenancy) { tn.cf.SetClientToken("") },
+		"not a JWT":       func(tn *tenancy) { tn.cf.SetClientToken("opaque-token") },
+		"payload not b64": func(tn *tenancy) { tn.cf.SetClientToken(header + ".!!!.sig") },
+		"payload not JSON": func(tn *tenancy) {
+			tn.cf.SetClientToken(header + "." + base64.RawURLEncoding.EncodeToString([]byte("nope")) + ".sig")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, req := range []struct{ method, path string }{
+				{http.MethodGet, "/orphans"},
+				{http.MethodPost, "/orphans/delete"},
+			} {
+				tn := newTenancy(t)
+				info := &countingInfo{InfoService: tn.services.Info, asked: map[string]int{}}
+				tn.services.Info = info
+				spoil(tn)
+				tn.cf.RemoveApp("app-b")
+
+				body := ""
+				if req.method == http.MethodPost {
+					body = `{"guids": ["` + tn.jobB.GUID + `", "` + tn.callB.GUID + `"]}`
+				}
+
+				rec := tn.do(req.method, req.path, body, tn.admin)
+				if rec.Code != http.StatusBadGateway {
+					t.Errorf("%s %s: status %d, want %d, body %s", req.method, req.path, rec.Code, http.StatusBadGateway, rec.Body)
+				}
+				if !strings.Contains(rec.Body.String(), "scopes") {
+					t.Errorf("%s %s: the refusal does not say the scopes could not be read: %s", req.method, req.path, rec.Body)
+				}
+				expectNothingAsked(t, tn, info, rec)
+			}
+		})
+	}
 }

@@ -52,6 +52,15 @@ type orphanResults struct {
 	Results []*orphanResult `json:"results"`
 }
 
+// appReaderScopes are the scopes that let the scheduler's own client read
+// every app. Without one, Cloud Controller answers 404 for each app it hides
+// from the client, which reads the same as a deleted app.
+var appReaderScopes = []string{
+	"cloud_controller.admin",
+	"cloud_controller.admin_read_only",
+	"cloud_controller.global_auditor",
+}
+
 func Orphans(e *echo.Echo, services *core.Services) {
 	ListOrphans(e, services)
 	DeleteOrphans(e, services)
@@ -66,6 +75,10 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 
 		if status := requireAdmin(services, tag, auth); status != 0 {
 			return c.JSON(status, "")
+		}
+
+		if status, message := requireAppReader(services, tag); status != 0 {
+			return c.JSON(status, message)
 		}
 
 		jobs, err := services.Jobs.All()
@@ -172,6 +185,10 @@ func DeleteOrphans(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusBadRequest, requestError("guids_required", "name at least one job or call GUID to delete"))
 		}
 
+		if status, message := requireAppReader(services, tag); status != 0 {
+			return c.JSON(status, message)
+		}
+
 		output := &orphanResults{Results: make([]*orphanResult, 0, len(guids))}
 		for _, guid := range guids {
 			output.Results = append(output.Results, deleteOrphan(c.Request().Context(), services, tag, guid))
@@ -179,6 +196,27 @@ func DeleteOrphans(e *echo.Echo, services *core.Services) {
 
 		return c.JSON(http.StatusOK, output)
 	})
+}
+
+// requireAppReader answers zero when the scheduler's own Cloud Controller
+// token carries one of appReaderScopes. Otherwise it answers the status and
+// message to refuse with, before anyone asks Cloud Controller about an app.
+func requireAppReader(services *core.Services, tag string) (int, string) {
+	scopes, err := services.Info.ClientScopes()
+	if err != nil {
+		services.Logger.Error(tag, fmt.Sprintf("could not read the scopes on the scheduler's Cloud Controller token: %v", err))
+		return http.StatusBadGateway, "could not read the scopes on the scheduler's Cloud Controller token"
+	}
+
+	for _, scope := range appReaderScopes {
+		if slices.Contains(scopes, scope) {
+			return 0, ""
+		}
+	}
+
+	message := "the scheduler's Cloud Controller client needs the cloud_controller.admin, cloud_controller.admin_read_only, or cloud_controller.global_auditor scope, because without one it cannot tell a deleted app from one it is not allowed to see"
+	services.Logger.Error(tag, fmt.Sprintf("%s; its token carries %v", message, scopes))
+	return http.StatusInternalServerError, message
 }
 
 // deleteOrphan deletes the job or call with guid, and its schedules, only

@@ -2,6 +2,8 @@ package mock
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"slices"
@@ -9,6 +11,7 @@ import (
 
 	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
+	"golang.org/x/oauth2"
 
 	localcf "github.com/cloudfoundry-community/ocf-scheduler/cf"
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
@@ -75,6 +78,8 @@ type CFClient struct {
 	failApps   bool
 	goneApps   map[string]bool
 	appErrors  map[string]error
+	token      string
+	tokenErr   error
 	locker     sync.Mutex
 }
 
@@ -302,6 +307,8 @@ func (client *CFClient) Reset() {
 	client.failApps = false
 	client.goneApps = make(map[string]bool)
 	client.appErrors = make(map[string]error)
+	client.token = scopedToken("cloud_controller.admin_read_only")
+	client.tokenErr = nil
 }
 
 // GetServiceInstance knows the instances added with PrepareServiceInstance
@@ -409,4 +416,52 @@ func (client *CFClient) prepareApp(appGUID string, spGUID string) *resource.App 
 	client.apps[appGUID] = output
 
 	return output
+}
+
+// Token returns the client's own token, which carries
+// cloud_controller.admin_read_only until SetClientScopes, SetClientToken, or
+// FailClientToken changes it.
+func (client *CFClient) Token() (*oauth2.Token, error) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	if client.tokenErr != nil {
+		return nil, client.tokenErr
+	}
+
+	return &oauth2.Token{AccessToken: client.token, TokenType: "bearer"}, nil
+}
+
+// SetClientScopes gives the client's own token exactly these scopes.
+func (client *CFClient) SetClientScopes(scopes ...string) {
+	client.SetClientToken(scopedToken(scopes...))
+}
+
+// SetClientToken makes Token return accessToken as it is, so a test can hand
+// out a token that does not decode.
+func (client *CFClient) SetClientToken(accessToken string) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	client.token = accessToken
+	client.tokenErr = nil
+}
+
+// FailClientToken makes Token fail as an unreachable UAA would.
+func (client *CFClient) FailClientToken(err error) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	client.tokenErr = err
+}
+
+// scopedToken builds an unsigned JWT that carries scopes.
+func scopedToken(scopes ...string) string {
+	if scopes == nil {
+		scopes = []string{}
+	}
+	payload, _ := json.Marshal(map[string]any{"scope": scopes})
+
+	return base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`)) + "." +
+		base64.RawURLEncoding.EncodeToString(payload) + ".sig"
 }

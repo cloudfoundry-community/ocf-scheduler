@@ -2,8 +2,10 @@ package cf_test
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/http"
+	"slices"
 	"testing"
 
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
@@ -58,6 +60,57 @@ func TestInfoService_AppExistsReportsEveryOtherFailure(t *testing.T) {
 			}
 			if exists {
 				t.Errorf("the app is reported to exist")
+			}
+		})
+	}
+}
+
+func TestInfoService_ClientScopes(t *testing.T) {
+	client, err := mock.NewCFClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	info := cf.NewInfoService(client)
+
+	client.SetClientScopes("cloud_controller.global_auditor", "uaa.resource")
+	scopes, err := info.ClientScopes()
+	if err != nil {
+		t.Fatalf("error %v, want none", err)
+	}
+	if !slices.Equal(scopes, []string{"cloud_controller.global_auditor", "uaa.resource"}) {
+		t.Errorf("scopes %v, want cloud_controller.global_auditor and uaa.resource", scopes)
+	}
+
+	client.SetClientScopes()
+	scopes, err = info.ClientScopes()
+	if err != nil || len(scopes) != 0 {
+		t.Errorf("a token with no scopes: scopes %v, error %v, want none and no error", scopes, err)
+	}
+}
+
+// A token that cannot be had or decoded is an error, never an empty list of
+// scopes.
+func TestInfoService_ClientScopesReportsAnUnreadableToken(t *testing.T) {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	for name, spoil := range map[string]func(client *mock.CFClient){
+		"UAA unreachable": func(client *mock.CFClient) { client.FailClientToken(errors.New("connection refused")) },
+		"empty token":     func(client *mock.CFClient) { client.SetClientToken("") },
+		"not a JWT":       func(client *mock.CFClient) { client.SetClientToken("opaque-token") },
+		"payload not b64": func(client *mock.CFClient) { client.SetClientToken(header + ".!!!.sig") },
+		"payload not JSON": func(client *mock.CFClient) {
+			client.SetClientToken(header + "." + base64.RawURLEncoding.EncodeToString([]byte("nope")) + ".sig")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			client, err := mock.NewCFClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			spoil(client)
+
+			scopes, err := cf.NewInfoService(client).ClientScopes()
+			if err == nil {
+				t.Errorf("scopes %v and no error, want an error", scopes)
 			}
 		})
 	}

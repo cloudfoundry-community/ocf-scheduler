@@ -93,4 +93,8 @@ type InfoService interface {
 	// answers false only when Cloud Controller says the app is not found, and
 	// an error when it cannot tell, including when ctx ends first.
 	AppExists(ctx context.Context, guid string) (bool, error)
+
+	// ClientScopes returns the scopes on the token the scheduler presents to
+	// Cloud Controller, and an error when it cannot read them.
+	ClientScopes() ([]string, error)
 }
