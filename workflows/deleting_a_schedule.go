@@ -38,8 +38,8 @@ func DeletingASchedule(services *core.Services, schedule *core.Schedule, executa
 	// gone when it resumes and takes it out itself. A rebind that lists the
 	// schedules after the row goes never sees it. The other order lets a
 	// rebind re-add the entry between the two steps and leave it firing for
-	// a schedule that no longer exists. A failed row delete leaves the cron
-	// entry as it was.
+	// a schedule that no longer exists. A row delete or a row lookup that
+	// fails returns before the cron entry is touched.
 	if services.Schedules.Delete(schedule) != nil {
 		doh := fmt.Sprintf("could not delete schedule with GUID %s", schedule.GUID)
 		services.Logger.Error(tag, doh)
