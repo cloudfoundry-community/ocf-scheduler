@@ -94,7 +94,10 @@ type InfoService interface {
 	// an error when it cannot tell, including when ctx ends first.
 	AppExists(ctx context.Context, guid string) (bool, error)
 
-	// ClientScopes returns the scopes on the token the scheduler presents to
-	// Cloud Controller, and an error when it cannot read them.
+	// ClientScopes returns the scopes on a token that the scheduler fetches
+	// from UAA with the same client credentials it uses for Cloud Controller,
+	// and an error when it cannot read them. It is not the token that the
+	// Cloud Controller client holds, so it can differ from that token until
+	// the scheduler restarts.
 	ClientScopes() ([]string, error)
 }
