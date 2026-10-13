@@ -320,7 +320,7 @@ Every request must carry `X-Broker-API-Version` 2.13 or later. A request without
 
 - Binding the app again resumes only the schedules that the unbind paused. A schedule that its owner disabled stays disabled.
 
-- Deleting the instance removes its bindings first, which pauses each app that loses its last binding, and then removes the instance.
+- Deleting the instance removes its bindings first, which pauses each app that loses its last binding, and then removes the instance. The space's jobs, calls, schedules, and execution history all stay, even when the space itself is deleted. An admin can find and remove them later, as [Cleaning up orphaned jobs and calls](#cleaning-up-orphaned-jobs-and-calls) describes.
 
 Every operation finishes before the broker answers, so the broker never answers `202 Accepted` and has no operation to poll. Changing the plan isn't supported.
 
@@ -346,6 +346,101 @@ Deleting the rows alone would let 2.1.x start, but a later upgrade to 2.2.0 woul
 ### Requiring a binding
 
 When `SCHEDULER_BROKER_REQUIRE_BINDING` is `true`, an app must be bound before anyone can create a job or a call for it, add a schedule to one, or run one. The routes that this covers are `POST /jobs`, `POST /calls`, `POST /jobs/:guid/schedules`, `POST /calls/:guid/schedules`, `POST /jobs/:guid/execute`, and `POST /calls/:guid/execute`. They check the caller's space access first, as they always do, and then answer `403 Forbidden` with a `binding_required` error for an app that isn't bound. A caller with `cloud_controller.admin` passes regardless. Reading, listing, and deleting stay open, so the owner of an unbound app can still see and clean up what it has.
+
+## Cleaning up orphaned jobs and calls
+
+When an app is deleted, or its whole space is, the scheduler keeps the app's jobs, calls, schedules, and execution history. Deprovisioning the space's scheduler service instance doesn't remove them either. A job whose app is gone fails each time it runs, and a call whose app is gone goes on calling its URL. The scheduler never deletes this data by itself, so an admin finds it and deletes it with two routes or the matching CLI commands.
+
+Both routes need a token with the `cloud_controller.admin` scope. A caller whose token can't be verified gets `401 Unauthorized`, and any other caller gets `403 Forbidden` with an empty body.
+
+### How the scheduler decides that an app is gone
+
+The scheduler asks Cloud Controller for each app with `GET /v3/apps/:guid`. It treats an app as gone only when Cloud Controller answers `404` with its own not-found error. Any other answer means the scheduler can't tell, and that includes a `403`, a `5xx`, a timeout, and a `404` that carries no Cloud Controller error, such as the one a router sends for a route it doesn't know. The scheduler never counts any of those as a deleted app.
+
+Cloud Controller also answers `404` for an app that the asking client isn't allowed to see. The scheduler asks with its own UAA client, the one set by `CLIENT_ID` and `CLIENT_SECRET`, so that client must be able to read every app in the foundation, for example by holding `cloud_controller.admin` or `cloud_controller.admin_read_only`. If it can't, every app outside its reach looks deleted. Reading the list before deleting anything is the guard against that.
+
+### Listing them
+
+`GET /orphans` returns every job and call, in every space, whose app is gone. The scheduler asks about each distinct app once per request. If any of those lookups fails, the whole request fails with `502 Bad Gateway` and returns no list, because a partial list could pass for a complete one. A failed database query answers `500 Internal Server Error`.
+
+A successful answer is `200 OK` with a body like the following:
+
+```json
+{
+  "resources": [
+    {
+      "guid": "9a1c1a56-0d0c-4f86-9a8c-5d4d1f3b2f10",
+      "type": "job",
+      "name": "nightly-backup",
+      "app_guid": "6f5b3a3e-2b8e-4c8f-a8a2-0e6f4f1f6c11",
+      "space_guid": "1d8f6c2a-7b4e-4a51-9b0e-3c2a6b7d9e12",
+      "schedules": [
+        {
+          "guid": "c0e4b7f2-5a1d-4f3e-8b6c-2d9a7e1f4b13",
+          "enabled": true,
+          "expression": "0 2 * * *",
+          "expression_type": "cron_expression",
+          "created_at": "2026-03-01T02:00:00Z",
+          "updated_at": "2026-03-01T02:00:00Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+The `type` is `job` or `call`. The list is sorted by space, then app, then type, then name, and it's empty when nothing is orphaned. Listing never changes anything.
+
+### Deleting them
+
+`POST /orphans/delete` deletes the jobs and calls that the request names. There's no way to delete everything at once, so the body must list the GUIDs, mixing jobs and calls freely:
+
+```json
+{
+  "guids": [
+    "9a1c1a56-0d0c-4f86-9a8c-5d4d1f3b2f10",
+    "5e2d8c4b-3f1a-4b7e-9c6d-8a0f2e4b6d14"
+  ]
+}
+```
+
+For each GUID, the scheduler finds the job or call and asks Cloud Controller about its app again, so an app that has come back since the list keeps its data. It deletes the job or call only when that check says the app is not found. It removes the schedules first, taking each one out of the database and out of cron, and then deletes the job or call itself, in the same order as `DELETE /jobs/:guid` and `DELETE /calls/:guid`. Execution history stays, as it does for those routes.
+
+The answer is `200 OK` with one result for each distinct GUID, in the order they were sent:
+
+```json
+{
+  "results": [
+    { "guid": "9a1c1a56-0d0c-4f86-9a8c-5d4d1f3b2f10", "type": "job", "result": "deleted" },
+    { "guid": "5e2d8c4b-3f1a-4b7e-9c6d-8a0f2e4b6d14", "type": "call", "result": "app_exists", "message": "app 6f5b3a3e-2b8e-4c8f-a8a2-0e6f4f1f6c11 exists" }
+  ]
+}
+```
+
+The `result` field takes one of the following values:
+
+- `deleted` means the job or call and all of its schedules are gone.
+
+- `app_exists` means Cloud Controller still knows the app, so nothing was deleted.
+
+- `not_found` means no job or call has that GUID.
+
+- `failed` means the scheduler couldn't look the job or call up, couldn't check its app, or couldn't finish deleting it. The `message` field says which step failed. When a check fails, nothing is deleted. When a later step fails, some schedules may already be gone, and sending the GUID again finishes the delete.
+
+A body that isn't a JSON object, or one whose `guids` list is missing or empty, gets `400 Bad Request` with an error body, and nothing is deleted.
+
+### Using the CLI
+
+The `sch` CLI wraps both routes. It reads the scheduler's URL from `SCHEDULER_URL` and an admin's token from `SCHEDULER_TOKEN`:
+
+```sh
+export SCHEDULER_URL=https://scheduler.system.example.com
+export SCHEDULER_TOKEN="$(cf oauth-token)"
+sch orphans list
+sch orphans del 9a1c1a56-0d0c-4f86-9a8c-5d4d1f3b2f10 5e2d8c4b-3f1a-4b7e-9c6d-8a0f2e4b6d14
+```
+
+`sch orphans list` prints one line for each orphaned job or call, with its type, name, GUID, app, space, and how many of its schedules are enabled. `sch orphans del` prints the result for each GUID, and it exits non-zero when any of them wasn't deleted.
 
 ## API Reference
 
@@ -374,6 +469,8 @@ A caller may act on a job, call, or schedule only in a space where they hold the
 - `GET /jobs?space_guid=` and `GET /calls?space_guid=` check the named space and answer `403 Forbidden` in the same way, including when `space_guid` is missing.
 
 - Routes that name a job or call by GUID check the space it was created in and answer `404 Not Found`, so they don't reveal another tenant's jobs or calls. A schedule GUID must also belong to the job or call in the path.
+
+- `GET /orphans` and `POST /orphans/delete` need the `cloud_controller.admin` scope and answer `403 Forbidden` to every other caller.
 
 - `GET /scheduler-time-zones` and `POST /schedules/validate` with only an expression need a `space_developer` or `space_manager` role in any space. Validating against a job or call checks that job's or call's space.
 
@@ -489,6 +586,13 @@ Single-resource endpoints return the entity directly as JSON.
 |---|---|---|
 | GET | `/` | Health check |
 | GET | `/scheduler-time-zones` | List available timezones |
+
+### Orphans
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/orphans` | List the jobs and calls whose app is gone, for admins only |
+| POST | `/orphans/delete` | Delete the named jobs and calls whose app is gone, for admins only |
 
 ## CI/CD Pipeline
 
