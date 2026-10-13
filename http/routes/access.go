@@ -30,6 +30,24 @@ func authorize(services *core.Services, tag, auth, spaceGUID string, denied int)
 	return denied
 }
 
+// requireAdmin lets only a caller with cloud_controller.admin go on. It
+// returns 0 when the caller may go on, 401 when the token fails, and 403 for
+// any other caller, as a route that names a space answers a caller with no
+// role there.
+func requireAdmin(services *core.Services, tag, auth string) int {
+	if services.Auth.IsAdmin(auth) {
+		return 0
+	}
+
+	if err := services.Auth.Verify(auth); errors.Is(err, core.ErrUnauthenticated) {
+		services.Logger.Error(tag, fmt.Sprintf("authentication failed: %v", err))
+		return http.StatusUnauthorized
+	}
+
+	services.Logger.Error(tag, "caller is not an admin")
+	return http.StatusForbidden
+}
+
 // missing picks the answer when the named job, call, schedule, or app is not
 // there. An unauthenticated caller still gets 401, so the answer does not
 // show whether the thing exists. Anyone else gets notFound.

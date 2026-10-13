@@ -11,4 +11,5 @@ func Apply(e *echo.Echo, services *core.Services) {
 	Calls(e, services)
 	Schedules(e, services)
 	Timezones(e, services)
+	Orphans(e, services)
 }
