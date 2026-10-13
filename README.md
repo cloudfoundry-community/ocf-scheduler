@@ -351,11 +351,11 @@ When `SCHEDULER_BROKER_REQUIRE_BINDING` is `true`, an app must be bound before a
 
 When an app is deleted, or its whole space is, the scheduler keeps the app's jobs, calls, schedules, and execution history. Deprovisioning the space's scheduler service instance doesn't remove them either. A job whose app is gone fails each time it runs, and a call whose app is gone goes on calling its URL. The scheduler never deletes this data by itself, so an admin finds it and deletes it with two routes or the matching CLI commands.
 
-Both routes need a token with the `cloud_controller.admin` scope. A caller whose token can't be verified gets `401 Unauthorized`, and any other caller gets `403 Forbidden` with an empty body.
+Both routes need a token with the `cloud_controller.admin` scope that belongs to an admin user, such as the one `cf oauth-token` prints. A token that a client gets with client credentials is refused with `401 Unauthorized`, even when it carries that scope, because the scheduler asks UAA which user owns the token. A caller whose token can't be verified gets `401 Unauthorized`, and any other caller gets `403 Forbidden` with an empty body.
 
 ### How the scheduler decides that an app is gone
 
-The scheduler asks Cloud Controller for each app with `GET /v3/apps/:guid`. It treats an app as gone only when Cloud Controller answers `404` with its own not-found error. Any other answer means the scheduler can't tell, and that includes a `403`, a `5xx`, a timeout, and a `404` that carries no Cloud Controller error, such as the one a router sends for a route it doesn't know. The scheduler never counts any of those as a deleted app.
+The scheduler asks Cloud Controller for each app with `GET /v3/apps/:guid`. It treats an app as gone only when Cloud Controller returns its own not-found error for that app. Any other answer means the scheduler can't tell, and that includes a `403`, a `5xx`, a timeout, and a `404` that carries no Cloud Controller error, such as the one a router sends for a route it doesn't know. The scheduler never counts any of those as a deleted app.
 
 Cloud Controller also answers `404` for an app that the asking client isn't allowed to see. The scheduler asks with its own UAA client, the one set by `CLIENT_ID` and `CLIENT_SECRET`, so if that client can't read every app in the foundation, each app outside its reach looks deleted. To guard against that, both routes read the scopes on the scheduler's own Cloud Controller token before they ask about any app. The token must carry one of the following scopes:
 
@@ -365,7 +365,7 @@ Cloud Controller also answers `404` for an app that the asking client isn't allo
 
 - `cloud_controller.global_auditor`
 
-When the token carries none of them, the route answers `500 Internal Server Error` with a message that names all three, and it lists and deletes nothing. When the scheduler can't get a token from UAA, or can't decode the one it gets, the route answers `502 Bad Gateway` and does nothing either. To fix the first case, we grant the scheduler's UAA client one of those scopes as an authority. The scheduler keeps each token until it expires, so restarting the scheduler makes the new scope take effect at once.
+When the token carries none of them, the route answers `500 Internal Server Error` with a message that names all three, and it lists and deletes nothing. When the scheduler can't get a token from UAA, or can't decode the one it gets, the route answers `502 Bad Gateway` and does nothing either. To fix the first case, we grant the scheduler's UAA client one of those scopes as an authority. The scheduler fetches the token for this check separately from the one its Cloud Controller client holds, and each is kept until it expires. After we grant or remove any of the three scopes, we must restart the scheduler. Until we do, the Cloud Controller client may still hold a token without the scope, and then the routes can treat apps that the client cannot see as gone.
 
 ### Listing them
 
