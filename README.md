@@ -369,6 +369,8 @@ Cloud Controller also answers `404` for an app that the asking client isn't allo
 
 When the token carries none of them, the route answers `500 Internal Server Error` with a message that names all three, and it lists and deletes nothing. When the scheduler can't get a token from UAA, or can't decode the one it gets, the route answers `502 Bad Gateway` and does nothing either. To fix the first case, we grant the scheduler's UAA client one of those scopes as an authority. The scheduler fetches the token for this check separately from the one its Cloud Controller client holds, and each is kept until it expires. After we grant or remove any of the three scopes, we must restart the scheduler. Until we do, the Cloud Controller client may still hold a token without the scope, and then the routes can treat apps that the client cannot see as gone.
 
+Orphan schedules never involve Cloud Controller, so the check applies only when a request would ask about an app. A list runs it only when there are jobs or calls to look up, and a delete runs it only when one of its GUIDs names a job or call, or can't be looked up. A request that deals only with orphan schedules works without the scope.
+
 ### Listing them
 
 `GET /orphans` returns every job and call, in every space, whose app is gone, and every schedule whose job or call is gone. The scheduler asks about each distinct app once per request, with up to ten lookups running at a time. If any of those lookups fails, the scheduler cancels the ones still running, and the whole request fails with `502 Bad Gateway` and returns no list, because a partial list could pass for a complete one. A failed database query answers `500 Internal Server Error`.
@@ -432,7 +434,11 @@ Both lists are empty when nothing is orphaned. Listing never changes anything.
 
 For each GUID, the scheduler finds the job or call and asks Cloud Controller about its app again, so an app that has come back since the list keeps its data. It deletes the job or call only when that check says the app is not found. It removes the schedules first, taking each one out of the database and out of cron, and then deletes the job or call itself, in the same order as `DELETE /jobs/:guid` and `DELETE /calls/:guid`. Execution history stays, as it does for those routes.
 
-After it deletes the job or call, the scheduler looks for its schedules once more and removes any it finds, because someone may have created a schedule while the delete was running. The job and call delete routes do the same. A route that creates a schedule does the matching check from its side. Once it has stored the schedule, it looks the job or call up again, and if the job or call is gone, it removes the schedule and answers `404 Not Found`. Both checks go through the database, so the stored schedules stay right even when more than one scheduler shares it.
+After it deletes the job or call, the scheduler looks for its schedules once more and removes any it finds, because someone may have created a schedule while the delete was running. The job and call delete routes do the same. A route that creates a schedule does the matching check from its side. Once it has stored the schedule, it looks the job or call up again, and if the job or call is gone, it removes the schedule and answers `404 Not Found`. If that second lookup fails for another reason, such as a lost database connection, the route keeps the schedule and answers `201 Created`, because the job or call was there a moment before and an error would only invite a retry that creates a second schedule. Should the job or call turn out to be gone after all, the schedule shows up in `orphan_schedules`.
+
+Whenever the scheduler knows that a schedule's job or call is gone, it takes the schedule out of cron even if it can't delete the schedule's row. The row then shows up in `orphan_schedules`, and the scheduler never loads it into cron again, because it loads schedules only through their job or call.
+
+These checks keep a schedule from outliving its job or call when one scheduler instance runs, which is how the release and the kit deploy it. With more than one instance, the stored schedules still stay right, but each instance keeps its own cron. If one instance creates a schedule while another deletes its job or call, the second instance removes the row but can't reach the first one's cron, so the schedule keeps firing there until that instance restarts.
 
 A GUID that names no job or call is looked up as a schedule. The scheduler deletes that schedule only when its job or call is still gone, and it takes the schedule out of the database and out of cron the same way. When the job or call exists, the schedule is left alone.
 
@@ -449,7 +455,7 @@ The answer is `200 OK` with one result for each distinct GUID, in the order they
 
 The `result` field takes one of the following values:
 
-- `deleted` means the job or call and all of its schedules are gone, or, for a schedule, that the schedule is gone. If a schedule created during the delete couldn't be removed, the `message` says so, and that schedule shows up in `orphan_schedules`.
+- `deleted` means the job or call and all of its schedules are gone, or, for a schedule, that the schedule is gone. If a schedule created during the delete couldn't be removed, the `message` says how many were left, and they show up in `orphan_schedules`. If the scheduler couldn't check for such schedules at all, the `message` says that instead, and any it missed show up in `orphan_schedules` too.
 
 - `app_exists` means Cloud Controller still knows the app, so nothing was deleted.
 
@@ -474,7 +480,7 @@ sch orphans del 9a1c1a56-0d0c-4f86-9a8c-5d4d1f3b2f10 5e2d8c4b-3f1a-4b7e-9c6d-8a0
 
 `sch orphans list` prints one line for each orphaned job or call, with its type, name, GUID, app, space, and how many of its schedules are enabled. Below that, it prints one line for each schedule whose job or call is gone, with the schedule's GUID, whether it belonged to a job or a call, that job or call's GUID, its expression, and whether it's enabled. `sch orphans del` takes job, call, and schedule GUIDs. It prints the result for each GUID, and it exits non-zero when any of them wasn't deleted.
 
-When the scheduler refuses the token with `401 Unauthorized`, the CLI says so and tells us to refresh `SCHEDULER_TOKEN` with `cf oauth-token` as an admin user. When it refuses with `403 Forbidden`, the CLI says that the token's user isn't an admin.
+When the scheduler refuses the token with `401 Unauthorized`, the orphans commands say so and tell us to refresh `SCHEDULER_TOKEN` with `cf oauth-token` as an admin user. When it refuses with `403 Forbidden`, they say that the token's user isn't an admin. The other `sch` commands are open to space members, so for those the CLI says only that the token was rejected and should be refreshed with `cf oauth-token`, or that the token's user isn't allowed to do what was asked.
 
 ## API Reference
 
@@ -504,7 +510,7 @@ A caller may act on a job, call, or schedule only in a space where they hold the
 
 - Routes that name a job or call by GUID check the space it was created in and answer `404 Not Found`, so they don't reveal another tenant's jobs or calls. A schedule GUID must also belong to the job or call in the path.
 
-- `GET /orphans` and `POST /orphans/delete` need the `cloud_controller.admin` scope and answer `403 Forbidden` to every other caller. They also refuse to run until the scheduler's own Cloud Controller token can read every app, as [How the scheduler decides that an app is gone](#how-the-scheduler-decides-that-an-app-is-gone) explains.
+- `GET /orphans` and `POST /orphans/delete` need the `cloud_controller.admin` scope and answer `403 Forbidden` to every other caller. Whenever they need to ask Cloud Controller about an app, they also refuse to run until the scheduler's own Cloud Controller token can read every app, as [How the scheduler decides that an app is gone](#how-the-scheduler-decides-that-an-app-is-gone) explains.
 
 - `GET /scheduler-time-zones` and `POST /schedules/validate` with only an expression need a `space_developer` or `space_manager` role in any space. Validating against a job or call checks that job's or call's space.
 

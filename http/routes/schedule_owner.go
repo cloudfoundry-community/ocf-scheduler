@@ -9,15 +9,20 @@ import (
 	"github.com/cloudfoundry-community/ocf-scheduler/workflows"
 )
 
-// A schedule create and a job or call delete do not share a lock, and the
-// scheduler can run more than one instance against the same database, so an
-// in-process lock would not cover them anyway. Each side instead checks the
-// other through the database after its own write. A delete removes the job or
-// call and then sweeps its schedules again. A create stores the schedule,
-// adds it to cron, and then looks the job or call up again. Whichever of the
-// two reads comes second sees the other side's write, so either the sweep
-// finds the new schedule or the create finds its owner gone, and the
-// schedule never outlives its job or call.
+// A schedule create and a job or call delete do not share a lock. Each side
+// instead checks the other through the database after its own write. A
+// delete removes the job or call and then sweeps its schedules again. A
+// create stores the schedule, adds it to cron, and then looks the job or call
+// up again. Whichever of the two reads comes second sees the other side's
+// write, so either the sweep finds the new schedule or the create finds its
+// owner gone.
+//
+// That keeps a schedule from outliving its job or call on a single scheduler
+// instance, which is what the release and the kit deploy. The stored rows
+// stay right with more than one instance, but cron entries live in each
+// process. When one instance creates a schedule and another deletes its job
+// or call, the sweep removes the row but cannot reach the first instance's
+// cron entry, which runs until that instance restarts.
 
 // sweepSchedules deletes the schedules still stored for an executable that
 // has just been deleted, which can only be schedules created while the delete
