@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/labstack/echo/v4"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 	"github.com/cloudfoundry-community/ocf-scheduler/workflows"
@@ -61,6 +62,10 @@ var appReaderScopes = []string{
 	"cloud_controller.global_auditor",
 }
 
+// appLookupLimit bounds how many apps a list asks Cloud Controller about at
+// once.
+const appLookupLimit = 10
+
 func Orphans(e *echo.Echo, services *core.Services) {
 	ListOrphans(e, services)
 	DeleteOrphans(e, services)
@@ -103,20 +108,15 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 
 		// Ask about each app once. Any answer but not-found fails the whole
 		// request, so a partial list never passes for a complete one.
-		gone := map[string]bool{}
-		for _, executable := range executables {
-			appGUID := ownerOf(executable).AppGUID
-			if _, asked := gone[appGUID]; asked {
-				continue
-			}
+		gone, err := appsGone(c.Request().Context(), services, executables)
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("could not check %v with Cloud Controller", err))
 
-			exists, err := services.Info.AppExists(c.Request().Context(), appGUID)
-			if err != nil {
-				services.Logger.Error(tag, fmt.Sprintf("could not check app %s with Cloud Controller: %v", appGUID, err))
-				return c.JSON(http.StatusBadGateway, fmt.Sprintf("could not check app %s with Cloud Controller", appGUID))
+			var lookup *appLookupError
+			if errors.As(err, &lookup) {
+				return c.JSON(http.StatusBadGateway, fmt.Sprintf("could not check app %s with Cloud Controller", lookup.appGUID))
 			}
-
-			gone[appGUID] = !exists
+			return c.JSON(http.StatusBadGateway, "could not check apps with Cloud Controller")
 		}
 
 		output := &orphanCollection{Resources: make([]*orphan, 0)}
@@ -196,6 +196,73 @@ func DeleteOrphans(e *echo.Echo, services *core.Services) {
 
 		return c.JSON(http.StatusOK, output)
 	})
+}
+
+// appLookupError names the app whose lookup failed a list.
+type appLookupError struct {
+	appGUID string
+	err     error
+}
+
+func (e *appLookupError) Error() string {
+	return fmt.Sprintf("app %s: %v", e.appGUID, e.err)
+}
+
+func (e *appLookupError) Unwrap() error {
+	return e.err
+}
+
+// appsGone asks Cloud Controller about each executable's app once, with up
+// to appLookupLimit lookups in flight, and reports which apps are gone. The
+// first lookup that fails cancels the rest, and its appLookupError is
+// returned.
+func appsGone(ctx context.Context, services *core.Services, executables []core.Executable) (map[string]bool, error) {
+	appGUIDs := make([]string, 0, len(executables))
+	for _, executable := range executables {
+		if appGUID := ownerOf(executable).AppGUID; !slices.Contains(appGUIDs, appGUID) {
+			appGUIDs = append(appGUIDs, appGUID)
+		}
+	}
+
+	exists := make([]bool, len(appGUIDs))
+
+	group, ctx := errgroup.WithContext(ctx)
+	group.SetLimit(appLookupLimit)
+
+	for i, appGUID := range appGUIDs {
+		if ctx.Err() != nil {
+			break
+		}
+
+		group.Go(func() error {
+			// A lookup that waited for a slot while another failed is not
+			// worth starting.
+			if err := ctx.Err(); err != nil {
+				return &appLookupError{appGUID, err}
+			}
+
+			found, err := services.Info.AppExists(ctx, appGUID)
+			if err != nil {
+				return &appLookupError{appGUID, err}
+			}
+
+			exists[i] = found
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	// The loop stops early only when ctx ends, and then a lookup has
+	// already returned an error.
+	gone := make(map[string]bool, len(appGUIDs))
+	for i, appGUID := range appGUIDs {
+		gone[appGUID] = !exists[i]
+	}
+
+	return gone, nil
 }
 
 // requireAppReader answers zero when the scheduler's own Cloud Controller

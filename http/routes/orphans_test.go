@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 
@@ -445,4 +446,130 @@ func TestDeleteOrphansAnswersNotFoundWhenTheJobIsAlreadyGone(t *testing.T) {
 
 	results := tn.deleteOrphans(t, tn.jobB.GUID)
 	expectResult(t, results, tn.jobB.GUID, "job", orphanNotFound)
+}
+
+// gatedInfo holds each app lookup until enough lookups are in flight at
+// once, or until wait passes, so a list that asks one app at a time shows up
+// as a slow list that never had two in flight. The lookup for fail waits the
+// same way and then fails, and every other lookup records whether the list
+// cancelled it.
+type gatedInfo struct {
+	core.InfoService
+	gate      int
+	wait      time.Duration
+	fail      string
+	locker    sync.Mutex
+	inFlight  int
+	most      int
+	started   int
+	cancelled int
+	timedOut  int
+	full      chan struct{}
+	fill      sync.Once
+}
+
+func newGatedInfo(info core.InfoService, gate int, wait time.Duration, fail string) *gatedInfo {
+	return &gatedInfo{InfoService: info, gate: gate, wait: wait, fail: fail, full: make(chan struct{})}
+}
+
+func (info *gatedInfo) AppExists(ctx context.Context, guid string) (bool, error) {
+	info.locker.Lock()
+	info.started++
+	info.inFlight++
+	info.most = max(info.most, info.inFlight)
+	if info.inFlight == info.gate {
+		info.fill.Do(func() { close(info.full) })
+	}
+	info.locker.Unlock()
+
+	defer func() {
+		info.locker.Lock()
+		info.inFlight--
+		info.locker.Unlock()
+	}()
+
+	if guid == info.fail {
+		select {
+		case <-info.full:
+		case <-time.After(info.wait):
+		}
+		return false, resource.CloudFoundryHTTPError{StatusCode: http.StatusServiceUnavailable, Status: "503 Service Unavailable"}
+	}
+
+	if info.fail != "" {
+		// Wait to be cancelled by the failing lookup.
+		select {
+		case <-ctx.Done():
+			info.locker.Lock()
+			info.cancelled++
+			info.locker.Unlock()
+			return false, ctx.Err()
+		case <-time.After(info.wait):
+			info.locker.Lock()
+			info.timedOut++
+			info.locker.Unlock()
+			return info.InfoService.AppExists(ctx, guid)
+		}
+	}
+
+	select {
+	case <-info.full:
+	case <-time.After(info.wait):
+	}
+	return info.InfoService.AppExists(ctx, guid)
+}
+
+// persistJobsOnApps stores one job on each of count more apps, so a list has
+// that many more apps to ask about.
+func (tn *tenancy) persistJobsOnApps(t *testing.T, count int) {
+	t.Helper()
+	for i := range count {
+		app := fmt.Sprintf("app-extra-%02d", i)
+		tn.cf.PrepareApp(app, "space-b")
+		if _, err := tn.services.Jobs.Persist(&core.Job{Name: "job-" + app, Command: "true", AppGUID: app, SpaceGUID: "space-b"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// The list asks about several apps at once, but never more than
+// appLookupLimit.
+func TestListOrphansAsksAboutAppsConcurrently(t *testing.T) {
+	tn := newTenancy(t)
+	tn.persistJobsOnApps(t, 25)
+	tn.cf.RemoveApp("app-b")
+	info := newGatedInfo(tn.services.Info, appLookupLimit, 100*time.Millisecond, "")
+	tn.services.Info = info
+
+	orphans := tn.listOrphans(t)
+
+	if len(orphans) != 2 {
+		t.Errorf("listed %d orphans, want job B and call B", len(orphans))
+	}
+	if info.most < 2 || info.most > appLookupLimit {
+		t.Errorf("at most %d lookups were in flight, want between 2 and %d", info.most, appLookupLimit)
+	}
+	if info.started != 27 {
+		t.Errorf("asked about %d apps, want 27", info.started)
+	}
+}
+
+// The first lookup that fails cancels the rest and fails the list.
+func TestListOrphansCancelsTheOtherLookupsWhenOneFails(t *testing.T) {
+	tn := newTenancy(t)
+	tn.persistJobsOnApps(t, 25)
+	info := newGatedInfo(tn.services.Info, appLookupLimit, 300*time.Millisecond, "app-extra-00")
+	tn.services.Info = info
+
+	rec := tn.do(http.MethodGet, "/orphans", "", tn.admin)
+
+	if rec.Code != http.StatusBadGateway || !strings.Contains(rec.Body.String(), "app-extra-00") {
+		t.Errorf("status %d, body %s, want %d naming app-extra-00", rec.Code, rec.Body, http.StatusBadGateway)
+	}
+	if info.timedOut != 0 || info.cancelled == 0 {
+		t.Errorf("%d lookups ran on and %d were cancelled, want none to run on", info.timedOut, info.cancelled)
+	}
+	if info.started > appLookupLimit {
+		t.Errorf("asked about %d apps after one failed, want at most %d", info.started, appLookupLimit)
+	}
 }
