@@ -27,6 +27,10 @@ var Client *Driver
 // list asks Cloud Controller about every app before it answers.
 var fetchClient = &http.Client{Timeout: 15 * time.Minute}
 
+// requestClient is for the jobs and calls commands, which wait as long as
+// hype's own client did.
+var requestClient = &http.Client{Timeout: 20 * time.Second}
+
 // maxMessage bounds the text shown from a body that isn't the scheduler's
 // own error, such as a gateway's HTML page.
 const maxMessage = 512
@@ -72,7 +76,7 @@ func (driver *Driver) send(method, path string, params hype.Params, body []byte)
 		path += "?" + params.ToValues().Encode()
 	}
 
-	result, err := driver.Fetch(method, path, body)
+	result, err := driver.fetchWith(requestClient, method, path, body)
 	if err != nil {
 		return &Result{Err: err}
 	}
@@ -176,6 +180,10 @@ func Message(body []byte) string {
 // Fetch makes a request and keeps the body of the response, even when the
 // status is an error.
 func (driver *Driver) Fetch(method, path string, body []byte) (*Result, error) {
+	return driver.fetchWith(fetchClient, method, path, body)
+}
+
+func (driver *Driver) fetchWith(client *http.Client, method, path string, body []byte) (*Result, error) {
 	url := strings.TrimRight(driver.baseURL, "/") + "/" + strings.TrimLeft(path, "/")
 
 	request, err := http.NewRequest(method, url, bytes.NewReader(body))
@@ -187,7 +195,7 @@ func (driver *Driver) Fetch(method, path string, body []byte) (*Result, error) {
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Authorization", driver.token)
 
-	response, err := fetchClient.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}

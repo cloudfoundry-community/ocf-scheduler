@@ -1,8 +1,11 @@
 package core
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Most commands are open to space members, so their 401 and 403 say nothing
@@ -90,6 +93,43 @@ func TestMessageTreatsABlankBodyAsEmpty(t *testing.T) {
 	for _, body := range []string{"", "\n", "  \n", `""`, "\"\"\n", `"  "`} {
 		if got := Message([]byte(body)); got != "" {
 			t.Errorf("Message(%q) = %q, want empty", body, got)
+		}
+	}
+}
+
+// Get, Post, and Delete keep the 20 second wait that they always had, and
+// only Fetch waits as long as an orphan list needs.
+func TestRequestTimeouts(t *testing.T) {
+	if requestClient.Timeout != 20*time.Second {
+		t.Errorf("requestClient waits %s, want 20s", requestClient.Timeout)
+	}
+	if fetchClient.Timeout != 15*time.Minute {
+		t.Errorf("fetchClient waits %s, want 15m", fetchClient.Timeout)
+	}
+}
+
+func TestSendUsesTheRequestClient(t *testing.T) {
+	saved := requestClient
+	defer func() { requestClient = saved }()
+	requestClient = &http.Client{Timeout: 50 * time.Millisecond}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(500 * time.Millisecond)
+	}))
+	defer server.Close()
+
+	driver, err := NewDriver(server.URL, "bearer token")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, result := range map[string]*Result{
+		"get":    driver.Get("jobs", nil),
+		"post":   driver.Post("jobs", nil, nil),
+		"delete": driver.Delete("jobs/1", nil),
+	} {
+		if result.Okay() || result.Error() == nil {
+			t.Errorf("%s did not time out on the request client", name)
 		}
 	}
 }
