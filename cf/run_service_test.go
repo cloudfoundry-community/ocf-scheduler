@@ -244,3 +244,77 @@ func TestRunService_ExecuteFollowsATaskUntilItFinishes(t *testing.T) {
 		})
 	}
 }
+
+// countingClient counts the tasks it is asked to create.
+type countingClient struct {
+	*mock.CFClient
+	created int
+}
+
+func (client *countingClient) CreateTask(ctx context.Context, appGUID string, request *resource.TaskCreate) (*resource.Task, error) {
+	client.created++
+	return client.CFClient.CreateTask(ctx, appGUID, request)
+}
+
+// unstartableExecutions cannot mark an execution started.
+type unstartableExecutions struct {
+	*mock.ExecutionService
+}
+
+func (unstartableExecutions) Start(*core.Execution) (*core.Execution, error) {
+	return nil, errors.New("database unavailable")
+}
+
+// lostExecutions cannot store an execution at all.
+type lostExecutions struct {
+	*mock.ExecutionService
+}
+
+func (lostExecutions) Persist(*core.Execution) (*core.Execution, error) {
+	return nil, errors.New("database unavailable")
+}
+
+// A run whose execution cannot be marked started creates no task, because
+// the execution might never record what the task did.
+func TestRunService_ExecuteCreatesNoTaskWhenTheExecutionCannotStart(t *testing.T) {
+	mockClient, err := mock.NewCFClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &countingClient{CFClient: mockClient}
+	executions := unstartableExecutions{mock.NewExecutionService()}
+	services := &core.Services{Workers: inlineWorkers{}, Executions: executions, Logger: logger.New()}
+	execution, err := executions.Persist(&core.Execution{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+	cf.NewRunService(client).Execute(services, execution, job)
+
+	if client.created != 0 {
+		t.Errorf("created %d tasks, want none", client.created)
+	}
+}
+
+// A scheduled job run whose execution cannot be stored creates no task.
+func TestJobRun_CreatesNoTaskWhenTheExecutionCannotBeStored(t *testing.T) {
+	mockClient, err := mock.NewCFClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &countingClient{CFClient: mockClient}
+	services := &core.Services{
+		Workers:    inlineWorkers{},
+		Executions: lostExecutions{mock.NewExecutionService()},
+		Runner:     cf.NewRunService(client),
+		Logger:     logger.New(),
+	}
+	job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+	core.NewJobRun(job, &core.Schedule{GUID: "schedule-guid"}, services).Run()
+
+	if client.created != 0 {
+		t.Errorf("created %d tasks, want none", client.created)
+	}
+}

@@ -33,8 +33,14 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 	services.Workers.Submit(func() {
 		defer core.RecoverRun(services, execution, "cf-run-service")
 
-		services.Executions.Start(execution)
 		tag := "cf-run-service"
+
+		// A run that cannot mark its execution started stops here, rather
+		// than send a task whose outcome the execution may never record.
+		if _, err := services.Executions.Start(execution); err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("not running execution %s, because it could not be marked started: %v", execution.GUID, err))
+			return
+		}
 
 		job, err := executable.ToJob()
 		if err != nil {

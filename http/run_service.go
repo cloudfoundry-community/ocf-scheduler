@@ -19,8 +19,14 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 	services.Workers.Submit(func() {
 		defer core.RecoverRun(services, execution, "http-run-service")
 
-		services.Executions.Start(execution)
 		tag := "http-run-service"
+
+		// A run that cannot mark its execution started stops here, rather
+		// than send a request whose outcome the execution may never record.
+		if _, err := services.Executions.Start(execution); err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("not running execution %s, because it could not be marked started: %v", execution.GUID, err))
+			return
+		}
 
 		call, err := executable.ToCall()
 		if err != nil {
