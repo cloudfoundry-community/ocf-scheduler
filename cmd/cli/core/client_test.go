@@ -83,3 +83,13 @@ func TestResultErrorBoundsAPlainTextBody(t *testing.T) {
 		t.Errorf("got %d characters, want %d", len(got), len(want))
 	}
 }
+
+// The scheduler refuses a request with the JSON empty string and a newline,
+// and a gateway may send nothing or whitespace, so all of them are empty.
+func TestMessageTreatsABlankBodyAsEmpty(t *testing.T) {
+	for _, body := range []string{"", "\n", "  \n", `""`, "\"\"\n", `"  "`} {
+		if got := Message([]byte(body)); got != "" {
+			t.Errorf("Message(%q) = %q, want empty", body, got)
+		}
+	}
+}

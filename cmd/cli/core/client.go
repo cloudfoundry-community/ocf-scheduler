@@ -53,28 +53,31 @@ func (driver *Driver) Token() string {
 	return driver.token
 }
 
-func (driver *Driver) Delete(path string, params hype.Params) hype.Response {
-	return driver.
-		raw.
-		Delete(path, params).
-		WithHeaderSet(driver.accept, driver.contentType, driver.auth).
-		Response()
+func (driver *Driver) Delete(path string, params hype.Params) *Result {
+	return driver.send(http.MethodDelete, path, params, nil)
 }
 
-func (driver *Driver) Get(path string, params hype.Params) hype.Response {
-	return driver.
-		raw.
-		Get(path, params).
-		WithHeaderSet(driver.accept, driver.contentType, driver.auth).
-		Response()
+func (driver *Driver) Get(path string, params hype.Params) *Result {
+	return driver.send(http.MethodGet, path, params, nil)
 }
 
-func (driver *Driver) Post(path string, params hype.Params, data []byte) hype.Response {
-	return driver.
-		raw.
-		Post(path, params, data).
-		WithHeaderSet(driver.accept, driver.contentType, driver.auth).
-		Response()
+func (driver *Driver) Post(path string, params hype.Params, data []byte) *Result {
+	return driver.send(http.MethodPost, path, params, data)
+}
+
+// send makes a request with query parameters and folds a transport failure
+// into the Result, so a caller checks Okay and returns Error either way.
+func (driver *Driver) send(method, path string, params hype.Params, body []byte) *Result {
+	if len(params) > 0 {
+		path += "?" + params.ToValues().Encode()
+	}
+
+	result, err := driver.Fetch(method, path, body)
+	if err != nil {
+		return &Result{Err: err}
+	}
+
+	return result
 }
 
 // Result is a response whose body is kept whatever the status, which the
@@ -82,10 +85,13 @@ func (driver *Driver) Post(path string, params hype.Params, data []byte) hype.Re
 type Result struct {
 	Status int
 	Body   []byte
+
+	// Err is set when the request never got a response.
+	Err error
 }
 
 func (result *Result) Okay() bool {
-	return result.Status >= 200 && result.Status < 300
+	return result.Err == nil && result.Status >= 200 && result.Status < 300
 }
 
 // Error describes a failed response, with the message that the scheduler
@@ -110,6 +116,10 @@ func (result *Result) AdminError() error {
 // explain describes a failed response, using unauthorized and forbidden for
 // a 401 or 403 that came with an empty body.
 func (result *Result) explain(unauthorized, forbidden string) error {
+	if result.Err != nil {
+		return result.Err
+	}
+
 	message := Message(result.Body)
 	if message == "" {
 		status := fmt.Sprintf("%d %s", result.Status, http.StatusText(result.Status))
@@ -125,6 +135,11 @@ func (result *Result) explain(unauthorized, forbidden string) error {
 	}
 
 	return fmt.Errorf("response status: %d: %s", result.Status, message)
+}
+
+// Data is the body of the response.
+func (result *Result) Data() []byte {
+	return result.Body
 }
 
 // Message extracts the explanation from an error body. The scheduler sends
