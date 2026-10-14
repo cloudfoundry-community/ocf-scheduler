@@ -351,6 +351,8 @@ When `SCHEDULER_BROKER_REQUIRE_BINDING` is `true`, an app must be bound before a
 
 When an app is deleted, or its whole space is, the scheduler keeps the app's jobs, calls, schedules, and execution history. Deprovisioning the space's scheduler service instance doesn't remove them either. A job whose app is gone fails each time it runs, and a call whose app is gone goes on calling its URL. The scheduler never deletes this data by itself, so an admin finds it and deletes it with two routes or the matching CLI commands.
 
+The same routes also find and delete schedules whose job or call is no longer stored. A schedule like that can be left behind when a delete fails partway. The scheduler skips it when it starts, but the schedule stays in the database until someone removes it.
+
 Both routes need a token with the `cloud_controller.admin` scope that belongs to an admin user, such as the one `cf oauth-token` prints. A token that a client gets with client credentials is refused with `401 Unauthorized`, even when it carries that scope, because the scheduler asks UAA which user owns the token. A caller whose token can't be verified gets `401 Unauthorized`, and any other caller gets `403 Forbidden` with an empty body.
 
 ### How the scheduler decides that an app is gone
@@ -369,7 +371,7 @@ When the token carries none of them, the route answers `500 Internal Server Erro
 
 ### Listing them
 
-`GET /orphans` returns every job and call, in every space, whose app is gone. The scheduler asks about each distinct app once per request. If any of those lookups fails, the whole request fails with `502 Bad Gateway` and returns no list, because a partial list could pass for a complete one. A failed database query answers `500 Internal Server Error`.
+`GET /orphans` returns every job and call, in every space, whose app is gone, and every schedule whose job or call is gone. The scheduler asks about each distinct app once per request, with up to ten lookups running at a time. If any of those lookups fails, the scheduler cancels the ones still running, and the whole request fails with `502 Bad Gateway` and returns no list, because a partial list could pass for a complete one. A failed database query answers `500 Internal Server Error`.
 
 A successful answer is `200 OK` with a body like the following:
 
@@ -393,15 +395,31 @@ A successful answer is `200 OK` with a body like the following:
         }
       ]
     }
+  ],
+  "orphan_schedules": [
+    {
+      "guid": "7b3e9d1a-4c2f-4e8b-a6d0-1f5c8e2a9b15",
+      "enabled": true,
+      "expression": "30 4 * * *",
+      "expression_type": "cron_expression",
+      "ref_type": "job",
+      "ref_guid": "3c7a2e9f-6b1d-4f0a-8e5c-9d2b4a6f1e16",
+      "created_at": "2026-03-02T04:30:00Z",
+      "updated_at": "2026-03-02T04:30:00Z"
+    }
   ]
 }
 ```
 
-The `type` is `job` or `call`. The list is sorted by space, then app, then type, then name, and it's empty when nothing is orphaned. Listing never changes anything.
+In `resources`, the `type` is `job` or `call`. That list is sorted by space, then app, then type, then name.
+
+Each entry in `orphan_schedules` is a schedule whose job or call isn't stored. Its `ref_type` says whether it belonged to a job or a call, and `ref_guid` is the GUID of that job or call. The scheduler finds these schedules in its own database without asking Cloud Controller anything. The list is sorted by `ref_type`, then `ref_guid`, then the schedule's GUID. A scheduler older than this field leaves it out of the answer.
+
+Both lists are empty when nothing is orphaned. Listing never changes anything.
 
 ### Deleting them
 
-`POST /orphans/delete` deletes the jobs and calls that the request names. There's no way to delete everything at once, so the body must list the GUIDs, mixing jobs and calls freely:
+`POST /orphans/delete` deletes the jobs, calls, and orphan schedules that the request names. There's no way to delete everything at once, so the body must list the GUIDs, mixing jobs, calls, and schedules freely:
 
 ```json
 {
@@ -413,6 +431,10 @@ The `type` is `job` or `call`. The list is sorted by space, then app, then type,
 ```
 
 For each GUID, the scheduler finds the job or call and asks Cloud Controller about its app again, so an app that has come back since the list keeps its data. It deletes the job or call only when that check says the app is not found. It removes the schedules first, taking each one out of the database and out of cron, and then deletes the job or call itself, in the same order as `DELETE /jobs/:guid` and `DELETE /calls/:guid`. Execution history stays, as it does for those routes.
+
+After it deletes the job or call, the scheduler looks for its schedules once more and removes any it finds, because someone may have created a schedule while the delete was running. The job and call delete routes do the same. A route that creates a schedule does the matching check from its side. Once it has stored the schedule, it looks the job or call up again, and if the job or call is gone, it removes the schedule and answers `404 Not Found`. Both checks go through the database, so the stored schedules stay right even when more than one scheduler shares it.
+
+A GUID that names no job or call is looked up as a schedule. The scheduler deletes that schedule only when its job or call is still gone, and it takes the schedule out of the database and out of cron the same way. When the job or call exists, the schedule is left alone.
 
 The answer is `200 OK` with one result for each distinct GUID, in the order they were sent:
 
@@ -427,13 +449,15 @@ The answer is `200 OK` with one result for each distinct GUID, in the order they
 
 The `result` field takes one of the following values:
 
-- `deleted` means the job or call and all of its schedules are gone.
+- `deleted` means the job or call and all of its schedules are gone, or, for a schedule, that the schedule is gone. If a schedule created during the delete couldn't be removed, the `message` says so, and that schedule shows up in `orphan_schedules`.
 
 - `app_exists` means Cloud Controller still knows the app, so nothing was deleted.
 
-- `not_found` means no job or call has that GUID.
+- `parent_exists` means the GUID names a schedule whose job or call is still stored, so nothing was deleted. The `type` is `schedule`, and the `message` names the job or call.
 
-- `failed` means the scheduler couldn't look the job or call up, couldn't check its app, or couldn't finish deleting it. The `message` field says which step failed. When a check fails, nothing is deleted. When a later step fails, some schedules may already be gone, and sending the GUID again finishes the delete.
+- `not_found` means no job, call, or schedule has that GUID.
+
+- `failed` means the scheduler couldn't look the job, call, or schedule up, couldn't check its app, or couldn't finish deleting it. The `message` field says which step failed. When a check fails, nothing is deleted. When a later step fails, some schedules may already be gone, and sending the GUID again finishes the delete.
 
 A body that isn't a JSON object, or one whose `guids` list is missing or empty, gets `400 Bad Request` with an error body, and nothing is deleted.
 
@@ -448,7 +472,9 @@ sch orphans list
 sch orphans del 9a1c1a56-0d0c-4f86-9a8c-5d4d1f3b2f10 5e2d8c4b-3f1a-4b7e-9c6d-8a0f2e4b6d14
 ```
 
-`sch orphans list` prints one line for each orphaned job or call, with its type, name, GUID, app, space, and how many of its schedules are enabled. `sch orphans del` prints the result for each GUID, and it exits non-zero when any of them wasn't deleted.
+`sch orphans list` prints one line for each orphaned job or call, with its type, name, GUID, app, space, and how many of its schedules are enabled. Below that, it prints one line for each schedule whose job or call is gone, with the schedule's GUID, whether it belonged to a job or a call, that job or call's GUID, its expression, and whether it's enabled. `sch orphans del` takes job, call, and schedule GUIDs. It prints the result for each GUID, and it exits non-zero when any of them wasn't deleted.
+
+When the scheduler refuses the token with `401 Unauthorized`, the CLI says so and tells us to refresh `SCHEDULER_TOKEN` with `cf oauth-token` as an admin user. When it refuses with `403 Forbidden`, the CLI says that the token's user isn't an admin.
 
 ## API Reference
 
@@ -599,8 +625,8 @@ Single-resource endpoints return the entity directly as JSON.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/orphans` | List the jobs and calls whose app is gone, for admins only |
-| POST | `/orphans/delete` | Delete the named jobs and calls whose app is gone, for admins only |
+| GET | `/orphans` | List the jobs and calls whose app is gone, and the schedules whose job or call is gone, for admins only |
+| POST | `/orphans/delete` | Delete the named jobs and calls whose app is gone, and the named schedules whose job or call is gone, for admins only |
 
 ## CI/CD Pipeline
 
