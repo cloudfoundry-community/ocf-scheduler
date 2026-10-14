@@ -67,7 +67,7 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 				return http.StatusUnprocessableEntity, requestError("schedule_failed", "%v", err)
 			}
 
-			return 0, nil
+			return confirmOwner(services, tag, schedule, job)
 		})
 		if status != 0 {
 			return c.JSON(status, body)
