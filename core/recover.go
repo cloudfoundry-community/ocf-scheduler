@@ -28,6 +28,10 @@ func RecoverRun(services *Services, execution *Execution, tag string) {
 		}
 	}()
 
-	services.Executions.UpdateMessage(execution, fmt.Sprintf("run failed unexpectedly: %v", recovered))
-	services.Executions.Fail(execution)
+	if _, err := services.Executions.UpdateMessage(execution, fmt.Sprintf("run failed unexpectedly: %v", recovered)); err != nil {
+		services.Logger.Error(tag, fmt.Sprintf("could not record the panic on execution %s: %v", execution.GUID, err))
+	}
+	if _, err := services.Executions.Fail(execution); err != nil {
+		services.Logger.Error(tag, fmt.Sprintf("could not fail execution %s after a panic, so it is left unfinished: %v", execution.GUID, err))
+	}
 }
