@@ -17,3 +17,11 @@ func SetTaskGUIDRetries(attempts int, backoff time.Duration) func() {
 	taskGUIDAttempts, taskGUIDBackoff = attempts, backoff
 	return func() { taskGUIDAttempts, taskGUIDBackoff = savedAttempts, savedBackoff }
 }
+
+// SetTaskPendingLimit changes how long waitForTask follows a PENDING task
+// for a test and returns a function that restores it.
+func SetTaskPendingLimit(limit time.Duration) func() {
+	saved := taskPendingLimit
+	taskPendingLimit = limit
+	return func() { taskPendingLimit = saved }
+}

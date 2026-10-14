@@ -494,6 +494,10 @@ A manual run behaves the same way. `POST /jobs/:guid/execute` and `POST /calls/:
 
 If the database stays down through both rounds of retries, the execution can stay `PENDING` for good. The scheduler logs both errors with the execution's GUID, and the automatic cleanup of old executions leaves the row alone, because it removes only executions that succeeded or failed. We can find such an execution in the job's or call's history and treat it as a run that never happened.
 
+### Tasks that never start
+
+The scheduler follows a job's Cloud Foundry task until it ends, but it waits only 15 minutes for a task that Cloud Controller still reports as `PENDING`. After that, it marks the execution `FAILED` with a message saying the task never started, and it stops following the task. It doesn't cancel the task, so Cloud Controller may still run it later, and the execution won't record how that run ends. A task that has started and is `RUNNING` has no time limit.
+
 ## API Reference
 
 > **Note:** The following HTTP API is an internal interface used by the scheduler service

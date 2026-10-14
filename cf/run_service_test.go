@@ -245,6 +245,85 @@ func TestRunService_ExecuteFollowsATaskUntilItFinishes(t *testing.T) {
 	}
 }
 
+// stallingTaskClient creates a task in the first of states and reports the
+// next state on each GetTask, staying in the last one until after has
+// passed since the task was created, and then reports final. It gives up
+// with an error after maxReads, so a run that never stops polling ends.
+type stallingTaskClient struct {
+	*mock.CFClient
+	states   []string
+	after    time.Duration
+	final    string
+	created  time.Time
+	reads    int
+	maxReads int
+}
+
+func (client *stallingTaskClient) CreateTask(_ context.Context, _ string, _ *resource.TaskCreate) (*resource.Task, error) {
+	client.created = time.Now()
+	return &resource.Task{State: client.states[0], Resource: resource.Resource{GUID: "task-guid"}}, nil
+}
+
+func (client *stallingTaskClient) GetTask(_ context.Context, guid string) (*resource.Task, error) {
+	client.reads++
+	if client.reads > client.maxReads {
+		return nil, errors.New("the task was read too many times")
+	}
+	state := client.states[min(client.reads, len(client.states)-1)]
+	if client.final != "" && time.Since(client.created) > client.after {
+		state = client.final
+	}
+	return &resource.Task{State: state, Resource: resource.Resource{GUID: guid}}, nil
+}
+
+// A task that stays PENDING past the limit fails the execution with a
+// message saying it never started, while a task that is RUNNING has no
+// limit and is followed to its end.
+func TestRunService_ExecuteLimitsHowLongATaskStaysPending(t *testing.T) {
+	defer cf.SetTaskPollInterval(time.Millisecond)()
+	defer cf.SetTaskPendingLimit(20 * time.Millisecond)()
+
+	tests := []struct {
+		name        string
+		client      *stallingTaskClient
+		wantState   string
+		wantMessage string
+	}{
+		{
+			name:        "a task that never leaves pending",
+			client:      &stallingTaskClient{states: []string{"PENDING"}, maxReads: 1000},
+			wantState:   "FAILED",
+			wantMessage: "task task-guid for the job nightly (job-guid) never started",
+		},
+		{
+			name:      "a task that runs past the limit",
+			client:    &stallingTaskClient{states: []string{"PENDING", "RUNNING"}, after: 100 * time.Millisecond, final: "SUCCEEDED", maxReads: 100000},
+			wantState: "SUCCEEDED",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := mock.NewCFClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.client.CFClient = client
+			services, execution := newRunServices(t)
+			job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+			cf.NewRunService(tt.client).Execute(services, execution, job)
+
+			if execution.State != tt.wantState {
+				t.Errorf("execution state is %q, want %q (message %q)", execution.State, tt.wantState, execution.Message)
+			}
+			if !strings.Contains(execution.Message, tt.wantMessage) {
+				t.Errorf("execution message is %q, want it to contain %q", execution.Message, tt.wantMessage)
+			}
+		})
+	}
+}
+
 // countingClient counts the tasks it is asked to create.
 type countingClient struct {
 	*mock.CFClient

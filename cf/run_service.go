@@ -2,6 +2,7 @@ package cf
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,15 @@ import (
 // taskPollInterval is how long waitForTask sleeps between asking Cloud
 // Controller for a running task's state.
 var taskPollInterval = 5 * time.Second
+
+// taskPendingLimit is how long waitForTask follows a task that Cloud
+// Controller still reports as PENDING. A task that has started and is
+// RUNNING has no limit.
+var taskPendingLimit = 15 * time.Minute
+
+// errTaskNeverStarted is returned by waitForTask for a task that was still
+// PENDING when taskPendingLimit ran out.
+var errTaskNeverStarted = errors.New("the task never started")
 
 // taskGUIDAttempts and taskGUIDBackoff bound how often Execute tries to
 // mark an execution started and to store a new task's GUID on it. The wait
@@ -87,10 +97,26 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 			service.storeTaskGUID(services, execution, task.GUID, tag)
 
 			task, err = service.waitForTask(services, task)
-			if err != nil {
+			switch {
+			case errors.Is(err, errTaskNeverStarted):
+				// The task is left alone in Cloud Controller, which may still
+				// start it, but the run no longer waits for it.
+				service.qq(
+					services,
+					execution,
+					tag,
+					fmt.Sprintf(
+						"task %s for the job %s (%s) never started, because it was still PENDING after %s, so the scheduler stopped following it",
+						task.GUID,
+						job.Name,
+						job.GUID,
+						taskPendingLimit,
+					),
+				)
+			case err != nil:
 				// There is no task to finalize, so the failure is the outcome.
 				service.handleTaskFailure(services, execution, job, err)
-			} else {
+			default:
 				services.Logger.Info(tag, fmt.Sprintf("task state before finalization: %s", task.State))
 
 				service.finalizeTask(services, execution, job, task)
@@ -151,11 +177,18 @@ func taskUnfinished(state string) bool {
 }
 
 // waitForTask polls the task until it leaves the pending, running, and
-// canceling states, and returns it in the state it ended in.
+// canceling states, and returns it in the state it ended in. A task still
+// PENDING once taskPendingLimit has passed is returned as it was last seen,
+// with errTaskNeverStarted.
 func (service *RunService) waitForTask(services *core.Services, task *resource.Task) (*resource.Task, error) {
 	count := 0
+	started := time.Now()
 
 	for taskUnfinished(task.State) {
+		if task.State == "PENDING" && time.Since(started) >= taskPendingLimit {
+			return task, errTaskNeverStarted
+		}
+
 		// oh hey, the task is still going, so let's wait a bit and see how
 		// it's doing
 
