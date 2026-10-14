@@ -406,9 +406,17 @@ func deleteOrphan(ctx context.Context, services *core.Services, tag, guid string
 	}
 
 	result.Result = orphanDeleted
-	if err := sweepSchedules(services, tag, executable); err != nil {
+	left, err := sweepSchedules(services, tag, executable)
+	if err != nil {
 		services.Logger.Error(tag, err.Error())
+	}
+	switch {
+	case left == 1:
 		result.Message = "a schedule created during the delete was left behind, and it is listed as an orphan schedule"
+	case left > 1:
+		result.Message = fmt.Sprintf("%d schedules created during the delete were left behind, and they are listed as orphan schedules", left)
+	case err != nil:
+		result.Message = "could not check for schedules created during the delete, so look for them in the orphan schedules list"
 	}
 
 	services.Logger.Info(tag, fmt.Sprintf("deleted %s %s of app %s in space %s", result.Type, guid, owner.AppGUID, owner.SpaceGUID))

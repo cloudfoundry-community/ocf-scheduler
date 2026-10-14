@@ -21,22 +21,28 @@ import (
 
 // sweepSchedules deletes the schedules still stored for an executable that
 // has just been deleted, which can only be schedules created while the delete
-// ran. It returns the first schedule it could not delete.
-func sweepSchedules(services *core.Services, tag string, executable core.Executable) error {
+// ran. It tries every schedule it finds and returns how many it could not
+// delete from the database, with the errors it met. When the schedules cannot
+// be listed at all, it returns zero and the error, because it cannot tell
+// whether any were left.
+func sweepSchedules(services *core.Services, tag string, executable core.Executable) (int, error) {
 	schedules, err := schedulesOf(services, executable)
 	if err != nil {
-		return fmt.Errorf("could not list schedules left on %s %s: %w", executable.Type(), ownerOf(executable).GUID, err)
+		return 0, fmt.Errorf("could not list schedules left on %s %s: %w", executable.Type(), ownerOf(executable).GUID, err)
 	}
 
+	left := 0
+	var errs []error
 	for _, schedule := range schedules {
 		services.Logger.Warn(tag, fmt.Sprintf("deleting schedule %s, created while %s %s was being deleted", schedule.GUID, executable.Type(), ownerOf(executable).GUID))
 
 		if err := dropOrphanSchedule(services, schedule, executable); err != nil {
-			return fmt.Errorf("could not delete schedule %s left on %s %s: %w", schedule.GUID, executable.Type(), ownerOf(executable).GUID, err)
+			left++
+			errs = append(errs, fmt.Errorf("could not delete schedule %s left on %s %s: %w", schedule.GUID, executable.Type(), ownerOf(executable).GUID, err))
 		}
 	}
 
-	return nil
+	return left, errors.Join(errs...)
 }
 
 // confirmOwner runs after a create has stored a schedule and added it to

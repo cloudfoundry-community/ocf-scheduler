@@ -55,7 +55,7 @@ func DeleteCall(e *echo.Echo, services *core.Services) {
 
 		// The call is deleted whatever the sweep finds, and a schedule the
 		// sweep cannot delete is listed as an orphan schedule.
-		if err := sweepSchedules(services, tag, call); err != nil {
+		if _, err := sweepSchedules(services, tag, call); err != nil {
 			services.Logger.Error(tag, err.Error())
 		}
 

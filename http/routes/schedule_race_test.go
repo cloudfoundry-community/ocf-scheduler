@@ -338,3 +338,69 @@ func TestCreateScheduleKeepsTheScheduleWhenTheOwnerCannotBeLookedUpAgain(t *test
 		})
 	}
 }
+
+// blindSchedules fails every schedule listing by job or call once it is
+// armed.
+type blindSchedules struct {
+	core.ScheduleService
+	armed *bool
+}
+
+func (schedules blindSchedules) ByJob(job *core.Job) ([]*core.Schedule, error) {
+	if *schedules.armed {
+		return nil, errors.New("database unavailable")
+	}
+	return schedules.ScheduleService.ByJob(job)
+}
+
+// The orphans delete says a schedule was left behind only when the sweep
+// really left one, and says it could not check when the sweep could not
+// list the schedules.
+func TestDeleteOrphansSaysWhatTheSweepLeft(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		wrap func(tn *tenancy, armed *bool)
+		late bool
+		want string
+	}{
+		{
+			name: "a schedule left behind",
+			wrap: func(tn *tenancy, armed *bool) { tn.services.Schedules = stuckSchedules{tn.services.Schedules, armed} },
+			late: true,
+			want: "a schedule created during the delete was left behind, and it is listed as an orphan schedule",
+		},
+		{
+			name: "a sweep that could not look",
+			wrap: func(tn *tenancy, armed *bool) { tn.services.Schedules = blindSchedules{tn.services.Schedules, armed} },
+			want: "could not check for schedules created during the delete, so look for them in the orphan schedules list",
+		},
+		{
+			name: "a clean sweep",
+			wrap: func(tn *tenancy, armed *bool) {},
+			late: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tn := newTenancy(t)
+			tn.cf.RemoveApp("app-b")
+			armed := false
+			tt.wrap(tn, &armed)
+
+			tn.services.Jobs = lateJobs{tn.services.Jobs, func(executable core.Executable) {
+				if !armed {
+					if tt.late {
+						tn.persistSchedule(t, executable)
+					}
+					armed = true
+				}
+			}}
+
+			guid := tn.jobB.GUID
+			results := tn.deleteOrphans(t, guid)
+			expectResult(t, results, guid, "job", orphanDeleted)
+			if got := results[guid].Message; got != tt.want {
+				t.Errorf("message %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
