@@ -348,6 +348,78 @@ func TestRunService_ExecuteLimitsHowLongATaskStaysPending(t *testing.T) {
 	}
 }
 
+// endingTaskClient is a stallingTaskClient whose task ends as the cancel
+// arrives, so the cancel fails and the next GetTask reports afterCancel, or
+// afterCancelErr when that is set.
+type endingTaskClient struct {
+	*stallingTaskClient
+	afterCancel    string
+	afterCancelErr error
+}
+
+func (client *endingTaskClient) GetTask(ctx context.Context, guid string) (*resource.Task, error) {
+	if client.cancels == 0 {
+		return client.stallingTaskClient.GetTask(ctx, guid)
+	}
+	client.reads++
+	if client.afterCancelErr != nil {
+		return nil, client.afterCancelErr
+	}
+	return &resource.Task{State: client.afterCancel, Resource: resource.Resource{GUID: guid}}, nil
+}
+
+// A task that ends while the scheduler cancels it is recorded in the state
+// it ended in. When the second look fails or still shows no end, the
+// execution fails as it did before.
+func TestRunService_ExecuteRecordsATaskThatEndedDuringTheCancel(t *testing.T) {
+	defer cf.SetTaskPollInterval(time.Millisecond)()
+	defer cf.SetTaskPendingLimit(20 * time.Millisecond)()
+
+	tests := []struct {
+		name        string
+		afterCancel string
+		lookupErr   error
+		wantState   string
+		wantMessage string
+	}{
+		{name: "the task succeeded", afterCancel: "SUCCEEDED", wantState: "SUCCEEDED"},
+		{name: "the task failed", afterCancel: "FAILED", wantState: "FAILED"},
+		{name: "the second lookup fails", lookupErr: errors.New("api down"), wantState: "FAILED", wantMessage: "Cloud Controller may still run it"},
+		{name: "the task is still pending", afterCancel: "PENDING", wantState: "FAILED", wantMessage: "Cloud Controller may still run it"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := mock.NewCFClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			ending := &endingTaskClient{
+				stallingTaskClient: &stallingTaskClient{CFClient: client, states: []string{"PENDING"}, maxReads: 1000, cancelErr: errors.New("task already finished")},
+				afterCancel:        tt.afterCancel,
+				afterCancelErr:     tt.lookupErr,
+			}
+			services, execution := newRunServices(t)
+			job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+			cf.NewRunService(ending).Execute(services, execution, job)
+
+			if execution.State != tt.wantState {
+				t.Errorf("execution state is %q, want %q (message %q)", execution.State, tt.wantState, execution.Message)
+			}
+			if tt.wantMessage == "" && strings.Contains(execution.Message, "never started") {
+				t.Errorf("execution message is %q, want the real outcome", execution.Message)
+			}
+			if !strings.Contains(execution.Message, tt.wantMessage) {
+				t.Errorf("execution message is %q, want it to contain %q", execution.Message, tt.wantMessage)
+			}
+			if ending.cancels != 1 {
+				t.Errorf("the task was cancelled %d times, want 1", ending.cancels)
+			}
+		})
+	}
+}
+
 // countingClient counts the tasks it is asked to create.
 type countingClient struct {
 	*mock.CFClient

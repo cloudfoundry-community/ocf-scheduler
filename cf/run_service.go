@@ -99,7 +99,12 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 			task, err = service.waitForTask(services, task)
 			switch {
 			case errors.Is(err, errTaskNeverStarted):
-				service.qq(services, execution, tag, service.cancelUnstartedTask(services, job, task, tag))
+				message, finished := service.cancelUnstartedTask(services, job, task, tag)
+				if finished != nil {
+					service.finalizeTask(services, execution, job, finished)
+				} else {
+					service.qq(services, execution, tag, message)
+				}
 			case err != nil:
 				// There is no task to finalize, so the failure is the outcome.
 				service.handleTaskFailure(services, execution, job, err)
@@ -202,7 +207,12 @@ func (service *RunService) waitForTask(services *core.Services, task *resource.T
 // taskPendingLimit, so that Cloud Controller cannot start it later with no
 // execution left to record its outcome. It returns the message for the
 // failed execution, which says whether the cancel went through.
-func (service *RunService) cancelUnstartedTask(services *core.Services, job *core.Job, task *resource.Task, tag string) string {
+//
+// Cloud Controller refuses to cancel a task that ended since the last poll,
+// so after a failed cancel the task is read once more. When it turns out to
+// be SUCCEEDED or FAILED, it is returned as the outcome to record in place of
+// the message.
+func (service *RunService) cancelUnstartedTask(services *core.Services, job *core.Job, task *resource.Task, tag string) (string, *resource.Task) {
 	message := fmt.Sprintf(
 		"task %s for the job %s (%s) never started, because it was still PENDING after %s",
 		task.GUID,
@@ -213,10 +223,16 @@ func (service *RunService) cancelUnstartedTask(services *core.Services, job *cor
 
 	if _, err := service.client.CancelTask(context.Background(), task.GUID); err != nil {
 		services.Logger.Error(tag, fmt.Sprintf("cannot cancel task %s for the job %s (%s): %v", task.GUID, job.Name, job.GUID, err))
-		return fmt.Sprintf("%s, and the scheduler could not cancel it, so Cloud Controller may still run it: %v", message, err)
+
+		latest, getErr := service.client.GetTask(context.Background(), task.GUID)
+		if getErr == nil && (latest.State == "SUCCEEDED" || latest.State == "FAILED") {
+			return "", latest
+		}
+
+		return fmt.Sprintf("%s, and the scheduler could not cancel it, so Cloud Controller may still run it: %v", message, err), nil
 	}
 
-	return message + ", so the scheduler cancelled it"
+	return message + ", so the scheduler cancelled it", nil
 }
 
 func (service *RunService) handleTaskFailure(services *core.Services, execution *core.Execution, job *core.Job, err error) error {
