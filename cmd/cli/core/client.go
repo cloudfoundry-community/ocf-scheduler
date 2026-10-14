@@ -89,11 +89,21 @@ func (result *Result) Okay() bool {
 }
 
 // Error describes a failed response, with the message that the scheduler
-// sent when there is one.
+// sent when there is one. The scheduler refuses a token with an empty body,
+// so for 401 and 403 it says what the refusal means instead.
 func (result *Result) Error() error {
 	message := Message(result.Body)
 	if message == "" {
-		return fmt.Errorf("response status: %d", result.Status)
+		status := fmt.Sprintf("%d %s", result.Status, http.StatusText(result.Status))
+
+		switch result.Status {
+		case http.StatusUnauthorized:
+			return fmt.Errorf("response status: %s: the scheduler rejected the token, so refresh SCHEDULER_TOKEN with `cf oauth-token` as an admin user", status)
+		case http.StatusForbidden:
+			return fmt.Errorf("response status: %s: the token's user is not an admin", status)
+		}
+
+		return fmt.Errorf("response status: %s", strings.TrimSpace(status))
 	}
 
 	return fmt.Errorf("response status: %d: %s", result.Status, message)

@@ -60,7 +60,7 @@ func TestListShowsAGatewaysPlainTextBody(t *testing.T) {
 func TestListWithAnEmptyBodyShowsTheStatus(t *testing.T) {
 	err := run(t, http.StatusForbidden, "")
 
-	if err == nil || err.Error() != "response status: 403" {
+	if err == nil || err.Error() != "response status: 403 Forbidden: the token's user is not an admin" {
 		t.Errorf("unexpected error %v", err)
 	}
 }
