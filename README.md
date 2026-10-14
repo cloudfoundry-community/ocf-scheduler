@@ -482,6 +482,18 @@ sch orphans del 9a1c1a56-0d0c-4f86-9a8c-5d4d1f3b2f10 5e2d8c4b-3f1a-4b7e-9c6d-8a0
 
 When the scheduler refuses the token with `401 Unauthorized`, the orphans commands say so and tell us to refresh `SCHEDULER_TOKEN` with `cf oauth-token` as an admin user. When it refuses with `403 Forbidden`, they say that the token's user isn't an admin. The other `sch` commands are open to space members, so for those the CLI says only that the token was rejected and should be refreshed with `cf oauth-token`, or that the token's user isn't allowed to do what was asked.
 
+## Operations Notes
+
+### Executions that stay PENDING
+
+Before a job or call runs, the scheduler marks its execution as started. If the database doesn't answer, it tries five times, waiting one second before the second try and doubling the wait after each failure, which comes to about fifteen seconds in all. If every try fails, the scheduler skips the run, because we would rather miss one run than start a task or a call that nothing records.
+
+When the scheduler skips a run, it notes why on the execution and then marks the execution `FAILED`, with the same retries. So the execution ends up `FAILED` whenever the database answers within that time, and its message says that the run was skipped.
+
+A manual run behaves the same way. `POST /jobs/:guid/execute` and `POST /calls/:guid/execute` answer `201 Created` with the new execution before the run starts, so the caller already holds the execution when the scheduler tries to start it. If the start fails, that execution moves from `PENDING` to `FAILED` as soon as the database allows it.
+
+If the database stays down through both rounds of retries, the execution can stay `PENDING` for good. The scheduler logs both errors with the execution's GUID, and the automatic cleanup of old executions leaves the row alone, because it removes only executions that succeeded or failed. We can find such an execution in the job's or call's history and treat it as a run that never happened.
+
 ## API Reference
 
 > **Note:** The following HTTP API is an internal interface used by the scheduler service

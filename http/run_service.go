@@ -2,10 +2,19 @@ package http
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ess/hype"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
+)
+
+// startAttempts and startBackoff bound how often Execute tries to mark an
+// execution started. The wait starts at startBackoff and doubles after each
+// failure.
+var (
+	startAttempts = 5
+	startBackoff  = time.Second
 )
 
 type RunService struct {
@@ -21,10 +30,9 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 
 		tag := "http-run-service"
 
-		// A run that cannot mark its execution started stops here, rather
+		// A run that cannot mark its execution started is skipped, rather
 		// than send a request whose outcome the execution may never record.
-		if _, err := services.Executions.Start(execution); err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("not running execution %s, because it could not be marked started: %v", execution.GUID, err))
+		if !core.StartRun(services, execution, tag, startAttempts, startBackoff) {
 			return
 		}
 

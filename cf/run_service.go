@@ -14,8 +14,8 @@ import (
 var taskPollInterval = 5 * time.Second
 
 // taskGUIDAttempts and taskGUIDBackoff bound how often Execute tries to
-// store a new task's GUID on its execution. The wait starts at
-// taskGUIDBackoff and doubles after each failure.
+// mark an execution started and to store a new task's GUID on it. The wait
+// starts at taskGUIDBackoff and doubles after each failure.
 var (
 	taskGUIDAttempts = 5
 	taskGUIDBackoff  = time.Second
@@ -35,10 +35,9 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 
 		tag := "cf-run-service"
 
-		// A run that cannot mark its execution started stops here, rather
+		// A run that cannot mark its execution started is skipped, rather
 		// than send a task whose outcome the execution may never record.
-		if _, err := services.Executions.Start(execution); err != nil {
-			services.Logger.Error(tag, fmt.Sprintf("not running execution %s, because it could not be marked started: %v", execution.GUID, err))
+		if !core.StartRun(services, execution, tag, taskGUIDAttempts, taskGUIDBackoff) {
 			return
 		}
 

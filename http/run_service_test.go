@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 	"github.com/cloudfoundry-community/ocf-scheduler/logger"
@@ -51,34 +52,62 @@ func TestRunService_ExecuteRecoversAPanic(t *testing.T) {
 	}
 }
 
-// unstartableExecutions cannot mark an execution started.
-type unstartableExecutions struct {
+// stallingExecutions fails the first startFailures calls to Start.
+type stallingExecutions struct {
 	*mock.ExecutionService
+	startFailures, starts int
 }
 
-func (unstartableExecutions) Start(*core.Execution) (*core.Execution, error) {
-	return nil, errors.New("database unavailable")
+func (executions *stallingExecutions) Start(execution *core.Execution) (*core.Execution, error) {
+	executions.starts++
+	if executions.starts <= executions.startFailures {
+		return nil, errors.New("database unavailable")
+	}
+	return executions.ExecutionService.Start(execution)
 }
 
-// A run whose execution cannot be marked started sends no request, because
-// the execution might never record how the call went.
-func TestRunService_ExecuteSendsNothingWhenTheExecutionCannotStart(t *testing.T) {
-	var requests atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests.Add(1)
-	}))
-	defer server.Close()
+// A brief database error while marking the execution started costs only a
+// retry. A run that never gets marked started sends no request, because the
+// execution might never record how the call went, and its execution is
+// failed rather than left PENDING.
+func TestRunService_ExecuteRetriesStartingTheExecution(t *testing.T) {
+	savedAttempts, savedBackoff := startAttempts, startBackoff
+	startAttempts, startBackoff = 3, time.Millisecond
+	defer func() { startAttempts, startBackoff = savedAttempts, savedBackoff }()
 
-	executions := unstartableExecutions{mock.NewExecutionService()}
-	services := &core.Services{Workers: inlineWorkers{}, Executions: executions, Logger: logger.New()}
-	execution, err := executions.Persist(&core.Execution{})
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name          string
+		startFailures int
+		wantRequests  int32
+		wantState     string
+	}{
+		{name: "a passing failure", startFailures: 1, wantRequests: 1, wantState: "SUCCEEDED"},
+		{name: "a failure that outlasts every attempt", startFailures: 100, wantRequests: 0, wantState: "FAILED"},
 	}
 
-	NewRunService().Execute(services, execution, &core.Call{GUID: "call-guid", Name: "ping", URL: server.URL})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var requests atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+			}))
+			defer server.Close()
 
-	if n := requests.Load(); n != 0 {
-		t.Errorf("sent %d requests, want none", n)
+			executions := &stallingExecutions{ExecutionService: mock.NewExecutionService(), startFailures: tt.startFailures}
+			services := &core.Services{Workers: inlineWorkers{}, Executions: executions, Logger: logger.New()}
+			execution, err := executions.Persist(&core.Execution{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			NewRunService().Execute(services, execution, &core.Call{GUID: "call-guid", Name: "ping", URL: server.URL})
+
+			if n := requests.Load(); n != tt.wantRequests {
+				t.Errorf("sent %d requests, want %d", n, tt.wantRequests)
+			}
+			if execution.State != tt.wantState {
+				t.Errorf("execution state is %q, want %q", execution.State, tt.wantState)
+			}
+		})
 	}
 }

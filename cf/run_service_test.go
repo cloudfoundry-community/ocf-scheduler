@@ -256,13 +256,28 @@ func (client *countingClient) CreateTask(ctx context.Context, appGUID string, re
 	return client.CFClient.CreateTask(ctx, appGUID, request)
 }
 
-// unstartableExecutions cannot mark an execution started.
-type unstartableExecutions struct {
+// stallingExecutions fails the first startFailures calls to Start and the
+// first failFailures calls to Fail, as a database that comes back would.
+type stallingExecutions struct {
 	*mock.ExecutionService
+	startFailures, failFailures int
+	starts, fails               int
 }
 
-func (unstartableExecutions) Start(*core.Execution) (*core.Execution, error) {
-	return nil, errors.New("database unavailable")
+func (executions *stallingExecutions) Start(execution *core.Execution) (*core.Execution, error) {
+	executions.starts++
+	if executions.starts <= executions.startFailures {
+		return nil, errors.New("database unavailable")
+	}
+	return executions.ExecutionService.Start(execution)
+}
+
+func (executions *stallingExecutions) Fail(execution *core.Execution) (*core.Execution, error) {
+	executions.fails++
+	if executions.fails <= executions.failFailures {
+		return nil, errors.New("database unavailable")
+	}
+	return executions.ExecutionService.Fail(execution)
 }
 
 // lostExecutions cannot store an execution at all.
@@ -274,26 +289,49 @@ func (lostExecutions) Persist(*core.Execution) (*core.Execution, error) {
 	return nil, errors.New("database unavailable")
 }
 
-// A run whose execution cannot be marked started creates no task, because
-// the execution might never record what the task did.
-func TestRunService_ExecuteCreatesNoTaskWhenTheExecutionCannotStart(t *testing.T) {
-	mockClient, err := mock.NewCFClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := &countingClient{CFClient: mockClient}
-	executions := unstartableExecutions{mock.NewExecutionService()}
-	services := &core.Services{Workers: inlineWorkers{}, Executions: executions, Logger: logger.New()}
-	execution, err := executions.Persist(&core.Execution{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+// A brief database error while marking the execution started costs only a
+// retry. A run that never gets marked started creates no task, because the
+// execution might never record what the task did, and its execution is
+// failed as soon as the database lets it, so it does not stay PENDING.
+func TestRunService_ExecuteRetriesStartingTheExecution(t *testing.T) {
+	defer cf.SetTaskPollInterval(time.Millisecond)()
+	defer cf.SetTaskGUIDRetries(3, time.Millisecond)()
 
-	cf.NewRunService(client).Execute(services, execution, job)
+	tests := []struct {
+		name                        string
+		startFailures, failFailures int
+		wantTasks                   int
+		wantState                   string
+	}{
+		{name: "a passing failure", startFailures: 1, wantTasks: 1, wantState: "SUCCEEDED"},
+		{name: "a failure that outlasts every attempt", startFailures: 100, wantTasks: 0, wantState: "FAILED"},
+		{name: "a failure that also delays the fail", startFailures: 100, failFailures: 2, wantTasks: 0, wantState: "FAILED"},
+	}
 
-	if client.created != 0 {
-		t.Errorf("created %d tasks, want none", client.created)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient, err := mock.NewCFClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			client := &countingClient{CFClient: mockClient}
+			executions := &stallingExecutions{ExecutionService: mock.NewExecutionService(), startFailures: tt.startFailures, failFailures: tt.failFailures}
+			services := &core.Services{Workers: inlineWorkers{}, Executions: executions, Logger: logger.New()}
+			execution, err := executions.Persist(&core.Execution{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+			cf.NewRunService(client).Execute(services, execution, job)
+
+			if client.created != tt.wantTasks {
+				t.Errorf("created %d tasks, want %d", client.created, tt.wantTasks)
+			}
+			if execution.State != tt.wantState {
+				t.Errorf("execution state is %q, want %q", execution.State, tt.wantState)
+			}
+		})
 	}
 }
 
