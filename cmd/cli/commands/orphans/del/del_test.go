@@ -52,6 +52,15 @@ func TestDelShowsThe502Message(t *testing.T) {
 	}
 }
 
+// Only an admin may delete orphans, so an empty 403 says the user is not one.
+func TestDelSaysAnAdminIsNeeded(t *testing.T) {
+	err := run(t, http.StatusForbidden, "")
+
+	if err == nil || err.Error() != "response status: 403 Forbidden: the token's user is not an admin" {
+		t.Errorf("unexpected error %v", err)
+	}
+}
+
 func TestDelSucceedsWhenEverythingIsDeleted(t *testing.T) {
 	err := run(t, http.StatusOK, `{"results":[{"guid":"guid-1","type":"job","result":"deleted"}]}`)
 

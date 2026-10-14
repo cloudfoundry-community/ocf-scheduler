@@ -51,7 +51,7 @@ The command fails if any GUID was not deleted.`,
 		}
 
 		if !response.Okay() {
-			return response.Error()
+			return response.AdminError()
 		}
 
 		data := struct {

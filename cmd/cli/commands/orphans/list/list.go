@@ -58,7 +58,7 @@ one left behind when a delete could not finish.`,
 		}
 
 		if !response.Okay() {
-			return response.Error()
+			return response.AdminError()
 		}
 
 		// A scheduler too old to list orphan schedules leaves the field

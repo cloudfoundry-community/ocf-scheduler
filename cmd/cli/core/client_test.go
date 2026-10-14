@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+// Most commands are open to space members, so their 401 and 403 say nothing
+// about admins.
 func TestResultErrorExplainsAnEmptyBody(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -14,12 +16,12 @@ func TestResultErrorExplainsAnEmptyBody(t *testing.T) {
 		{
 			name:   "a rejected token",
 			status: 401,
-			want:   "response status: 401 Unauthorized: the scheduler rejected the token, so refresh SCHEDULER_TOKEN with `cf oauth-token` as an admin user",
+			want:   "response status: 401 Unauthorized: the scheduler rejected the token, so refresh SCHEDULER_TOKEN with `cf oauth-token`",
 		},
 		{
-			name:   "a user who is not an admin",
+			name:   "a user who may not do this",
 			status: 403,
-			want:   "response status: 403 Forbidden: the token's user is not an admin",
+			want:   "response status: 403 Forbidden: the token's user is not allowed to do this",
 		},
 		{
 			name:   "a gateway failure",
@@ -41,6 +43,26 @@ func TestResultErrorExplainsAnEmptyBody(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// Only an admin may run the orphans commands, so their 401 and 403 say so.
+func TestResultAdminErrorExplainsAnEmptyBody(t *testing.T) {
+	tests := []struct {
+		status int
+		want   string
+	}{
+		{401, "response status: 401 Unauthorized: the scheduler rejected the token, so refresh SCHEDULER_TOKEN with `cf oauth-token` as an admin user"},
+		{403, "response status: 403 Forbidden: the token's user is not an admin"},
+		{502, "response status: 502 Bad Gateway"},
+	}
+
+	for _, tt := range tests {
+		result := &Result{Status: tt.status}
+
+		if got := result.AdminError().Error(); got != tt.want {
+			t.Errorf("%d: got %q, want %q", tt.status, got, tt.want)
+		}
 	}
 }
 

@@ -89,18 +89,36 @@ func (result *Result) Okay() bool {
 }
 
 // Error describes a failed response, with the message that the scheduler
-// sent when there is one. The scheduler refuses a token with an empty body,
-// so for 401 and 403 it says what the refusal means instead.
+// sent when there is one. The scheduler refuses a request with an empty
+// body, so for 401 and 403 it says what the refusal means instead.
 func (result *Result) Error() error {
+	return result.explain(
+		"the scheduler rejected the token, so refresh SCHEDULER_TOKEN with `cf oauth-token`",
+		"the token's user is not allowed to do this",
+	)
+}
+
+// AdminError is Error for a command that only an admin may run, so its 401
+// and 403 say that the token must belong to an admin.
+func (result *Result) AdminError() error {
+	return result.explain(
+		"the scheduler rejected the token, so refresh SCHEDULER_TOKEN with `cf oauth-token` as an admin user",
+		"the token's user is not an admin",
+	)
+}
+
+// explain describes a failed response, using unauthorized and forbidden for
+// a 401 or 403 that came with an empty body.
+func (result *Result) explain(unauthorized, forbidden string) error {
 	message := Message(result.Body)
 	if message == "" {
 		status := fmt.Sprintf("%d %s", result.Status, http.StatusText(result.Status))
 
 		switch result.Status {
 		case http.StatusUnauthorized:
-			return fmt.Errorf("response status: %s: the scheduler rejected the token, so refresh SCHEDULER_TOKEN with `cf oauth-token` as an admin user", status)
+			return fmt.Errorf("response status: %s: %s", status, unauthorized)
 		case http.StatusForbidden:
-			return fmt.Errorf("response status: %s: the token's user is not an admin", status)
+			return fmt.Errorf("response status: %s: %s", status, forbidden)
 		}
 
 		return fmt.Errorf("response status: %s", strings.TrimSpace(status))
