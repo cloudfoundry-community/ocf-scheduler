@@ -106,11 +106,15 @@ func newTenancy(t *testing.T) *tenancy {
 	}
 
 	log := logger.New()
+	jobs := mock.NewJobService()
+	calls := mock.NewCallService()
+	schedules := mock.NewScheduleService()
+	schedules.Owners(jobs, calls)
 	tn.services = &core.Services{
 		Info:       cf.NewInfoService(client),
-		Jobs:       mock.NewJobService(),
-		Calls:      mock.NewCallService(),
-		Schedules:  mock.NewScheduleService(),
+		Jobs:       jobs,
+		Calls:      calls,
+		Schedules:  schedules,
 		Executions: mock.NewExecutionService(),
 		Runner:     tn.runner,
 		Cron:       cron.NewCronService(log, cron.Rules{}),

@@ -30,6 +30,11 @@ type ScheduleService interface {
 	// ByApp returns every schedule on the app's jobs and calls.
 	ByApp(appGUID string) ([]*Schedule, error)
 
+	// Orphaned returns every schedule whose job or call is not stored, such
+	// as one left behind when a delete could not finish. It reports a failed
+	// query, so a lost database never reads as having no orphans.
+	Orphaned() ([]*Schedule, error)
+
 	// Pause disables every enabled schedule on the app's jobs and calls,
 	// marks each one with reason, and returns the schedules it changed.
 	Pause(appGUID string, reason string) ([]*Schedule, error)

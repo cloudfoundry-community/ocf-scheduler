@@ -27,6 +27,12 @@ var scheduleColumns = []string{
 const appSchedules = `((ref_type = 'job' AND ref_guid IN (SELECT guid FROM jobs WHERE app_guid = $1)) OR
 	(ref_type = 'call' AND ref_guid IN (SELECT guid FROM calls WHERE app_guid = $1)))`
 
+// orphanedSchedules matches the schedules whose job or call is not stored.
+// It goes by ref_type, as loading schedules at startup does, so a schedule
+// that names the wrong kind of owner counts as orphaned too.
+const orphanedSchedules = `NOT EXISTS (SELECT 1 FROM jobs WHERE schedules.ref_type = 'job' AND jobs.guid = schedules.ref_guid) AND
+	NOT EXISTS (SELECT 1 FROM calls WHERE schedules.ref_type = 'call' AND calls.guid = schedules.ref_guid)`
+
 type ScheduleService struct {
 	db                  *sql.DB
 	queryByPrimaryKey   string
@@ -34,6 +40,7 @@ type ScheduleService struct {
 	queryByCall         string
 	queryByJob          string
 	queryByApp          string
+	queryOrphaned       string
 	pauseByApp          string
 	resumeByApp         string
 	insertIntoSchedules string
@@ -46,6 +53,7 @@ func NewScheduleService(db *sql.DB) *ScheduleService {
 	qbj := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE ref_type = 'job' AND ref_guid = $1"
 
 	qba := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE " + appSchedules
+	qo := "SELECT " + strings.Join(scheduleColumns, ", ") + " FROM schedules WHERE " + orphanedSchedules
 	pba := "UPDATE schedules SET enabled = false, paused_by = $2, updated_at = $3 WHERE enabled AND " +
 		appSchedules + " RETURNING " + strings.Join(scheduleColumns, ", ")
 	rba := "UPDATE schedules SET enabled = true, paused_by = NULL, updated_at = $3 WHERE paused_by = $2 AND guid = ANY($4::text[]) AND " +
@@ -59,6 +67,7 @@ func NewScheduleService(db *sql.DB) *ScheduleService {
 		queryByCall:         qbc,
 		queryByJob:          qbj,
 		queryByApp:          qba,
+		queryOrphaned:       qo,
 		pauseByApp:          pba,
 		resumeByApp:         rba,
 		insertIntoSchedules: is,
@@ -112,6 +121,10 @@ func (service *ScheduleService) ByApp(appGUID string) ([]*core.Schedule, error) 
 	}
 
 	return scanSchedules(rows)
+}
+
+func (service *ScheduleService) Orphaned() ([]*core.Schedule, error) {
+	return service.query(service.queryOrphaned)
 }
 
 func (service *ScheduleService) Pause(appGUID string, reason string) ([]*core.Schedule, error) {

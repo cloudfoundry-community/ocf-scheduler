@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"golang.org/x/sync/errgroup"
@@ -26,8 +27,23 @@ type orphan struct {
 	Schedules []*core.Schedule `json:"schedules"`
 }
 
+// An orphan schedule is a schedule whose job or call is not stored, such as
+// one left behind when a delete could not finish. Unlike a schedule shown
+// under its job or call, it names the job or call it belonged to.
+type orphanSchedule struct {
+	GUID           string    `json:"guid"`
+	Enabled        bool      `json:"enabled"`
+	Expression     string    `json:"expression"`
+	ExpressionType string    `json:"expression_type"`
+	RefType        string    `json:"ref_type"`
+	RefGUID        string    `json:"ref_guid"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type orphanCollection struct {
-	Resources []*orphan `json:"resources"`
+	Resources       []*orphan         `json:"resources"`
+	OrphanSchedules []*orphanSchedule `json:"orphan_schedules"`
 }
 
 type orphanDeletion struct {
@@ -38,8 +54,10 @@ type orphanDeletion struct {
 const (
 	orphanDeleted   = "deleted"
 	orphanAppExists = "app_exists"
-	orphanNotFound  = "not_found"
-	orphanFailed    = "failed"
+	// A schedule GUID whose job or call is still stored.
+	orphanParentExists = "parent_exists"
+	orphanNotFound     = "not_found"
+	orphanFailed       = "failed"
 )
 
 type orphanResult struct {
@@ -72,7 +90,8 @@ func Orphans(e *echo.Echo, services *core.Services) {
 }
 
 func ListOrphans(e *echo.Echo, services *core.Services) {
-	// List the jobs and calls whose app is gone, across every space
+	// List the jobs and calls whose app is gone, across every space, and
+	// the schedules whose job or call is gone
 	// GET /orphans
 	e.GET("/orphans", func(c echo.Context) error {
 		tag := "list-orphans"
@@ -98,6 +117,12 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusInternalServerError, "error retrieving calls")
 		}
 
+		schedules, err := services.Schedules.Orphaned()
+		if err != nil {
+			services.Logger.Error(tag, fmt.Sprintf("error retrieving schedules whose job or call is gone: %v", err))
+			return c.JSON(http.StatusInternalServerError, "error retrieving schedules")
+		}
+
 		executables := make([]core.Executable, 0, len(jobs)+len(calls))
 		for _, job := range jobs {
 			executables = append(executables, job)
@@ -119,7 +144,10 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusBadGateway, "could not check apps with Cloud Controller")
 		}
 
-		output := &orphanCollection{Resources: make([]*orphan, 0)}
+		output := &orphanCollection{
+			Resources:       make([]*orphan, 0),
+			OrphanSchedules: make([]*orphanSchedule, 0, len(schedules)),
+		}
 		for _, executable := range executables {
 			owner := ownerOf(executable)
 			if !gone[owner.AppGUID] {
@@ -151,13 +179,38 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 			)
 		})
 
-		services.Logger.Info(tag, fmt.Sprintf("found %d jobs and calls whose app is gone", len(output.Resources)))
+		for _, schedule := range schedules {
+			output.OrphanSchedules = append(output.OrphanSchedules, &orphanSchedule{
+				GUID:           schedule.GUID,
+				Enabled:        schedule.Enabled,
+				Expression:     schedule.Expression,
+				ExpressionType: schedule.ExpressionType,
+				RefType:        schedule.RefType,
+				RefGUID:        schedule.RefGUID,
+				CreatedAt:      schedule.CreatedAt,
+				UpdatedAt:      schedule.UpdatedAt,
+			})
+		}
+
+		slices.SortStableFunc(output.OrphanSchedules, func(a, b *orphanSchedule) int {
+			return cmp.Or(
+				cmp.Compare(a.RefType, b.RefType),
+				cmp.Compare(a.RefGUID, b.RefGUID),
+				cmp.Compare(a.GUID, b.GUID),
+			)
+		})
+
+		services.Logger.Info(tag, fmt.Sprintf(
+			"found %d jobs and calls whose app is gone, and %d schedules whose job or call is gone",
+			len(output.Resources), len(output.OrphanSchedules),
+		))
 		return c.JSON(http.StatusOK, output)
 	})
 }
 
 func DeleteOrphans(e *echo.Echo, services *core.Services) {
-	// Delete the named jobs and calls whose app is gone
+	// Delete the named jobs and calls whose app is gone, and the named
+	// schedules whose job or call is gone
 	// POST /orphans/delete
 	e.POST("/orphans/delete", func(c echo.Context) error {
 		tag := "delete-orphans"
@@ -182,7 +235,7 @@ func DeleteOrphans(e *echo.Echo, services *core.Services) {
 
 		if len(guids) == 0 {
 			services.Logger.Error(tag, "got no GUIDs to delete")
-			return c.JSON(http.StatusBadRequest, requestError("guids_required", "name at least one job or call GUID to delete"))
+			return c.JSON(http.StatusBadRequest, requestError("guids_required", "name at least one job, call, or schedule GUID to delete"))
 		}
 
 		if status, message := requireAppReader(services, tag); status != 0 {
@@ -287,15 +340,14 @@ func requireAppReader(services *core.Services, tag string) (int, string) {
 }
 
 // deleteOrphan deletes the job or call with guid, and its schedules, only
-// when Cloud Controller says its app is not found.
+// when Cloud Controller says its app is not found. A guid that names no job
+// or call is tried as an orphan schedule.
 func deleteOrphan(ctx context.Context, services *core.Services, tag, guid string) *orphanResult {
 	result := &orphanResult{GUID: guid}
 
 	executable, err := findExecutable(services, guid)
 	if errors.Is(err, core.ErrNotFound) {
-		services.Logger.Warn(tag, fmt.Sprintf("no job or call %s", guid))
-		result.Result = orphanNotFound
-		return result
+		return deleteOrphanSchedule(services, tag, guid)
 	}
 	if err != nil {
 		services.Logger.Error(tag, fmt.Sprintf("could not look up %s: %v", guid, err))
@@ -361,6 +413,64 @@ func deleteOrphan(ctx context.Context, services *core.Services, tag, guid string
 
 	services.Logger.Info(tag, fmt.Sprintf("deleted %s %s of app %s in space %s", result.Type, guid, owner.AppGUID, owner.SpaceGUID))
 	return result
+}
+
+// deleteOrphanSchedule deletes the schedule with guid only when its job or
+// call is not stored, through the workflow that keeps cron and the database
+// in step.
+func deleteOrphanSchedule(services *core.Services, tag, guid string) *orphanResult {
+	result := &orphanResult{GUID: guid}
+
+	schedule, err := services.Schedules.Get(guid)
+	if errors.Is(err, core.ErrNotFound) {
+		services.Logger.Warn(tag, fmt.Sprintf("no job, call, or schedule %s", guid))
+		result.Result = orphanNotFound
+		return result
+	}
+	if err != nil {
+		services.Logger.Error(tag, fmt.Sprintf("could not look up schedule %s: %v", guid, err))
+		result.Result = orphanFailed
+		result.Message = "could not look up the schedule"
+		return result
+	}
+
+	result.Type = "schedule"
+	parent := parentOf(schedule)
+
+	_, err = findOwner(services, parent)
+	if err == nil {
+		services.Logger.Warn(tag, fmt.Sprintf("refusing to delete schedule %s, because %s %s exists", guid, parent.Type(), schedule.RefGUID))
+		result.Result = orphanParentExists
+		result.Message = fmt.Sprintf("%s %s exists", parent.Type(), schedule.RefGUID)
+		return result
+	}
+	if !errors.Is(err, core.ErrNotFound) {
+		services.Logger.Error(tag, fmt.Sprintf("could not look up %s %s of schedule %s: %v", parent.Type(), schedule.RefGUID, guid, err))
+		result.Result = orphanFailed
+		result.Message = fmt.Sprintf("could not look up %s %s", parent.Type(), schedule.RefGUID)
+		return result
+	}
+
+	if err := workflows.DeletingASchedule(services, schedule, parent); err != nil {
+		services.Logger.Error(tag, fmt.Sprintf("failed to delete schedule %s of %s %s: %v", guid, parent.Type(), schedule.RefGUID, err))
+		result.Result = orphanFailed
+		result.Message = "could not delete the schedule"
+		return result
+	}
+
+	services.Logger.Info(tag, fmt.Sprintf("deleted schedule %s of %s %s, which is gone", guid, parent.Type(), schedule.RefGUID))
+	result.Result = orphanDeleted
+	return result
+}
+
+// parentOf stands in for the job or call that a schedule names, so the
+// schedule can be looked up against it and deleted through the workflow.
+func parentOf(schedule *core.Schedule) core.Executable {
+	if schedule.RefType == "call" {
+		return &core.Call{GUID: schedule.RefGUID}
+	}
+
+	return &core.Job{GUID: schedule.RefGUID}
 }
 
 // owner holds the fields that jobs and calls share.

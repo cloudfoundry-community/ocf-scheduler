@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -93,7 +94,7 @@ func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
 	}
 
 	if len(candidates) < 1 {
-		return nil, fmt.Errorf("too few results")
+		return nil, fmt.Errorf("too few results: %w", core.ErrNotFound)
 	}
 
 	return candidates[0], nil
@@ -182,6 +183,39 @@ func (service *ScheduleService) ByApp(appGUID string) ([]*core.Schedule, error) 
 	for _, candidate := range service.storage {
 		if service.ownedByApp(candidate, appGUID) {
 			found = append(found, candidate)
+		}
+	}
+
+	return found, nil
+}
+
+// Orphaned needs Owners, and without it fails rather than call every
+// schedule orphaned.
+func (service *ScheduleService) Orphaned() ([]*core.Schedule, error) {
+	service.locker.Lock()
+	defer service.locker.Unlock()
+
+	if service.jobs == nil || service.calls == nil {
+		return nil, fmt.Errorf("the mock schedule service has no owners to check")
+	}
+
+	found := make([]*core.Schedule, 0)
+
+	for _, candidate := range service.storage {
+		var err error
+		switch candidate.RefType {
+		case "job":
+			_, err = service.jobs.Get(candidate.RefGUID)
+		case "call":
+			_, err = service.calls.Get(candidate.RefGUID)
+		default:
+			err = core.ErrNotFound
+		}
+
+		if errors.Is(err, core.ErrNotFound) {
+			found = append(found, candidate)
+		} else if err != nil {
+			return nil, err
 		}
 	}
 

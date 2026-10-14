@@ -107,3 +107,71 @@ func TestScheduleService_DeleteReportsARowThatFailsToScan(t *testing.T) {
 		t.Errorf("expected an error, the row was left out of the list")
 	}
 }
+
+func TestScheduleService_OrphanedReportsAFailedQuery(t *testing.T) {
+	found, err := lostDatabase(t).Orphaned()
+
+	if err == nil {
+		t.Errorf("expected an error, got %d schedules", len(found))
+	}
+}
+
+// Orphaned finds the schedules whose job or call is gone, including one
+// that names a call as its job, and leaves out the ones whose owner exists.
+func TestScheduleService_OrphanedFindsSchedulesWhoseOwnerIsGone(t *testing.T) {
+	testscope.SkipUnlessUnit(t)
+	Cleaner.Acquire("jobs", "calls", "schedules")
+	defer Cleaner.Clean("jobs", "calls", "schedules")
+
+	jobs := NewJobService(testdb)
+	calls := NewCallService(testdb)
+	schedules := NewScheduleService(testdb)
+
+	app, _ := core.GenGUID()
+	space, _ := core.GenGUID()
+	job, err := jobs.Persist(&core.Job{Name: "backup", Command: "true", AppGUID: app, SpaceGUID: space})
+	if err != nil {
+		t.Fatal(err)
+	}
+	call, err := calls.Persist(&core.Call{Name: "ping", URL: "https://example.com", AuthHeader: "x", AppGUID: app, SpaceGUID: space})
+	if err != nil {
+		t.Fatal(err)
+	}
+	goneJob, _ := core.GenGUID()
+	goneCall, _ := core.GenGUID()
+
+	persist := func(refType, refGUID string) *core.Schedule {
+		t.Helper()
+		schedule, err := schedules.Persist(&core.Schedule{Enabled: true, Expression: "0 2 * * *", ExpressionType: "cron_expression", RefType: refType, RefGUID: refGUID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return schedule
+	}
+
+	persist("job", job.GUID)
+	persist("call", call.GUID)
+	want := map[string]bool{
+		persist("job", goneJob).GUID:   true,
+		persist("call", goneCall).GUID: true,
+		persist("job", call.GUID).GUID: true,
+	}
+
+	found, err := schedules.Orphaned()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]bool{}
+	for _, schedule := range found {
+		got[schedule.GUID] = true
+	}
+	if len(found) != len(want) || len(got) != len(want) {
+		t.Errorf("got %d orphaned schedules, want %d", len(found), len(want))
+	}
+	for guid := range want {
+		if !got[guid] {
+			t.Errorf("schedule %s is not listed as orphaned", guid)
+		}
+	}
+}
