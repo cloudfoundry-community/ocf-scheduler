@@ -129,3 +129,65 @@ func TestRunService_ExecuteRecoversAPanicWithNoExecution(t *testing.T) {
 
 	cf.NewRunService(nil).Execute(services, nil, job)
 }
+
+// flakyExecutions fails the first failures calls to UpdateTaskGUID the way
+// the postgres service does, with no execution and an error.
+type flakyExecutions struct {
+	*mock.ExecutionService
+	failures int
+	calls    int
+}
+
+func (executions *flakyExecutions) UpdateTaskGUID(execution *core.Execution, taskGUID string) (*core.Execution, error) {
+	executions.calls++
+	if executions.calls <= executions.failures {
+		return nil, errors.New("database unavailable")
+	}
+	return executions.ExecutionService.UpdateTaskGUID(execution, taskGUID)
+}
+
+func TestRunService_ExecuteRetriesStoringTheTaskGUID(t *testing.T) {
+	defer cf.SetTaskPollInterval(time.Millisecond)()
+
+	tests := []struct {
+		name      string
+		failures  int
+		wantCalls int
+	}{
+		{name: "a passing failure", failures: 2, wantCalls: 3},
+		{name: "a failure that outlasts every attempt", failures: 100, wantCalls: 4},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer cf.SetTaskGUIDRetries(4, time.Millisecond)()
+
+			client, err := mock.NewCFClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			executions := &flakyExecutions{ExecutionService: mock.NewExecutionService(), failures: tt.failures}
+			services := &core.Services{
+				Workers:    inlineWorkers{},
+				Executions: executions,
+				Logger:     logger.New(),
+			}
+			execution, err := executions.Persist(&core.Execution{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+			cf.NewRunService(client).Execute(services, execution, job)
+
+			if executions.calls != tt.wantCalls {
+				t.Errorf("UpdateTaskGUID was called %d times, want %d", executions.calls, tt.wantCalls)
+			}
+			// The task is already running in Cloud Controller, so the run
+			// follows it to the end even when its GUID could not be stored.
+			if execution.State != "SUCCEEDED" {
+				t.Errorf("execution state is %q, want SUCCEEDED", execution.State)
+			}
+		})
+	}
+}

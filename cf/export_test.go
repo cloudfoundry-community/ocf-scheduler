@@ -9,3 +9,11 @@ func SetTaskPollInterval(interval time.Duration) func() {
 	taskPollInterval = interval
 	return func() { taskPollInterval = saved }
 }
+
+// SetTaskGUIDRetries changes how Execute retries storing a task GUID for a
+// test and returns a function that restores the defaults.
+func SetTaskGUIDRetries(attempts int, backoff time.Duration) func() {
+	savedAttempts, savedBackoff := taskGUIDAttempts, taskGUIDBackoff
+	taskGUIDAttempts, taskGUIDBackoff = attempts, backoff
+	return func() { taskGUIDAttempts, taskGUIDBackoff = savedAttempts, savedBackoff }
+}

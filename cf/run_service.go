@@ -13,6 +13,14 @@ import (
 // Controller for a running task's state.
 var taskPollInterval = 5 * time.Second
 
+// taskGUIDAttempts and taskGUIDBackoff bound how often Execute tries to
+// store a new task's GUID on its execution. The wait starts at
+// taskGUIDBackoff and doubles after each failure.
+var (
+	taskGUIDAttempts = 5
+	taskGUIDBackoff  = time.Second
+)
+
 type RunService struct {
 	client CFClient
 }
@@ -71,12 +79,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 				),
 			)
 		} else {
-			execution, err = services.Executions.UpdateTaskGUID(execution, task.GUID)
-			for err != nil {
-				// We literally can't continue until the execution has a task GUID
-				services.Logger.Warn(tag, fmt.Sprintf("retrying UpdateTaskGUID for execution %s: %v", execution.GUID, err))
-				execution, err = services.Executions.UpdateTaskGUID(execution, task.GUID)
-			}
+			service.storeTaskGUID(services, execution, task.GUID, tag)
 
 			task, err = service.waitForTask(services, task)
 			if err != nil {
@@ -92,6 +95,46 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 		finishmsg := fmt.Sprintf("Finishing job %s (%s)", job.Name, job.GUID)
 		services.Logger.Info(tag, finishmsg)
 	})
+}
+
+// storeTaskGUID records the task GUID on the execution, retrying with
+// backoff. The task is already running in Cloud Controller, so when every
+// attempt fails it logs the loss and lets the run go on to follow the task.
+// It never replaces execution, because a failed update returns none.
+func (service *RunService) storeTaskGUID(services *core.Services, execution *core.Execution, taskGUID string, tag string) {
+	backoff := taskGUIDBackoff
+
+	var err error
+	for attempt := 1; attempt <= taskGUIDAttempts; attempt++ {
+		if _, err = services.Executions.UpdateTaskGUID(execution, taskGUID); err == nil {
+			return
+		}
+
+		if attempt == taskGUIDAttempts {
+			break
+		}
+
+		services.Logger.Warn(tag, fmt.Sprintf(
+			"cannot store task %s on execution %s (attempt %d of %d), retrying in %s: %v",
+			taskGUID, executionGUID(execution), attempt, taskGUIDAttempts, backoff, err,
+		))
+		time.Sleep(backoff)
+		backoff *= 2
+	}
+
+	services.Logger.Error(tag, fmt.Sprintf(
+		"gave up storing task %s on execution %s after %d attempts, and the task is still followed to its end: %v",
+		taskGUID, executionGUID(execution), taskGUIDAttempts, err,
+	))
+}
+
+// executionGUID names an execution in a log line, including a missing one.
+func executionGUID(execution *core.Execution) string {
+	if execution == nil {
+		return "(none)"
+	}
+
+	return execution.GUID
 }
 
 func (service *RunService) qq(services *core.Services, execution *core.Execution, tag string, message string) {
