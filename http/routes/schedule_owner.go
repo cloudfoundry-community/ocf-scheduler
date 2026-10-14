@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 	"github.com/cloudfoundry-community/ocf-scheduler/workflows"
@@ -50,22 +51,32 @@ func sweepSchedules(services *core.Services, tag string, executable core.Executa
 	return left, errors.Join(errs...)
 }
 
+// ownerLookupAttempts and ownerLookupBackoff bound how often confirmOwner
+// looks a job or call up again when the lookup fails for a reason other
+// than not found. The backoff doubles after each failed attempt.
+var (
+	ownerLookupAttempts = 3
+	ownerLookupBackoff  = 100 * time.Millisecond
+)
+
 // confirmOwner runs after a create has stored a schedule and added it to
 // cron. When the schedule's job or call is gone, it takes the schedule back
 // out and returns the status to answer with. Otherwise it returns zero.
 //
-// A lookup that fails for another reason keeps the schedule. The job or
-// call was there when the create began, and answering with an error would
-// invite a retry that stores a second schedule beside this one. If the
-// owner has gone after all, the orphan schedules list shows the schedule.
+// A lookup that fails for another reason is tried again a few times. If it
+// never succeeds, the schedule is kept. The job or call was there when the
+// create began, and answering with an error would invite a retry that
+// stores a second schedule beside this one. If the owner has gone after
+// all, the kept schedule goes on firing until it is deleted or the
+// scheduler restarts, and the orphan schedules list shows it.
 func confirmOwner(services *core.Services, tag string, schedule *core.Schedule, executable core.Executable) (int, any) {
-	_, err := findOwner(services, executable)
+	err := lookUpOwner(services, tag, schedule, executable)
 	if err == nil {
 		return 0, nil
 	}
 
 	if !errors.Is(err, core.ErrNotFound) {
-		services.Logger.Warn(tag, fmt.Sprintf("could not confirm %s %s still exists after creating schedule %s, so the schedule is kept: %v", executable.Type(), ownerOf(executable).GUID, schedule.GUID, err))
+		services.Logger.Warn(tag, fmt.Sprintf("could not confirm %s %s still exists after creating schedule %s in %d attempts, so the schedule is kept: %v", executable.Type(), ownerOf(executable).GUID, schedule.GUID, ownerLookupAttempts, err))
 		return 0, nil
 	}
 
@@ -105,6 +116,25 @@ func runOf(services *core.Services, schedule *core.Schedule, executable core.Exe
 
 	call, _ := executable.ToCall()
 	return core.NewCallRun(call, schedule, services)
+}
+
+// lookUpOwner looks the job or call behind executable up again, retrying
+// with a backoff while the lookup fails for a reason other than not found.
+// It returns the last lookup's error.
+func lookUpOwner(services *core.Services, tag string, schedule *core.Schedule, executable core.Executable) error {
+	backoff := ownerLookupBackoff
+	var err error
+	for attempt := 1; attempt <= ownerLookupAttempts; attempt++ {
+		if _, err = findOwner(services, executable); err == nil || errors.Is(err, core.ErrNotFound) {
+			return err
+		}
+		if attempt < ownerLookupAttempts {
+			services.Logger.Warn(tag, fmt.Sprintf("could not look up %s %s for schedule %s, attempt %d of %d: %v", executable.Type(), ownerOf(executable).GUID, schedule.GUID, attempt, ownerLookupAttempts, err))
+			time.Sleep(backoff)
+			backoff *= 2
+		}
+	}
+	return err
 }
 
 // findOwner looks up the stored job or call behind executable again.

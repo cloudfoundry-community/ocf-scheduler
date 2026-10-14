@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/cloudfoundry-community/ocf-scheduler/core"
 )
@@ -313,6 +314,7 @@ func TestCreateScheduleKeepsTheScheduleWhenTheOwnerCannotBeLookedUpAgain(t *test
 		{name: "call", target: func(tn *tenancy) core.Executable { return tn.callB }},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			shortenOwnerLookups(t)
 			tn := newTenancy(t)
 			target := tt.target(tn)
 			before := tn.services.Cron.Count()
@@ -334,6 +336,95 @@ func TestCreateScheduleKeepsTheScheduleWhenTheOwnerCannotBeLookedUpAgain(t *test
 			}
 			if n := tn.services.Cron.Count(); n != before+1 {
 				t.Errorf("cron holds %d entries, want %d", n, before+1)
+			}
+		})
+	}
+}
+
+// shortenOwnerLookups makes confirmOwner's retries quick for one test.
+func shortenOwnerLookups(t *testing.T) {
+	t.Helper()
+	attempts, backoff := ownerLookupAttempts, ownerLookupBackoff
+	ownerLookupAttempts, ownerLookupBackoff = 3, time.Millisecond
+	t.Cleanup(func() { ownerLookupAttempts, ownerLookupBackoff = attempts, backoff })
+}
+
+// flakyJobs and flakyCalls fail lookups while failures is above zero,
+// counting it down, and then look up as usual.
+type flakyJobs struct {
+	core.JobService
+	failures *int
+}
+
+func (jobs flakyJobs) Get(guid string) (*core.Job, error) {
+	if *jobs.failures > 0 {
+		*jobs.failures--
+		return nil, errors.New("database unavailable")
+	}
+	return jobs.JobService.Get(guid)
+}
+
+type flakyCalls struct {
+	core.CallService
+	failures *int
+}
+
+func (calls flakyCalls) Get(guid string) (*core.Call, error) {
+	if *calls.failures > 0 {
+		*calls.failures--
+		return nil, errors.New("database unavailable")
+	}
+	return calls.CallService.Get(guid)
+}
+
+// flickeringSchedules deletes the schedule's job or call just before the
+// schedule is stored, and makes the next lookups of jobs and calls fail
+// before they report the owner gone.
+type flickeringSchedules struct {
+	core.ScheduleService
+	tn       *tenancy
+	failures *int
+}
+
+func (schedules flickeringSchedules) Persist(schedule *core.Schedule) (*core.Schedule, error) {
+	schedules.tn.services.Jobs = flakyJobs{schedules.tn.services.Jobs, schedules.failures}
+	schedules.tn.services.Calls = flakyCalls{schedules.tn.services.Calls, schedules.failures}
+	return vanishingSchedules{schedules.ScheduleService, schedules.tn}.Persist(schedule)
+}
+
+// A create whose second lookup fails for a moment and then finds the job or
+// call gone removes the schedule and answers not found, rather than keep a
+// schedule for an owner that no longer exists.
+func TestCreateScheduleRetriesTheOwnerLookup(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		target func(tn *tenancy) core.Executable
+	}{
+		{name: "job", target: func(tn *tenancy) core.Executable { return tn.jobB }},
+		{name: "call", target: func(tn *tenancy) core.Executable { return tn.callB }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			shortenOwnerLookups(t)
+			tn := newTenancy(t)
+			target := tt.target(tn)
+			before := tn.services.Cron.Count()
+
+			var stored *core.Schedule
+			failures := ownerLookupAttempts - 1
+			tn.services.Schedules = &capturingSchedules{flickeringSchedules{tn.services.Schedules, tn, &failures}, &stored}
+
+			rec := tn.do(http.MethodPost, "/"+tt.name+"s/"+ownerOf(target).GUID+"/schedules",
+				`{"enabled": true, "expression": "0 3 * * *", "expression_type": "cron_expression"}`, tn.userB)
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("status %d, want %d, body %s", rec.Code, http.StatusNotFound, rec.Body)
+			}
+
+			if stored == nil {
+				t.Fatal("the create never stored a schedule")
+			}
+			expectScheduleGone(t, tn, stored, target)
+			if n := tn.services.Cron.Count(); n != before {
+				t.Errorf("cron holds %d entries, want %d", n, before)
 			}
 		})
 	}
