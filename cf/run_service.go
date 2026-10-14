@@ -116,7 +116,7 @@ func (service *RunService) storeTaskGUID(services *core.Services, execution *cor
 
 		services.Logger.Warn(tag, fmt.Sprintf(
 			"cannot store task %s on execution %s (attempt %d of %d), retrying in %s: %v",
-			taskGUID, executionGUID(execution), attempt, taskGUIDAttempts, backoff, err,
+			taskGUID, execution.GUID, attempt, taskGUIDAttempts, backoff, err,
 		))
 		time.Sleep(backoff)
 		backoff *= 2
@@ -124,17 +124,8 @@ func (service *RunService) storeTaskGUID(services *core.Services, execution *cor
 
 	services.Logger.Error(tag, fmt.Sprintf(
 		"gave up storing task %s on execution %s after %d attempts, and the task is still followed to its end: %v",
-		taskGUID, executionGUID(execution), taskGUIDAttempts, err,
+		taskGUID, execution.GUID, taskGUIDAttempts, err,
 	))
-}
-
-// executionGUID names an execution in a log line, including a missing one.
-func executionGUID(execution *core.Execution) string {
-	if execution == nil {
-		return "(none)"
-	}
-
-	return execution.GUID
 }
 
 func (service *RunService) qq(services *core.Services, execution *core.Execution, tag string, message string) {

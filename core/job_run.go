@@ -24,9 +24,12 @@ func (run *JobRun) Run() {
 		ScheduleGUID: run.schedule.GUID,
 	}
 
+	// A run with no stored execution has nothing to record its outcome on,
+	// so it is skipped rather than run unrecorded.
 	execution, err := run.services.Executions.Persist(execution)
 	if err != nil {
-		run.services.Logger.Warn("job-run", fmt.Sprintf("failed to persist execution for job %s: %v", run.job.GUID, err))
+		run.services.Logger.Error("job-run", fmt.Sprintf("skipping a run of job %s on schedule %s, because its execution could not be stored: %v", run.job.GUID, run.schedule.GUID, err))
+		return
 	}
 
 	run.services.Runner.Execute(

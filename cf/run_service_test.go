@@ -121,15 +121,6 @@ func TestRunService_ExecuteRecoversAPanic(t *testing.T) {
 	}
 }
 
-// A scheduled run whose execution row could not be stored reaches the
-// runner with no execution, and that must not end the scheduler either.
-func TestRunService_ExecuteRecoversAPanicWithNoExecution(t *testing.T) {
-	services, _ := newRunServices(t)
-	job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
-
-	cf.NewRunService(nil).Execute(services, nil, job)
-}
-
 // flakyExecutions fails the first failures calls to UpdateTaskGUID the way
 // the postgres service does, with no execution and an error.
 type flakyExecutions struct {

@@ -24,9 +24,12 @@ func (run *CallRun) Run() {
 		ScheduleGUID: run.schedule.GUID,
 	}
 
+	// A run with no stored execution has nothing to record its outcome on,
+	// so it is skipped rather than run unrecorded.
 	execution, err := run.services.Executions.Persist(execution)
 	if err != nil {
-		run.services.Logger.Warn("call-run", fmt.Sprintf("failed to persist execution for call %s: %v", run.call.GUID, err))
+		run.services.Logger.Error("call-run", fmt.Sprintf("skipping a run of call %s on schedule %s, because its execution could not be stored: %v", run.call.GUID, run.schedule.GUID, err))
+		return
 	}
 
 	run.services.Runner.Execute(

@@ -8,16 +8,13 @@ import (
 // RecoverRun is deferred at the top of the work a RunService submits to the
 // worker pool. The pool runs that work on its own goroutines and does not
 // recover panics, so a panic in one run would end the scheduler. RecoverRun
-// logs the panic with its stack trace, fails the execution when there is
-// one, and lets the worker carry on with the next run.
+// logs the panic with its stack trace, fails the execution, and lets the
+// worker carry on with the next run. JobRun and CallRun never hand a run
+// service a nil execution, because they skip a run whose execution could
+// not be stored.
 func RecoverRun(services *Services, execution *Execution, tag string) {
 	recovered := recover()
 	if recovered == nil {
-		return
-	}
-
-	if execution == nil {
-		services.Logger.Error(tag, fmt.Sprintf("run panicked with no execution: %v\n%s", recovered, debug.Stack()))
 		return
 	}
 
