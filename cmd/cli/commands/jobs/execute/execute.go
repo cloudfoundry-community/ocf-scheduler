@@ -59,7 +59,7 @@ func getJob(driver *core.Driver, jobGUID string) (*scheduler.Job, error) {
 
 	err := json.Unmarshal(response.Data(), job)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't look up that job: %w", err)
 	}
 
 	return job, nil

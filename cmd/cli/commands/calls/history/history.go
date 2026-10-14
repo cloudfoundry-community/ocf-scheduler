@@ -77,7 +77,7 @@ func getCall(driver *core.Driver, callGUID string) (*scheduler.Call, error) {
 
 	err := json.Unmarshal(response.Data(), call)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't look up that call: %w", err)
 	}
 
 	return call, nil
