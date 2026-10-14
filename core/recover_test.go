@@ -43,3 +43,26 @@ func TestRecoverRunLogsAFailureItCannotRecord(t *testing.T) {
 		t.Errorf("logged %q, want lines saying the message and the failure were not recorded", log.lines)
 	}
 }
+
+// A panic in a run with no execution is still recovered and logged, rather
+// than turned into a second panic that ends the scheduler.
+func TestRecoverRunHandlesANilExecution(t *testing.T) {
+	log := &recordingLog{}
+	services := &core.Services{Executions: mock.NewExecutionService(), Logger: log}
+
+	escaped := func() (escaped any) {
+		defer func() { escaped = recover() }()
+		func() {
+			defer core.RecoverRun(services, nil, "test-run")
+			panic("run blew up")
+		}()
+		return nil
+	}()
+
+	if escaped != nil {
+		t.Fatalf("a panic escaped RecoverRun: %v", escaped)
+	}
+	if len(log.lines) != 1 || !strings.Contains(log.lines[0], "run blew up") {
+		t.Errorf("logged %q, want one line naming the panic", log.lines)
+	}
+}
