@@ -23,6 +23,8 @@ func NewRunService(client CFClient) *RunService {
 
 func (service *RunService) Execute(services *core.Services, execution *core.Execution, executable core.Executable) {
 	services.Workers.Submit(func() {
+		defer core.RecoverRun(services, execution, "cf-run-service")
+
 		services.Executions.Start(execution)
 		tag := "cf-run-service"
 

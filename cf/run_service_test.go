@@ -3,6 +3,7 @@ package cf_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,4 +89,43 @@ func TestRunService_ExecuteStopsWhenTheTaskCannotBeRead(t *testing.T) {
 	if want := "cannot get task for the job nightly (job-guid)"; execution.Message != want {
 		t.Errorf("execution message is %q, want %q", execution.Message, want)
 	}
+}
+
+// panickingClient panics when asked to create a task, standing in for any
+// bug that panics inside a worker.
+type panickingClient struct {
+	*mock.CFClient
+}
+
+func (panickingClient) CreateTask(_ context.Context, _ string, _ *resource.TaskCreate) (*resource.Task, error) {
+	panic("task creation blew up")
+}
+
+// The worker pool does not recover panics, so a panic in a run would end the
+// scheduler. The run recovers it and fails the execution instead.
+func TestRunService_ExecuteRecoversAPanic(t *testing.T) {
+	client, err := mock.NewCFClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	services, execution := newRunServices(t)
+	job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+	cf.NewRunService(panickingClient{client}).Execute(services, execution, job)
+
+	if execution.State != "FAILED" {
+		t.Errorf("execution state is %q, want FAILED", execution.State)
+	}
+	if !strings.Contains(execution.Message, "task creation blew up") {
+		t.Errorf("execution message is %q, want it to name the panic", execution.Message)
+	}
+}
+
+// A scheduled run whose execution row could not be stored reaches the
+// runner with no execution, and that must not end the scheduler either.
+func TestRunService_ExecuteRecoversAPanicWithNoExecution(t *testing.T) {
+	services, _ := newRunServices(t)
+	job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+	cf.NewRunService(nil).Execute(services, nil, job)
 }
