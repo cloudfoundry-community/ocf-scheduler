@@ -208,3 +208,34 @@ func (driver *Driver) fetchWith(client *http.Client, method, path string, body [
 
 	return &Result{Status: response.StatusCode, Body: data}, nil
 }
+
+// Refused is true when the scheduler turned the token away.
+func (result *Result) Refused() bool {
+	return result.Err == nil &&
+		(result.Status == http.StatusUnauthorized || result.Status == http.StatusForbidden)
+}
+
+// Lookup describes a failed lookup of a job or call, named by kind. A
+// refused token gets the refusal text unchanged, a 404 says that nothing has
+// that name, and anything else keeps its message behind the lookup context.
+func (result *Result) Lookup(kind string) error {
+	switch {
+	case result.Refused():
+		return result.Error()
+	case result.Err == nil && result.Status == http.StatusNotFound:
+		return fmt.Errorf("couldn't find that %s", kind)
+	}
+
+	return fmt.Errorf("couldn't look up that %s: %w", kind, result.Error())
+}
+
+// Action describes a failed change to a job, call, or schedule. A refused
+// token gets the refusal text unchanged, and anything else keeps its message
+// behind what the command was doing.
+func (result *Result) Action(failure string) error {
+	if result.Refused() {
+		return result.Error()
+	}
+
+	return fmt.Errorf("%s: %w", failure, result.Error())
+}

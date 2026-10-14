@@ -30,12 +30,12 @@ var Command = &cobra.Command{
 
 		job, err := getJob(core.Client, jobGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't find that job")
+			return err
 		}
 
 		schedule, err := scheduleJob(core.Client, jobGUID, cronExpression)
 		if err != nil {
-			return fmt.Errorf("couldn't schedule that job")
+			return err
 		}
 
 		writer := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', uint(0))
@@ -62,7 +62,7 @@ func getJob(driver *core.Driver, jobGUID string) (*scheduler.Job, error) {
 	response := driver.Get("jobs/"+jobGUID, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Lookup("job")
 	}
 
 	job := &scheduler.Job{}
@@ -91,7 +91,7 @@ func scheduleJob(driver *core.Driver, jobGUID string, when string) (*scheduler.S
 	response := driver.Post("jobs/"+jobGUID+"/schedules", nil, sdata)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Action("couldn't schedule that job")
 	}
 
 	output := &scheduler.Schedule{}

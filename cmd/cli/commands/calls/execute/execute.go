@@ -27,12 +27,12 @@ var Command = &cobra.Command{
 
 		call, err := getCall(core.Client, callGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't find that call")
+			return err
 		}
 
 		execution, err := executeCall(core.Client, callGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't execute that call")
+			return err
 		}
 
 		fmt.Printf(
@@ -52,7 +52,7 @@ func getCall(driver *core.Driver, callGUID string) (*scheduler.Call, error) {
 	response := driver.Get("calls/"+callGUID, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Lookup("call")
 	}
 
 	call := &scheduler.Call{}
@@ -69,7 +69,7 @@ func executeCall(driver *core.Driver, callGUID string) (*execution, error) {
 	response := driver.Post("calls/"+callGUID+"/execute", nil, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Action("couldn't execute that call")
 	}
 
 	exec := &execution{}

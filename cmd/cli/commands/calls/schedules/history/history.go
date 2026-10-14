@@ -31,10 +31,13 @@ var Command = &cobra.Command{
 
 		call, err := getCall(core.Client, callGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't find that call")
+			return err
 		}
 
-		executions := getScheduleExecutions(core.Client, call.GUID, scheduleGUID)
+		executions, err := getScheduleExecutions(core.Client, call.GUID, scheduleGUID)
+		if err != nil {
+			return err
+		}
 
 		if len(executions) == 0 {
 			fmt.Println("No executions for schedule", scheduleGUID)
@@ -66,7 +69,7 @@ func getCall(driver *core.Driver, callGUID string) (*scheduler.Call, error) {
 	response := driver.Get("calls/"+callGUID, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Lookup("call")
 	}
 
 	call := &scheduler.Call{}
@@ -79,13 +82,11 @@ func getCall(driver *core.Driver, callGUID string) (*scheduler.Call, error) {
 	return call, nil
 }
 
-func getScheduleExecutions(driver *core.Driver, callGUID string, scheduleGUID string) []*execution {
-	dumb := make([]*execution, 0)
-
+func getScheduleExecutions(driver *core.Driver, callGUID string, scheduleGUID string) ([]*execution, error) {
 	response := driver.Get("calls/"+callGUID+"/schedules/"+scheduleGUID+"/history", nil)
 
 	if !response.Okay() {
-		return dumb
+		return nil, response.Error()
 	}
 
 	data := struct {
@@ -94,10 +95,10 @@ func getScheduleExecutions(driver *core.Driver, callGUID string, scheduleGUID st
 
 	err := json.Unmarshal(response.Data(), &data)
 	if err != nil {
-		return dumb
+		return nil, err
 	}
 
-	return data.Resources
+	return data.Resources, nil
 }
 
 type execution struct {

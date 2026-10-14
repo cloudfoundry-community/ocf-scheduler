@@ -29,10 +29,13 @@ var Command = &cobra.Command{
 
 		call, err := getCall(core.Client, callGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't find that call")
+			return err
 		}
 
-		schedules := getCallSchedules(core.Client, callGUID)
+		schedules, err := getCallSchedules(core.Client, callGUID)
+		if err != nil {
+			return err
+		}
 		if len(schedules) == 0 {
 			fmt.Println("No schedules for call", callGUID)
 			return nil
@@ -58,7 +61,7 @@ func getCall(driver *core.Driver, callGUID string) (*scheduler.Call, error) {
 	response := driver.Get("calls/"+callGUID, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Lookup("call")
 	}
 
 	call := &scheduler.Call{}
@@ -71,13 +74,11 @@ func getCall(driver *core.Driver, callGUID string) (*scheduler.Call, error) {
 	return call, nil
 }
 
-func getCallSchedules(driver *core.Driver, callGUID string) []*scheduler.Schedule {
-	dumb := make([]*scheduler.Schedule, 0)
-
-	response := core.Client.Get("calls/"+callGUID+"/schedules", nil)
+func getCallSchedules(driver *core.Driver, callGUID string) ([]*scheduler.Schedule, error) {
+	response := driver.Get("calls/"+callGUID+"/schedules", nil)
 
 	if !response.Okay() {
-		return dumb
+		return nil, response.Error()
 	}
 
 	data := struct {
@@ -86,8 +87,8 @@ func getCallSchedules(driver *core.Driver, callGUID string) []*scheduler.Schedul
 
 	err := json.Unmarshal(response.Data(), &data)
 	if err != nil {
-		return dumb
+		return nil, err
 	}
 
-	return data.Resources
+	return data.Resources, nil
 }

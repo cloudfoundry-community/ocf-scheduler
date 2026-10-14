@@ -29,10 +29,13 @@ var Command = &cobra.Command{
 
 		job, err := getJob(core.Client, jobGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't find that job")
+			return err
 		}
 
-		schedules := getJobSchedules(core.Client, jobGUID)
+		schedules, err := getJobSchedules(core.Client, jobGUID)
+		if err != nil {
+			return err
+		}
 		if len(schedules) == 0 {
 			fmt.Println("No schedules for job", jobGUID)
 			return nil
@@ -58,7 +61,7 @@ func getJob(driver *core.Driver, jobGUID string) (*scheduler.Job, error) {
 	response := driver.Get("jobs/"+jobGUID, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Lookup("job")
 	}
 
 	job := &scheduler.Job{}
@@ -71,13 +74,11 @@ func getJob(driver *core.Driver, jobGUID string) (*scheduler.Job, error) {
 	return job, nil
 }
 
-func getJobSchedules(driver *core.Driver, jobGUID string) []*scheduler.Schedule {
-	dumb := make([]*scheduler.Schedule, 0)
-
-	response := core.Client.Get("jobs/"+jobGUID+"/schedules", nil)
+func getJobSchedules(driver *core.Driver, jobGUID string) ([]*scheduler.Schedule, error) {
+	response := driver.Get("jobs/"+jobGUID+"/schedules", nil)
 
 	if !response.Okay() {
-		return dumb
+		return nil, response.Error()
 	}
 
 	data := struct {
@@ -86,8 +87,8 @@ func getJobSchedules(driver *core.Driver, jobGUID string) []*scheduler.Schedule 
 
 	err := json.Unmarshal(response.Data(), &data)
 	if err != nil {
-		return dumb
+		return nil, err
 	}
 
-	return data.Resources
+	return data.Resources, nil
 }

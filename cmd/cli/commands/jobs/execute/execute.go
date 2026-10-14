@@ -27,12 +27,12 @@ var Command = &cobra.Command{
 
 		job, err := getJob(core.Client, jobGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't find that job")
+			return err
 		}
 
 		execution, err := executeJob(core.Client, jobGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't execute that job")
+			return err
 		}
 
 		fmt.Printf(
@@ -52,7 +52,7 @@ func getJob(driver *core.Driver, jobGUID string) (*scheduler.Job, error) {
 	response := driver.Get("jobs/"+jobGUID, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Lookup("job")
 	}
 
 	job := &scheduler.Job{}
@@ -69,7 +69,7 @@ func executeJob(driver *core.Driver, jobGUID string) (*execution, error) {
 	response := driver.Post("jobs/"+jobGUID+"/execute", nil, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Action("couldn't execute that job")
 	}
 
 	exec := &execution{}

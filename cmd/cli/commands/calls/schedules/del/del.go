@@ -28,12 +28,12 @@ var Command = &cobra.Command{
 
 		call, err := getCall(core.Client, callGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't find that call")
+			return err
 		}
 
 		err = deleteSchedule(core.Client, call.GUID, scheduleGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't delete schedule %s", scheduleGUID)
+			return err
 		}
 
 		fmt.Println("Schedule", scheduleGUID, "deleted.")
@@ -47,7 +47,7 @@ func getCall(driver *core.Driver, callGUID string) (*scheduler.Call, error) {
 	response := driver.Get("calls/"+callGUID, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Lookup("call")
 	}
 
 	call := &scheduler.Call{}
@@ -67,7 +67,7 @@ func deleteSchedule(driver *core.Driver, callGUID string, scheduleGUID string) e
 	)
 
 	if !response.Okay() {
-		return response.Error()
+		return response.Action(fmt.Sprintf("couldn't delete schedule %s", scheduleGUID))
 	}
 
 	return nil

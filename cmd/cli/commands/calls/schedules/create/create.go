@@ -30,12 +30,12 @@ var Command = &cobra.Command{
 
 		call, err := getCall(core.Client, callGUID)
 		if err != nil {
-			return fmt.Errorf("couldn't find that call")
+			return err
 		}
 
 		schedule, err := scheduleCall(core.Client, callGUID, cronExpression)
 		if err != nil {
-			return fmt.Errorf("couldn't schedule that call")
+			return err
 		}
 
 		writer := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', uint(0))
@@ -62,7 +62,7 @@ func getCall(driver *core.Driver, callGUID string) (*scheduler.Call, error) {
 	response := driver.Get("calls/"+callGUID, nil)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Lookup("call")
 	}
 
 	call := &scheduler.Call{}
@@ -91,7 +91,7 @@ func scheduleCall(driver *core.Driver, callGUID string, when string) (*scheduler
 	response := driver.Post("calls/"+callGUID+"/schedules", nil, sdata)
 
 	if !response.Okay() {
-		return nil, response.Error()
+		return nil, response.Action("couldn't schedule that call")
 	}
 
 	output := &scheduler.Schedule{}
