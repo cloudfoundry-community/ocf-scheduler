@@ -108,6 +108,18 @@ func TestScheduleService_DeleteReportsARowThatFailsToScan(t *testing.T) {
 	}
 }
 
+// A lookup that fails is not reported as a schedule that does not exist.
+func TestScheduleService_GetReportsAFailedQuery(t *testing.T) {
+	found, err := lostDatabase(t).Get("some-guid")
+
+	if err == nil {
+		t.Fatalf("expected an error, got %v", found)
+	}
+	if errors.Is(err, core.ErrNotFound) {
+		t.Errorf("a failed query reads as not found: %v", err)
+	}
+}
+
 func TestScheduleService_OrphanedReportsAFailedQuery(t *testing.T) {
 	found, err := lostDatabase(t).Orphaned()
 

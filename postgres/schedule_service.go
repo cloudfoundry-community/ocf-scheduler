@@ -74,11 +74,16 @@ func NewScheduleService(db *sql.DB) *ScheduleService {
 	}
 }
 
+// Get reports a failed query, because a lost database must not read as a
+// schedule that does not exist.
 func (service *ScheduleService) Get(guid string) (*core.Schedule, error) {
-	candidates := service.getCollection(
+	candidates, err := service.query(
 		service.queryByPrimaryKey, // "select * from schedules where guid = $1"
 		guid,
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := expectingOne(len(candidates)); err != nil {
 		return nil, err
