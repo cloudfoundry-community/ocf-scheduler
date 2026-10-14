@@ -113,7 +113,7 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusInternalServerError, "error retrieving calls")
 		}
 
-		schedules, err := services.Schedules.Orphaned()
+		orphaned, err := services.Schedules.Orphaned()
 		if err != nil {
 			services.Logger.Error(tag, fmt.Sprintf("error retrieving schedules whose job or call is gone: %v", err))
 			return c.JSON(http.StatusInternalServerError, "error retrieving schedules")
@@ -150,7 +150,7 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 
 		output := &orphanCollection{
 			Resources:       make([]*orphan, 0),
-			OrphanSchedules: make([]*orphanSchedule, 0, len(schedules)),
+			OrphanSchedules: make([]*orphanSchedule, 0, len(orphaned)),
 		}
 		for _, executable := range executables {
 			owner := ownerOf(executable)
@@ -183,7 +183,7 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 			)
 		})
 
-		for _, schedule := range schedules {
+		for _, schedule := range orphaned {
 			output.OrphanSchedules = append(output.OrphanSchedules, &orphanSchedule{
 				GUID:           schedule.GUID,
 				Enabled:        schedule.Enabled,
