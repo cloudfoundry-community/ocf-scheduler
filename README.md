@@ -351,7 +351,7 @@ When `SCHEDULER_BROKER_REQUIRE_BINDING` is `true`, an app must be bound before a
 
 When an app is deleted, or its whole space is, the scheduler keeps the app's jobs, calls, schedules, and execution history. Deprovisioning the space's scheduler service instance doesn't remove them either. A job whose app is gone fails each time it runs, and a call whose app is gone goes on calling its URL. The scheduler never deletes this data by itself, so an admin finds it and deletes it with two routes or the matching CLI commands.
 
-The same routes also find and delete schedules whose job or call is no longer stored. A schedule like that can be left behind when a delete fails partway. The scheduler skips it when it starts, but the schedule stays in the database until someone removes it.
+The same routes also let us find and delete schedules whose job or call is no longer stored. A schedule like that can be left behind when a delete fails partway. The scheduler skips it when it starts, but the schedule stays in the database until someone removes it.
 
 Both routes need a token with the `cloud_controller.admin` scope that belongs to an admin user, such as the one `cf oauth-token` prints. A token that a client gets with client credentials is refused with `401 Unauthorized`, even when it carries that scope, because the scheduler asks UAA which user owns the token. A caller whose token can't be verified gets `401 Unauthorized`, and any other caller gets `403 Forbidden` with an empty body.
 
@@ -434,7 +434,9 @@ Both lists are empty when nothing is orphaned. Listing never changes anything.
 
 For each GUID, the scheduler finds the job or call and asks Cloud Controller about its app again, so an app that has come back since the list keeps its data. It deletes the job or call only when that check says the app is not found. It removes the schedules first, taking each one out of the database and out of cron, and then deletes the job or call itself, in the same order as `DELETE /jobs/:guid` and `DELETE /calls/:guid`. Execution history stays, as it does for those routes.
 
-After it deletes the job or call, the scheduler looks for its schedules once more and removes any it finds, because someone may have created a schedule while the delete was running. The job and call delete routes do the same. A route that creates a schedule does the matching check from its side. Once it has stored the schedule, it looks the job or call up again, and if the job or call is gone, it removes the schedule and answers `404 Not Found`. If that second lookup fails for another reason, such as a lost database connection, the route tries it up to three times, waiting a moment between tries. If every try fails, the route keeps the schedule and answers `201 Created`, because the job or call was there a moment before and an error would only invite a retry that creates a second schedule. Should the job or call turn out to be gone after all, the schedule keeps firing until it's deleted or the scheduler restarts, and it shows up in `orphan_schedules` meanwhile.
+After it deletes the job or call, the scheduler looks for its schedules once more and removes any it finds, because someone may have created a schedule while the delete was running. The job and call delete routes do the same.
+
+A route that creates a schedule does the matching check from its side. Once it has stored the schedule, it looks the job or call up again, and if the job or call is gone, it removes the schedule and answers `404 Not Found`. If that second lookup fails for another reason, such as a lost database connection, the route tries it up to three times, waiting a moment between tries. If every try fails, the route keeps the schedule and answers `201 Created`, because the job or call was there a moment before, and an error would only invite a retry that creates a second schedule. Should the job or call turn out to be gone after all, the schedule keeps firing until it's deleted or the scheduler restarts, and it shows up in `orphan_schedules` meanwhile.
 
 Whenever the scheduler knows that a schedule's job or call is gone, it takes the schedule out of cron even if it can't delete the schedule's row. The row then shows up in `orphan_schedules`, and the scheduler never loads it into cron again, because it loads schedules only through their job or call.
 
@@ -492,7 +494,7 @@ When the scheduler skips a run, it notes why on the execution and then marks the
 
 A manual run behaves the same way. `POST /jobs/:guid/execute` and `POST /calls/:guid/execute` answer `201 Created` with the new execution before the run starts, so the caller already holds the execution when the scheduler tries to start it. If the start fails, that execution moves from `PENDING` to `FAILED` as soon as the database allows it.
 
-If the database stays down through both rounds of retries, the execution can stay `PENDING` for good. The scheduler logs both errors with the execution's GUID, and the automatic cleanup of old executions leaves the row alone, because it removes only executions that succeeded or failed. We can find such an execution in the job's or call's history and treat it as a run that never happened.
+If the database stays down through both rounds of retries, the execution can stay `PENDING` for good. The scheduler logs both errors with the execution's GUID, and the automatic cleanup of old executions leaves the row alone, because it removes only executions that succeeded or failed. We can find such an execution in the job's or call's history, and we can treat it as a run that never happened.
 
 ### Tasks that never start
 
