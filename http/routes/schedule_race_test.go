@@ -273,3 +273,68 @@ func TestAScheduleWhoseOwnerIsGoneLeavesCronWhenItsRowStays(t *testing.T) {
 		})
 	}
 }
+
+// brokenJobs and brokenCalls fail every lookup with an error other than
+// not found.
+type brokenJobs struct{ core.JobService }
+
+func (brokenJobs) Get(string) (*core.Job, error) {
+	return nil, errors.New("database unavailable")
+}
+
+type brokenCalls struct{ core.CallService }
+
+func (brokenCalls) Get(string) (*core.Call, error) {
+	return nil, errors.New("database unavailable")
+}
+
+// breakingSchedules breaks job and call lookups just as the schedule is
+// stored, so only the create's second lookup fails.
+type breakingSchedules struct {
+	core.ScheduleService
+	tn *tenancy
+}
+
+func (schedules breakingSchedules) Persist(schedule *core.Schedule) (*core.Schedule, error) {
+	schedules.tn.services.Jobs = brokenJobs{schedules.tn.services.Jobs}
+	schedules.tn.services.Calls = brokenCalls{schedules.tn.services.Calls}
+	return schedules.ScheduleService.Persist(schedule)
+}
+
+// A create whose second lookup of the job or call fails keeps the schedule
+// and answers created. The owner was there a moment before, and an error
+// would invite a retry that stores a second schedule.
+func TestCreateScheduleKeepsTheScheduleWhenTheOwnerCannotBeLookedUpAgain(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		target func(tn *tenancy) core.Executable
+	}{
+		{name: "job", target: func(tn *tenancy) core.Executable { return tn.jobB }},
+		{name: "call", target: func(tn *tenancy) core.Executable { return tn.callB }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tn := newTenancy(t)
+			target := tt.target(tn)
+			before := tn.services.Cron.Count()
+
+			var stored *core.Schedule
+			tn.services.Schedules = &capturingSchedules{breakingSchedules{tn.services.Schedules, tn}, &stored}
+
+			rec := tn.do(http.MethodPost, "/"+tt.name+"s/"+ownerOf(target).GUID+"/schedules",
+				`{"enabled": true, "expression": "0 3 * * *", "expression_type": "cron_expression"}`, tn.userB)
+			if rec.Code != http.StatusCreated {
+				t.Errorf("status %d, want %d, body %s", rec.Code, http.StatusCreated, rec.Body)
+			}
+
+			if stored == nil {
+				t.Fatal("the create never stored a schedule")
+			}
+			if _, err := tn.services.Schedules.Get(stored.GUID); err != nil {
+				t.Errorf("schedule %s is no longer stored: %v", stored.GUID, err)
+			}
+			if n := tn.services.Cron.Count(); n != before+1 {
+				t.Errorf("cron holds %d entries, want %d", n, before+1)
+			}
+		})
+	}
+}

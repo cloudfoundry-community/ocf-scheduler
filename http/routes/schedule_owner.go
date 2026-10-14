@@ -40,32 +40,30 @@ func sweepSchedules(services *core.Services, tag string, executable core.Executa
 }
 
 // confirmOwner runs after a create has stored a schedule and added it to
-// cron. When the schedule's job or call is gone, or cannot be looked up, it
-// takes the schedule back out and returns the status to answer with.
-// Otherwise it returns zero.
+// cron. When the schedule's job or call is gone, it takes the schedule back
+// out and returns the status to answer with. Otherwise it returns zero.
+//
+// A lookup that fails for another reason keeps the schedule. The job or
+// call was there when the create began, and answering with an error would
+// invite a retry that stores a second schedule beside this one. If the
+// owner has gone after all, the orphan schedules list shows the schedule.
 func confirmOwner(services *core.Services, tag string, schedule *core.Schedule, executable core.Executable) (int, any) {
 	_, err := findOwner(services, executable)
 	if err == nil {
 		return 0, nil
 	}
 
-	status := http.StatusInternalServerError
-	if errors.Is(err, core.ErrNotFound) {
-		status = http.StatusNotFound
-		services.Logger.Warn(tag, fmt.Sprintf("%s %s was deleted while schedule %s was created, so the schedule is removed", executable.Type(), ownerOf(executable).GUID, schedule.GUID))
-	} else {
-		services.Logger.Error(tag, fmt.Sprintf("could not confirm %s %s still exists after creating schedule %s, so the schedule is removed: %v", executable.Type(), ownerOf(executable).GUID, schedule.GUID, err))
+	if !errors.Is(err, core.ErrNotFound) {
+		services.Logger.Warn(tag, fmt.Sprintf("could not confirm %s %s still exists after creating schedule %s, so the schedule is kept: %v", executable.Type(), ownerOf(executable).GUID, schedule.GUID, err))
+		return 0, nil
 	}
 
-	undo := workflows.DeletingASchedule
-	if status == http.StatusNotFound {
-		undo = dropOrphanSchedule
-	}
-	if err := undo(services, schedule, executable); err != nil {
+	services.Logger.Warn(tag, fmt.Sprintf("%s %s was deleted while schedule %s was created, so the schedule is removed", executable.Type(), ownerOf(executable).GUID, schedule.GUID))
+	if err := dropOrphanSchedule(services, schedule, executable); err != nil {
 		services.Logger.Error(tag, fmt.Sprintf("could not remove schedule %s, whose %s %s is gone: %v", schedule.GUID, executable.Type(), ownerOf(executable).GUID, err))
 	}
 
-	return status, ""
+	return http.StatusNotFound, ""
 }
 
 // dropOrphanSchedule deletes a schedule whose job or call is known to be
