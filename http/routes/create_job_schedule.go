@@ -64,6 +64,10 @@ func CreateJobSchedule(e *echo.Echo, services *core.Services) {
 
 			if err := services.Cron.Add(core.NewJobRun(job, schedule, services)); err != nil {
 				services.Logger.Error(tag, fmt.Sprintf("failed to add cron entry for job %s: %v", guid, err))
+				// A row left behind would load into cron on the next restart.
+				if err := services.Schedules.Delete(schedule); err != nil {
+					services.Logger.Error(tag, fmt.Sprintf("could not delete schedule %s, which cron refused: %v", schedule.GUID, err))
+				}
 				return http.StatusUnprocessableEntity, requestError("schedule_failed", "%v", err)
 			}
 
