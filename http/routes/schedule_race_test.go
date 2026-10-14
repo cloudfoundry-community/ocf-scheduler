@@ -38,7 +38,12 @@ func expectScheduleGone(t *testing.T, tn *tenancy, schedule *core.Schedule, exec
 	if _, err := tn.services.Schedules.Get(schedule.GUID); err == nil {
 		t.Errorf("schedule %s is still stored", schedule.GUID)
 	}
+	expectUnscheduled(t, tn, schedule, executable)
+}
 
+// expectUnscheduled checks that a schedule is out of cron.
+func expectUnscheduled(t *testing.T, tn *tenancy, schedule *core.Schedule, executable core.Executable) {
+	t.Helper()
 	var run core.Runnable
 	if job, err := executable.ToJob(); err == nil {
 		run = core.NewJobRun(job, schedule, tn.services)
@@ -181,4 +186,90 @@ func (schedules *capturingSchedules) Persist(schedule *core.Schedule) (*core.Sch
 	stored, err := schedules.ScheduleService.Persist(schedule)
 	*schedules.stored = stored
 	return stored, err
+}
+
+// stuckSchedules fails every schedule delete once it is armed, standing in
+// for a database that drops the connection partway through.
+type stuckSchedules struct {
+	core.ScheduleService
+	armed *bool
+}
+
+func (schedules stuckSchedules) Delete(schedule *core.Schedule) error {
+	if *schedules.armed {
+		return errors.New("database unavailable")
+	}
+	return schedules.ScheduleService.Delete(schedule)
+}
+
+// A schedule whose job or call is gone comes out of cron even when its row
+// cannot be deleted, because the entry would otherwise go on running a job
+// or call that no longer exists.
+func TestAScheduleWhoseOwnerIsGoneLeavesCronWhenItsRowStays(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		target func(tn *tenancy) core.Executable
+		act    func(t *testing.T, tn *tenancy, target core.Executable, armed *bool) *core.Schedule
+	}{
+		{
+			name:   "create undo",
+			target: func(tn *tenancy) core.Executable { return tn.jobB },
+			act: func(t *testing.T, tn *tenancy, target core.Executable, armed *bool) *core.Schedule {
+				var stored *core.Schedule
+				tn.services.Schedules = &capturingSchedules{vanishingSchedules{tn.services.Schedules, tn}, &stored}
+				*armed = true
+				tn.services.Schedules = stuckSchedules{tn.services.Schedules, armed}
+
+				rec := tn.do(http.MethodPost, "/jobs/"+ownerOf(target).GUID+"/schedules",
+					`{"enabled": true, "expression": "0 3 * * *", "expression_type": "cron_expression"}`, tn.userB)
+				if rec.Code != http.StatusNotFound {
+					t.Errorf("status %d, want %d, body %s", rec.Code, http.StatusNotFound, rec.Body)
+				}
+				return stored
+			},
+		},
+		{
+			name:   "delete sweep",
+			target: func(tn *tenancy) core.Executable { return tn.callB },
+			act: func(t *testing.T, tn *tenancy, target core.Executable, armed *bool) *core.Schedule {
+				var late *core.Schedule
+				tn.services.Calls = lateCalls{tn.services.Calls, func(executable core.Executable) {
+					if late == nil {
+						late = tn.persistSchedule(t, executable)
+						*armed = true
+					}
+				}}
+
+				if rec := tn.do(http.MethodDelete, "/calls/"+ownerOf(target).GUID, "", tn.userB); rec.Code != http.StatusNoContent {
+					t.Errorf("status %d, body %s", rec.Code, rec.Body)
+				}
+				return late
+			},
+		},
+		{
+			name:   "orphan schedule delete",
+			target: func(tn *tenancy) core.Executable { return &core.Job{GUID: "gone-job"} },
+			act: func(t *testing.T, tn *tenancy, target core.Executable, armed *bool) *core.Schedule {
+				schedule := tn.persistSchedule(t, target)
+				*armed = true
+
+				expectResult(t, tn.deleteOrphans(t, schedule.GUID), schedule.GUID, "schedule", orphanFailed)
+				return schedule
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tn := newTenancy(t)
+			target := tt.target(tn)
+			armed := false
+			tn.services.Schedules = stuckSchedules{tn.services.Schedules, &armed}
+
+			schedule := tt.act(t, tn, target, &armed)
+			if schedule == nil {
+				t.Fatal("no schedule was stored")
+			}
+
+			expectUnscheduled(t, tn, schedule, target)
+		})
+	}
 }

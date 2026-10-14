@@ -451,7 +451,7 @@ func deleteOrphanSchedule(services *core.Services, tag, guid string) *orphanResu
 		return result
 	}
 
-	if err := workflows.DeletingASchedule(services, schedule, parent); err != nil {
+	if err := dropOrphanSchedule(services, schedule, parent); err != nil {
 		services.Logger.Error(tag, fmt.Sprintf("failed to delete schedule %s of %s %s: %v", guid, parent.Type(), schedule.RefGUID, err))
 		result.Result = orphanFailed
 		result.Message = "could not delete the schedule"
