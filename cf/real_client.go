@@ -35,6 +35,10 @@ func (r *RealCFClient) GetTask(ctx context.Context, guid string) (*resource.Task
 	return r.inner.Tasks.Get(ctx, guid)
 }
 
+func (r *RealCFClient) CancelTask(ctx context.Context, guid string) (*resource.Task, error) {
+	return r.inner.Tasks.Cancel(ctx, guid)
+}
+
 func (r *RealCFClient) ListUsers(ctx context.Context, opts *cfclient.UserListOptions) ([]*resource.User, error) {
 	return r.inner.Users.ListAll(ctx, opts)
 }

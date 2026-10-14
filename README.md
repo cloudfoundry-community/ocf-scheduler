@@ -498,7 +498,7 @@ If the database stays down through both rounds of retries, the execution can sta
 
 ### Tasks that never start
 
-The scheduler follows a job's Cloud Foundry task until it ends, but it waits only 15 minutes for a task that Cloud Controller still reports as `PENDING`. After that, it marks the execution `FAILED` with a message saying the task never started, and it stops following the task. It doesn't cancel the task, so Cloud Controller may still run it later, and the execution won't record how that run ends. A task that has started and is `RUNNING` has no time limit.
+The scheduler follows a job's Cloud Foundry task until it ends, but it waits only 15 minutes for a task that Cloud Controller still reports as `PENDING`. After that, it asks Cloud Controller to cancel the task, so that the task can't start later with nothing to record how it ends. Then it marks the execution `FAILED` with a message saying the task never started. If the cancel fails, the scheduler logs the error and adds it to that message, because Cloud Controller may then still run the task. A task that has started and is `RUNNING` has no time limit.
 
 ## API Reference
 

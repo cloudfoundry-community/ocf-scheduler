@@ -248,15 +248,26 @@ func TestRunService_ExecuteFollowsATaskUntilItFinishes(t *testing.T) {
 // stallingTaskClient creates a task in the first of states and reports the
 // next state on each GetTask, staying in the last one until after has
 // passed since the task was created, and then reports final. It gives up
-// with an error after maxReads, so a run that never stops polling ends.
+// with an error after maxReads, so a run that never stops polling ends. It
+// counts cancels and fails them with cancelErr when that is set.
 type stallingTaskClient struct {
 	*mock.CFClient
-	states   []string
-	after    time.Duration
-	final    string
-	created  time.Time
-	reads    int
-	maxReads int
+	states    []string
+	after     time.Duration
+	final     string
+	created   time.Time
+	reads     int
+	maxReads  int
+	cancels   int
+	cancelErr error
+}
+
+func (client *stallingTaskClient) CancelTask(_ context.Context, guid string) (*resource.Task, error) {
+	client.cancels++
+	if client.cancelErr != nil {
+		return nil, client.cancelErr
+	}
+	return &resource.Task{State: "CANCELING", Resource: resource.Resource{GUID: guid}}, nil
 }
 
 func (client *stallingTaskClient) CreateTask(_ context.Context, _ string, _ *resource.TaskCreate) (*resource.Task, error) {
@@ -276,9 +287,10 @@ func (client *stallingTaskClient) GetTask(_ context.Context, guid string) (*reso
 	return &resource.Task{State: state, Resource: resource.Resource{GUID: guid}}, nil
 }
 
-// A task that stays PENDING past the limit fails the execution with a
-// message saying it never started, while a task that is RUNNING has no
-// limit and is followed to its end.
+// A task that stays PENDING past the limit is cancelled, and the execution
+// fails with a message saying the task never started and whether the
+// cancel went through. A task that is RUNNING has no limit and is followed
+// to its end.
 func TestRunService_ExecuteLimitsHowLongATaskStaysPending(t *testing.T) {
 	defer cf.SetTaskPollInterval(time.Millisecond)()
 	defer cf.SetTaskPendingLimit(20 * time.Millisecond)()
@@ -288,12 +300,21 @@ func TestRunService_ExecuteLimitsHowLongATaskStaysPending(t *testing.T) {
 		client      *stallingTaskClient
 		wantState   string
 		wantMessage string
+		wantCancels int
 	}{
 		{
 			name:        "a task that never leaves pending",
 			client:      &stallingTaskClient{states: []string{"PENDING"}, maxReads: 1000},
 			wantState:   "FAILED",
-			wantMessage: "task task-guid for the job nightly (job-guid) never started",
+			wantMessage: "task task-guid for the job nightly (job-guid) never started, because it was still PENDING after 20ms, so the scheduler cancelled it",
+			wantCancels: 1,
+		},
+		{
+			name:        "a cancel that fails",
+			client:      &stallingTaskClient{states: []string{"PENDING"}, maxReads: 1000, cancelErr: errors.New("cloud controller unavailable")},
+			wantState:   "FAILED",
+			wantMessage: "the scheduler could not cancel it, so Cloud Controller may still run it: cloud controller unavailable",
+			wantCancels: 1,
 		},
 		{
 			name:      "a task that runs past the limit",
@@ -319,6 +340,9 @@ func TestRunService_ExecuteLimitsHowLongATaskStaysPending(t *testing.T) {
 			}
 			if !strings.Contains(execution.Message, tt.wantMessage) {
 				t.Errorf("execution message is %q, want it to contain %q", execution.Message, tt.wantMessage)
+			}
+			if tt.client.cancels != tt.wantCancels {
+				t.Errorf("the task was cancelled %d times, want %d", tt.client.cancels, tt.wantCancels)
 			}
 		})
 	}

@@ -99,20 +99,7 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 			task, err = service.waitForTask(services, task)
 			switch {
 			case errors.Is(err, errTaskNeverStarted):
-				// The task is left alone in Cloud Controller, which may still
-				// start it, but the run no longer waits for it.
-				service.qq(
-					services,
-					execution,
-					tag,
-					fmt.Sprintf(
-						"task %s for the job %s (%s) never started, because it was still PENDING after %s, so the scheduler stopped following it",
-						task.GUID,
-						job.Name,
-						job.GUID,
-						taskPendingLimit,
-					),
-				)
+				service.qq(services, execution, tag, service.cancelUnstartedTask(services, job, task, tag))
 			case err != nil:
 				// There is no task to finalize, so the failure is the outcome.
 				service.handleTaskFailure(services, execution, job, err)
@@ -209,6 +196,27 @@ func (service *RunService) waitForTask(services *core.Services, task *resource.T
 	}
 
 	return task, nil
+}
+
+// cancelUnstartedTask cancels a task that stayed PENDING past
+// taskPendingLimit, so that Cloud Controller cannot start it later with no
+// execution left to record its outcome. It returns the message for the
+// failed execution, which says whether the cancel went through.
+func (service *RunService) cancelUnstartedTask(services *core.Services, job *core.Job, task *resource.Task, tag string) string {
+	message := fmt.Sprintf(
+		"task %s for the job %s (%s) never started, because it was still PENDING after %s",
+		task.GUID,
+		job.Name,
+		job.GUID,
+		taskPendingLimit,
+	)
+
+	if _, err := service.client.CancelTask(context.Background(), task.GUID); err != nil {
+		services.Logger.Error(tag, fmt.Sprintf("cannot cancel task %s for the job %s (%s): %v", task.GUID, job.Name, job.GUID, err))
+		return fmt.Sprintf("%s, and the scheduler could not cancel it, so Cloud Controller may still run it: %v", message, err)
+	}
+
+	return message + ", so the scheduler cancelled it"
 }
 
 func (service *RunService) handleTaskFailure(services *core.Services, execution *core.Execution, job *core.Job, err error) error {

@@ -169,6 +169,26 @@ func (client *CFClient) fail(task *resource.Task) *resource.Task {
 	}
 }
 
+// CancelTask ends a known task as FAILED, as Cloud Controller does once a
+// cancel goes through, and returns it in the CANCELING state.
+func (client *CFClient) CancelTask(_ context.Context, guid string) (*resource.Task, error) {
+	client.locker.Lock()
+	defer client.locker.Unlock()
+
+	original, found := client.tasks[guid]
+	if !found {
+		return nil, fmt.Errorf("Task not found")
+	}
+
+	delete(client.retries, guid)
+	delete(client.maxretries, guid)
+	client.tasks[guid] = client.fail(original)
+
+	canceling := *client.tasks[guid]
+	canceling.State = "CANCELING"
+	return &canceling, nil
+}
+
 func (client *CFClient) GetTask(_ context.Context, guid string) (*resource.Task, error) {
 	client.locker.Lock()
 	defer client.locker.Unlock()
