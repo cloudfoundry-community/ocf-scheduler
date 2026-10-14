@@ -130,3 +130,36 @@ func TestDeleteOrphansDeletesSchedulesWhoseOwnerIsGone(t *testing.T) {
 	results = tn.deleteOrphans(t, orphans[0].GUID)
 	expectResult(t, results, orphans[0].GUID, "", "not_found")
 }
+
+// Orphan schedules never send a request to Cloud Controller, so they can be
+// listed and deleted when the scheduler's client lacks the app reader scope.
+// A request that names a job or call is still refused.
+func TestOrphanSchedulesNeedNoAppReaderScope(t *testing.T) {
+	tn := newTenancy(t)
+	orphans, _ := tn.persistOrphanSchedules(t)
+	tn.cf.SetClientScopes("cloud_controller.read")
+
+	// With no jobs or calls to check, the list asks about no app.
+	jobs, calls := tn.services.Jobs, tn.services.Calls
+	tn.services.Jobs, tn.services.Calls = noJobs{jobs}, noCalls{calls}
+	if listed := tn.listOrphanSchedules(t); len(listed) != 2 {
+		t.Errorf("listed %d orphan schedules, want 2", len(listed))
+	}
+	tn.services.Jobs, tn.services.Calls = jobs, calls
+
+	expectResult(t, tn.deleteOrphans(t, orphans[0].GUID), orphans[0].GUID, "schedule", orphanDeleted)
+
+	body := `{"guids": ["` + orphans[1].GUID + `", "` + tn.jobB.GUID + `"]}`
+	if rec := tn.do(http.MethodPost, "/orphans/delete", body, tn.admin); rec.Code != http.StatusInternalServerError {
+		t.Errorf("a delete naming a job: status %d, want %d, body %s", rec.Code, http.StatusInternalServerError, rec.Body)
+	}
+}
+
+// noJobs and noCalls list nothing, though their lookups still work.
+type noJobs struct{ core.JobService }
+
+func (noJobs) All() ([]*core.Job, error) { return nil, nil }
+
+type noCalls struct{ core.CallService }
+
+func (noCalls) All() ([]*core.Call, error) { return nil, nil }

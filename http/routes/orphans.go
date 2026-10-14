@@ -101,10 +101,6 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 			return c.JSON(status, "")
 		}
 
-		if status, message := requireAppReader(services, tag); status != 0 {
-			return c.JSON(status, message)
-		}
-
 		jobs, err := services.Jobs.All()
 		if err != nil {
 			services.Logger.Error(tag, fmt.Sprintf("error retrieving jobs: %v", err))
@@ -129,6 +125,14 @@ func ListOrphans(e *echo.Echo, services *core.Services) {
 		}
 		for _, call := range calls {
 			executables = append(executables, call)
+		}
+
+		// Only the jobs and calls send the list to Cloud Controller, so a
+		// list of orphan schedules alone works without the scope.
+		if len(executables) > 0 {
+			if status, message := requireAppReader(services, tag); status != 0 {
+				return c.JSON(status, message)
+			}
 		}
 
 		// Ask about each app once. Any answer but not-found fails the whole
@@ -238,8 +242,10 @@ func DeleteOrphans(e *echo.Echo, services *core.Services) {
 			return c.JSON(http.StatusBadRequest, requestError("guids_required", "name at least one job, call, or schedule GUID to delete"))
 		}
 
-		if status, message := requireAppReader(services, tag); status != 0 {
-			return c.JSON(status, message)
+		if asksCloudController(services, guids) {
+			if status, message := requireAppReader(services, tag); status != 0 {
+				return c.JSON(status, message)
+			}
 		}
 
 		output := &orphanResults{Results: make([]*orphanResult, 0, len(guids))}
@@ -316,6 +322,19 @@ func appsGone(ctx context.Context, services *core.Services, executables []core.E
 	}
 
 	return gone, nil
+}
+
+// asksCloudController reports whether deleting guids would ask Cloud
+// Controller about an app, which only a job or call does. A GUID whose
+// lookup fails counts, so the scope is checked whenever there is doubt.
+func asksCloudController(services *core.Services, guids []string) bool {
+	for _, guid := range guids {
+		if _, err := findExecutable(services, guid); !errors.Is(err, core.ErrNotFound) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // requireAppReader answers zero when the scheduler's own Cloud Controller
