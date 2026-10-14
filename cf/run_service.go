@@ -9,6 +9,10 @@ import (
 	"github.com/cloudfoundry/go-cfclient/v3/resource"
 )
 
+// taskPollInterval is how long waitForTask sleeps between asking Cloud
+// Controller for a running task's state.
+var taskPollInterval = 5 * time.Second
+
 type RunService struct {
 	client CFClient
 }
@@ -74,12 +78,13 @@ func (service *RunService) Execute(services *core.Services, execution *core.Exec
 
 			task, err = service.waitForTask(services, task)
 			if err != nil {
-				service.handleTaskFailure(services, execution, job, task, err)
+				// There is no task to finalize, so the failure is the outcome.
+				service.handleTaskFailure(services, execution, job, err)
+			} else {
+				services.Logger.Info(tag, fmt.Sprintf("task state before finalization: %s", task.State))
+
+				service.finalizeTask(services, execution, job, task)
 			}
-
-			services.Logger.Info(tag, fmt.Sprintf("task state before finalization: %s", task.State))
-
-			service.finalizeTask(services, execution, job, task)
 		}
 
 		finishmsg := fmt.Sprintf("Finishing job %s (%s)", job.Name, job.GUID)
@@ -101,13 +106,13 @@ func (service *RunService) waitForTask(services *core.Services, task *resource.T
 		// going
 
 		services.Logger.Info("wait-for-task", fmt.Sprintf("waiting for task %s, iteration %d", task.GUID, count))
-		time.Sleep(5 * time.Second)
+		time.Sleep(taskPollInterval)
 
 		updatedTask, err := service.client.GetTask(context.Background(), task.GUID)
 		if err != nil {
 			// Even though the task was created, the API now says that we don't
 			// get to know about it, so let's cry about it
-			return updatedTask, fmt.Errorf("api failure")
+			return nil, fmt.Errorf("api failure: %w", err)
 		}
 
 		services.Logger.Info("wait-for-task", fmt.Sprintf("got a task with state %s on iteration %d", updatedTask.State, count))
@@ -119,7 +124,7 @@ func (service *RunService) waitForTask(services *core.Services, task *resource.T
 	return task, nil
 }
 
-func (service *RunService) handleTaskFailure(services *core.Services, execution *core.Execution, job *core.Job, task *resource.Task, err error) error {
+func (service *RunService) handleTaskFailure(services *core.Services, execution *core.Execution, job *core.Job, err error) error {
 	tag := "cf-run-service"
 
 	if err == nil {
@@ -136,9 +141,9 @@ func (service *RunService) handleTaskFailure(services *core.Services, execution 
 			job.GUID,
 		),
 	)
+	services.Logger.Error(tag, fmt.Sprintf("specific error: %s", err.Error()))
 
 	return err
-
 }
 
 func (service *RunService) finalizeTask(services *core.Services, execution *core.Execution, job *core.Job, task *resource.Task) {
