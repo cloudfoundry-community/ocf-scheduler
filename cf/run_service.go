@@ -134,12 +134,25 @@ func (service *RunService) qq(services *core.Services, execution *core.Execution
 	services.Executions.Fail(execution)
 }
 
+// taskUnfinished reports whether a task in state may still change, so
+// waitForTask keeps polling it.
+func taskUnfinished(state string) bool {
+	switch state {
+	case "PENDING", "RUNNING", "CANCELING":
+		return true
+	}
+
+	return false
+}
+
+// waitForTask polls the task until it leaves the pending, running, and
+// canceling states, and returns it in the state it ended in.
 func (service *RunService) waitForTask(services *core.Services, task *resource.Task) (*resource.Task, error) {
 	count := 0
 
-	for task.State == "RUNNING" {
-		// oh hey, the task is running, so let's wait a bit and see how it's
-		// going
+	for taskUnfinished(task.State) {
+		// oh hey, the task is still going, so let's wait a bit and see how
+		// it's doing
 
 		services.Logger.Info("wait-for-task", fmt.Sprintf("waiting for task %s, iteration %d", task.GUID, count))
 		time.Sleep(taskPollInterval)
@@ -182,10 +195,23 @@ func (service *RunService) handleTaskFailure(services *core.Services, execution 
 	return err
 }
 
+// finalizeTask records how a finished task ended. Only SUCCEEDED counts as
+// success, and any state Cloud Controller adds later counts as a failure.
 func (service *RunService) finalizeTask(services *core.Services, execution *core.Execution, job *core.Job, task *resource.Task) {
 	tag := "cf-run-service"
 
-	if task.State == "FAILED" {
+	switch task.State {
+	case "SUCCEEDED":
+		// WE HAVE ACHIEVED A SUCCESSFUL TASK
+		message := fmt.Sprintf(
+			"task successfully completed for the job %s (%s)",
+			job.Name,
+			job.GUID,
+		)
+
+		services.Logger.Info(tag, message)
+		services.Executions.Success(execution)
+	case "FAILED":
 		services.Logger.Error(
 			tag,
 			fmt.Sprintf(
@@ -201,17 +227,17 @@ func (service *RunService) finalizeTask(services *core.Services, execution *core
 		}
 		services.Executions.UpdateMessage(execution, failureReason)
 		services.Executions.Fail(execution)
-
-		return
+	default:
+		service.qq(
+			services,
+			execution,
+			tag,
+			fmt.Sprintf(
+				"task for the job %s (%s) ended in the unknown state %s",
+				job.Name,
+				job.GUID,
+				task.State,
+			),
+		)
 	}
-
-	// WE HAVE ACHIEVED A SUCCESSFUL TASK
-	message := fmt.Sprintf(
-		"task successfully completed for the job %s (%s)",
-		job.Name,
-		job.GUID,
-	)
-
-	services.Logger.Info(tag, message)
-	services.Executions.Success(execution)
 }

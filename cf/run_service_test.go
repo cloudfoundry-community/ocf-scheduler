@@ -182,3 +182,65 @@ func TestRunService_ExecuteRetriesStoringTheTaskGUID(t *testing.T) {
 		})
 	}
 }
+
+// scriptedTaskClient creates a task in the first of states and reports the
+// rest, one per GetTask.
+type scriptedTaskClient struct {
+	*mock.CFClient
+	states []string
+	reads  int
+}
+
+func (client *scriptedTaskClient) CreateTask(_ context.Context, _ string, _ *resource.TaskCreate) (*resource.Task, error) {
+	return &resource.Task{State: client.states[0], Resource: resource.Resource{GUID: "task-guid"}}, nil
+}
+
+func (client *scriptedTaskClient) GetTask(_ context.Context, guid string) (*resource.Task, error) {
+	client.reads++
+	if client.reads >= len(client.states) {
+		return nil, errors.New("the task was read after it finished")
+	}
+	return &resource.Task{State: client.states[client.reads], Resource: resource.Resource{GUID: guid}}, nil
+}
+
+// The run waits while a task is pending, running, or canceling. Only a task
+// that succeeded counts as success, and a state the scheduler does not know
+// counts as a failure that names it.
+func TestRunService_ExecuteFollowsATaskUntilItFinishes(t *testing.T) {
+	defer cf.SetTaskPollInterval(time.Millisecond)()
+
+	tests := []struct {
+		name        string
+		states      []string
+		wantState   string
+		wantMessage string
+	}{
+		{name: "pending then succeeded", states: []string{"PENDING", "RUNNING", "SUCCEEDED"}, wantState: "SUCCEEDED"},
+		{name: "canceled", states: []string{"PENDING", "CANCELING", "FAILED"}, wantState: "FAILED"},
+		{name: "an unknown state", states: []string{"RUNNING", "MISPLACED"}, wantState: "FAILED", wantMessage: "MISPLACED"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := mock.NewCFClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			scripted := &scriptedTaskClient{CFClient: client, states: tt.states}
+			services, execution := newRunServices(t)
+			job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
+
+			cf.NewRunService(scripted).Execute(services, execution, job)
+
+			if want := len(tt.states) - 1; scripted.reads != want {
+				t.Errorf("the task was read %d times, want %d", scripted.reads, want)
+			}
+			if execution.State != tt.wantState {
+				t.Errorf("execution state is %q, want %q", execution.State, tt.wantState)
+			}
+			if !strings.Contains(execution.Message, tt.wantMessage) {
+				t.Errorf("execution message is %q, want it to name %q", execution.Message, tt.wantMessage)
+			}
+		})
+	}
+}
