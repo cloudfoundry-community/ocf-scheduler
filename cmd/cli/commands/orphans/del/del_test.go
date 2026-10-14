@@ -1,6 +1,7 @@
 package del
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -64,5 +65,20 @@ func TestDelFailsWhenAGUIDIsKept(t *testing.T) {
 
 	if err == nil || err.Error() != "1 of 1 were not deleted" {
 		t.Errorf("unexpected error %v", err)
+	}
+}
+
+func TestDelShowsARefusedSchedule(t *testing.T) {
+	var printed bytes.Buffer
+	Command.SetOut(&printed)
+	defer Command.SetOut(nil)
+
+	err := run(t, http.StatusOK, `{"results":[{"guid":"guid-1","type":"schedule","result":"parent_exists","message":"job job-1 exists"}]}`)
+
+	if err == nil || err.Error() != "1 of 1 were not deleted" {
+		t.Errorf("unexpected error %v", err)
+	}
+	if !strings.Contains(printed.String(), "parent_exists") || !strings.Contains(printed.String(), "job job-1 exists") {
+		t.Errorf("the output does not show the refusal:\n%s", printed.String())
 	}
 }

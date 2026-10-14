@@ -13,8 +13,9 @@ var Command = &cobra.Command{
 	Long: `Admin ops for jobs and calls whose app is gone
 
 These commands find and delete jobs and calls whose app Cloud Controller
-reports as not found. They need a token with cloud_controller.admin. Please
-see the Available Commands section below.`,
+reports as not found, and schedules whose job or call is no longer stored.
+They need a token with cloud_controller.admin. Please see the Available
+Commands section below.`,
 }
 
 func init() {

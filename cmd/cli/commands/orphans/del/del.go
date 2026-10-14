@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -20,18 +19,22 @@ type result struct {
 }
 
 var Command = &cobra.Command{
-	Use:   "del <job or call GUID>...",
-	Short: "Delete jobs and calls whose app is gone",
-	Long: `Delete jobs and calls whose app is gone
+	Use:   "del <job, call, or schedule GUID>...",
+	Short: "Delete jobs and calls whose app is gone, and schedules whose job or call is gone",
+	Long: `Delete jobs and calls whose app is gone, and schedules whose job or call is gone
 
 Deletes each named job or call, with its schedules, only when Cloud
 Controller reports its app as not found. It refuses any job or call whose
-app exists or could not be checked, and it fails if any GUID was not
-deleted.`,
+app exists or could not be checked.
+
+A schedule GUID from the list of orphan schedules is deleted only when its
+job or call is still gone, and it is refused with parent_exists otherwise.
+
+The command fails if any GUID was not deleted.`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			cmd.Help()
-			return fmt.Errorf("\nRequires at least one argument: <job or call GUID>")
+			return fmt.Errorf("\nRequires at least one argument: <job, call, or schedule GUID>")
 		}
 
 		return nil
@@ -60,7 +63,7 @@ deleted.`,
 			return err
 		}
 
-		writer := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', uint(0))
+		writer := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 3, ' ', uint(0))
 		fmt.Fprintln(writer, "GUID\tType\tResult\tMessage")
 		fmt.Fprintln(writer, "====\t====\t======\t=======")
 
