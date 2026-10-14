@@ -225,7 +225,7 @@ func (service *RunService) cancelUnstartedTask(services *core.Services, job *cor
 		services.Logger.Error(tag, fmt.Sprintf("cannot cancel task %s for the job %s (%s): %v", task.GUID, job.Name, job.GUID, err))
 
 		latest, getErr := service.client.GetTask(context.Background(), task.GUID)
-		if getErr == nil && (latest.State == "SUCCEEDED" || latest.State == "FAILED") {
+		if getErr == nil && latest != nil && (latest.State == "SUCCEEDED" || latest.State == "FAILED") {
 			return "", latest
 		}
 

@@ -355,6 +355,7 @@ type endingTaskClient struct {
 	*stallingTaskClient
 	afterCancel    string
 	afterCancelErr error
+	nilTask        bool
 }
 
 func (client *endingTaskClient) GetTask(ctx context.Context, guid string) (*resource.Task, error) {
@@ -364,6 +365,9 @@ func (client *endingTaskClient) GetTask(ctx context.Context, guid string) (*reso
 	client.reads++
 	if client.afterCancelErr != nil {
 		return nil, client.afterCancelErr
+	}
+	if client.nilTask {
+		return nil, nil
 	}
 	return &resource.Task{State: client.afterCancel, Resource: resource.Resource{GUID: guid}}, nil
 }
@@ -379,12 +383,14 @@ func TestRunService_ExecuteRecordsATaskThatEndedDuringTheCancel(t *testing.T) {
 		name        string
 		afterCancel string
 		lookupErr   error
+		nilTask     bool
 		wantState   string
 		wantMessage string
 	}{
 		{name: "the task succeeded", afterCancel: "SUCCEEDED", wantState: "SUCCEEDED"},
 		{name: "the task failed", afterCancel: "FAILED", wantState: "FAILED"},
 		{name: "the second lookup fails", lookupErr: errors.New("api down"), wantState: "FAILED", wantMessage: "Cloud Controller may still run it"},
+		{name: "the second lookup returns no task", nilTask: true, wantState: "FAILED", wantMessage: "Cloud Controller may still run it"},
 		{name: "the task is still pending", afterCancel: "PENDING", wantState: "FAILED", wantMessage: "Cloud Controller may still run it"},
 	}
 
@@ -398,6 +404,7 @@ func TestRunService_ExecuteRecordsATaskThatEndedDuringTheCancel(t *testing.T) {
 				stallingTaskClient: &stallingTaskClient{CFClient: client, states: []string{"PENDING"}, maxReads: 1000, cancelErr: errors.New("task already finished")},
 				afterCancel:        tt.afterCancel,
 				afterCancelErr:     tt.lookupErr,
+				nilTask:            tt.nilTask,
 			}
 			services, execution := newRunServices(t)
 			job := &core.Job{GUID: "job-guid", Name: "nightly", Command: "true", AppGUID: "app-guid"}
