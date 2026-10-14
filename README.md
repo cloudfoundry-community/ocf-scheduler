@@ -492,7 +492,7 @@ Before a job or call runs, the scheduler marks its execution as started. If the 
 
 When the scheduler skips a run, it notes why on the execution and then marks the execution `FAILED`, with the same retries. So the execution ends up `FAILED` whenever the database answers within that time, and its message says that the run was skipped.
 
-A manual run behaves the same way. `POST /jobs/:guid/execute` and `POST /calls/:guid/execute` answer `201 Created` with the new execution before the run starts, so the caller already holds the execution when the scheduler tries to start it. If the start fails, that execution moves from `PENDING` to `FAILED` as soon as the database allows it.
+A manual run behaves the same way. `POST /jobs/:guid/execute` and `POST /calls/:guid/execute` store the new execution as `PENDING`, queue the run, and answer `201 Created` with the execution as it was stored. The run goes on in the background, so the caller holds a `PENDING` execution whatever happens when the scheduler tries to start it. If the start fails, that execution moves from `PENDING` to `FAILED` as soon as the database allows it.
 
 If the database stays down through both rounds of retries, the execution can stay `PENDING` for good. The scheduler logs both errors with the execution's GUID, and the automatic cleanup of old executions leaves the row alone, because it removes only executions that succeeded or failed. We can find such an execution in the job's or call's history, and we can treat it as a run that never happened.
 

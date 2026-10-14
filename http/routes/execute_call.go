@@ -44,13 +44,17 @@ func ExecuteCall(e *echo.Echo, services *core.Services) {
 		input.RefGUID = guid
 		input.RefType = "call"
 
-		var execution *core.Execution
+		var answer *presenters.CallExecution
 		status, body = whileBound(services, tag, call.AppGUID, admin, func() (int, any) {
-			execution, err = services.Executions.Persist(input)
+			execution, err := services.Executions.Persist(input)
 			if err != nil {
 				services.Logger.Error(tag, fmt.Sprintf("failed to persist execution for call %s: %v", guid, err))
 				return http.StatusUnprocessableEntity, ""
 			}
+
+			// The answer copies the execution before the run is queued,
+			// because a worker may start writing to it at once.
+			answer = presenters.AsCallExecution(execution)
 
 			// Execute only queues the run, so it never holds the lock long.
 			services.Runner.Execute(services, execution, call)
@@ -62,9 +66,6 @@ func ExecuteCall(e *echo.Echo, services *core.Services) {
 		}
 		services.Logger.Info(tag, fmt.Sprintf("dispatched execution for call %s", guid))
 
-		return c.JSON(
-			http.StatusCreated,
-			presenters.AsCallExecution(execution),
-		)
+		return c.JSON(http.StatusCreated, answer)
 	})
 }
