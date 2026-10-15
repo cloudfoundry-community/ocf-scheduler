@@ -46,17 +46,23 @@
    assessed each time, and needing an understanding of the deployment.
 10. First-time setup, such as registering the service broker, belongs with
     the deployment docs, because a new foundation repeats it. That matches
-    the ITIL 4 deployment management practice.
+    the ITIL 4 deployment management practice. Each deployment level
+    documents its own part. The service README covers the scheduler
+    itself, including deploying it by hand. The BOSH release, the Genesis
+    kit, and any later packaging, such as a Kubernetes release, each cover
+    only what they add, and link to the level below for the rest.
+11. Any guide may have its own troubleshooting section, covering what its
+    own audience can see and fix. Its heading names that scope, such as
+    "Troubleshooting jobs and calls", so it stays unique across the docs.
+12. The guides describe the scheduler itself. When a procedure has a step
+    that depends on how the scheduler was deployed, such as redeploying
+    with BOSH, it links to that deployment level's docs for the step.
 
 ## Open questions
 
 - Whether the user guide needs a tutorial.
 - Cron expressions: explain them in concepts, or point to the plugin's
   [cron expression reference](https://github.com/cloudfoundry-community/ocf-scheduler-cf-plugin/blob/develop/cron-expression-reference.md).
-- Whether troubleshooting stays a part of the operator guide or becomes a
-  guide of its own. The kit already has a troubleshooting page.
-- Which deployment docs hold first-time setup: the service README, or the
-  boshrelease and kit docs. The kit already has a post-deployment page.
 - Build tooling, deferred until the first PDF or book is needed.
 - README sections that belong in the operator guide, and a pointer from the
   README to these docs, both agreed with the README's maintainers.

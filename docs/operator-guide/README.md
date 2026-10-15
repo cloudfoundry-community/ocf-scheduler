@@ -3,7 +3,7 @@
 For the teams that run the scheduler once it is deployed. Each procedure
 starts with a **Requires:** line that names the access it needs.
 First-time setup, such as registering the service broker, is in the
-deployment docs.
+deployment docs for each way of deploying the scheduler.
 
 ## Contents
 
