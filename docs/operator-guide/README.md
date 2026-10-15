@@ -2,24 +2,41 @@
 
 For the teams that run the scheduler once it is deployed. Each procedure
 starts with a **Requires:** line that names the access it needs.
+First-time setup, such as registering the service broker, is in the
+deployment docs.
 
 ## Contents
 
 - Concepts (included from [Concepts](../concepts/README.md))
 
+### How the scheduler runs
+
+Background that operators need and users don't. Planned:
+
+- Where time zone data comes from
+- Running one instance or several
+- The worker pool
+- Database migrations
+
 ### Routine operations
 
-Repeatable tasks that follow a set procedure. Planned:
+Working with the running system without changing the deployment.
+Planned:
 
 - Checking health and reading logs
-- Executions that stay PENDING, and tasks that never start
 - Finding and removing orphaned jobs, calls, and schedules
 
 ### Planned changes
 
-Changes that need an understanding of the deployment. Planned:
+Changing an existing deployment. Planned:
 
-- Registering the service broker
 - Upgrading, and rolling back
-- Running more than one instance
-- Where time zone data comes from
+- Scaling
+- Updating time zone data
+
+### Troubleshooting
+
+Diagnosing and recovering. Planned:
+
+- Executions that stay PENDING
+- Tasks that never start

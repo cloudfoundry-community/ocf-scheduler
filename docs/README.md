@@ -31,16 +31,32 @@
    access it needs, such as a CF admin token, `psql` access to the
    scheduler's database, or BOSH director access. It names the access, not
    a team.
-9. The operator guide has two parts, named after the ITIL change types.
-   *Routine operations* are standard changes: pre-approved, low risk, and
-   done by a set procedure. *Planned changes* are normal changes: assessed
-   each time, and needing an understanding of the deployment.
+9. The operator guide has four parts after the concepts, and each one
+   matches an ITIL 4 management practice:
+
+   | Part | Holds | ITIL 4 practice |
+   |---|---|---|
+   | *How the scheduler runs* | Background that operators need and users don't, such as where time zone data comes from, running one instance or several, the worker pool, and migrations | Knowledge management |
+   | *Routine operations* | Working with the running system without changing the deployment, such as checking health, reading logs, and cleaning up orphans | Service request management; monitoring and event management |
+   | *Planned changes* | Changing an existing deployment, such as upgrading, rolling back, scaling, and updating time zone data | Change enablement |
+   | *Troubleshooting* | Diagnosing and recovering, such as executions that stay PENDING and tasks that never start. An emergency links to the planned-change procedure it uses, so each procedure is written once | Incident management; problem management |
+
+   *Routine operations* are ITIL standard changes: pre-approved, low risk,
+   and done by a set procedure. *Planned changes* are ITIL normal changes:
+   assessed each time, and needing an understanding of the deployment.
+10. First-time setup, such as registering the service broker, belongs with
+    the deployment docs, because a new foundation repeats it. That matches
+    the ITIL 4 deployment management practice.
 
 ## Open questions
 
 - Whether the user guide needs a tutorial.
 - Cron expressions: explain them in concepts, or point to the plugin's
   [cron expression reference](https://github.com/cloudfoundry-community/ocf-scheduler-cf-plugin/blob/develop/cron-expression-reference.md).
+- Whether troubleshooting stays a part of the operator guide or becomes a
+  guide of its own. The kit already has a troubleshooting page.
+- Which deployment docs hold first-time setup: the service README, or the
+  boshrelease and kit docs. The kit already has a post-deployment page.
 - Build tooling, deferred until the first PDF or book is needed.
 - README sections that belong in the operator guide, and a pointer from the
   README to these docs, both agreed with the README's maintainers.
