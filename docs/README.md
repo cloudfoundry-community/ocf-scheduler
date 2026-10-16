@@ -60,7 +60,9 @@
 
 ## Open questions
 
-- Whether the user guide needs a tutorial.
+- What form the user guide's tutorial takes. It will have one, and it
+  could be an exercise that walks through the commands, the user guide's
+  own examples, a script to run, or something else.
 - Cron expressions: explain them in concepts, or point to the plugin's
   [cron expression reference](https://github.com/cloudfoundry-community/ocf-scheduler-cf-plugin/blob/develop/cron-expression-reference.md).
 - Build tooling, deferred until the first PDF or book is needed.

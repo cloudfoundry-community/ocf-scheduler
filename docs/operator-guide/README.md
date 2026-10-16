@@ -23,6 +23,7 @@ Background that operators need and users don't. Planned:
 Working with the running system without changing the deployment.
 Planned:
 
+- [Connecting to the scheduler's database](database-access.md)
 - Checking health and reading logs
 - Finding and removing orphaned jobs, calls, and schedules
 
