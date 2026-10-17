@@ -740,4 +740,9 @@ Issues and pull requests are welcome at [github.com/cloudfoundry-community/ocf-s
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE.md).
+This project is licensed under either of these, at your option:
+
+- [MIT License](LICENSE.md)
+- [Apache License, Version 2.0](LICENSE-APACHE)
+
+See [NOTICE](NOTICE) for the copyright notices.
