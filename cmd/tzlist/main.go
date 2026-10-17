@@ -183,6 +183,9 @@ func main() {
 
 		fmt.Fprintf(os.Stderr, "OPTIONS:\n")
 		pflag.PrintDefaults()
+
+		fmt.Fprintf(os.Stderr, "\nThe following applies to the rfc9636 directory tree only:\n\n")
+		fmt.Fprint(os.Stderr, rfc9636.License)
 	}
 	logLevels := map[string]slog.Level{
 		"t": LevelTrace, "trace": LevelTrace,
