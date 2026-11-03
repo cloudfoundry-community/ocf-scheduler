@@ -10,7 +10,7 @@ require (
 	github.com/fivetwenty-io/osbapi/v2 v2.0.5
 	github.com/gammazero/workerpool v1.2.1
 	github.com/google/uuid v1.6.0
-	github.com/labstack/echo/v4 v4.15.4
+	github.com/labstack/echo/v4 v4.16.3
 	github.com/lib/pq v1.12.3
 	github.com/netresearch/go-cron v0.16.1
 	github.com/rubenv/sql-migrate v1.8.1
@@ -19,7 +19,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.22.0
+	golang.org/x/sync v0.23.0
 	gopkg.in/khaiql/dbcleaner.v2 v2.3.0
 )
 
@@ -52,10 +52,10 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.53.0 // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
